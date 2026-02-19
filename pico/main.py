@@ -2,7 +2,7 @@
 REIP Robot - Pi Pico Motor Controller
 MicroPython firmware for motor PWM and encoder reading
 
-Pin Configuration (matches Clanker-1 hardware):
+Pin Configuration (matches clanker1 hardware):
 - Motor L: GP18, GP19 (via DRV8833 AIN1/AIN2)
 - Motor R: GP20, GP21 (via DRV8833 BIN1/BIN2)
 - Encoder L: GP3 (A), GP4 (B)
@@ -39,7 +39,7 @@ UART_TX = 0       # GP0 -> Pi Zero RX
 UART_RX = 1       # GP1 <- Pi Zero TX
 
 # PWM frequency
-PWM_FREQ = 1000   # 1kHz - audible but works well with your motors
+PWM_FREQ = 20000  # 20kHz - above human hearing (no hum)
 
 # Motor direction inversion (set True if wheel spins backwards)
 INVERT_LEFT = True   # Your left motor needs inversion
@@ -255,7 +255,7 @@ def main():
     last_cmd_time = time.ticks_ms()
     motors_active = False
     
-    print("REIP Pico Ready - Clanker-1")
+    print("REIP Pico Ready - clanker1")
     
     # Input buffer
     buffer = ""

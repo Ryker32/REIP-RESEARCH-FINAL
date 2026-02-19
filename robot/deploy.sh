@@ -4,7 +4,7 @@
 
 set -e
 
-HOST="${1:-clanker-1.local}"
+HOST="${1:-clanker1.local}"
 ROBOT_ID="${2:-0}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 

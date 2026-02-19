@@ -21,15 +21,15 @@ Or use Thonny:
 **Option A: Manual copy**
 ```bash
 # From your computer
-scp reip_controller.py pi@clanker-1.local:~/
-scp test_hardware_quick.py pi@clanker-1.local:~/
-scp requirements.txt pi@clanker-1.local:~/
+scp reip_controller.py pi@clanker1.local:~/
+scp test_hardware_quick.py pi@clanker1.local:~/
+scp requirements.txt pi@clanker1.local:~/
 ```
 
 **Option B: Using deploy script (Linux/Mac)**
 ```bash
 chmod +x deploy.sh
-./deploy.sh clanker-1.local 0
+./deploy.sh clanker1.local 0
 ```
 
 ### 3. Install Dependencies

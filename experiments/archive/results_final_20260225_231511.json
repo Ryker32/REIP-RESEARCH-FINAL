@@ -1,0 +1,53 @@
+[
+  {
+    "name": "open_reip_BadLeader_t1",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "open",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 100.0,
+    "time_to_80": 33.70345950126648,
+    "time_to_detection": 2.249589681625366,
+    "time_to_first_suspicion": 0.3654935359954834,
+    "num_leader_changes": 9,
+    "false_positives": 0,
+    "coverage_at_90s": 100.0,
+    "coverage_timeline": []
+  },
+  {
+    "name": "open_raft_BadLeader_t1",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "open",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 72.91666666666666,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 58.854166666666664,
+    "coverage_timeline": []
+  },
+  {
+    "name": "open_decentralized_BadLeader_t1",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "open",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 100.0,
+    "time_to_80": 65.62934756278992,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 100.0,
+    "coverage_timeline": []
+  }
+]

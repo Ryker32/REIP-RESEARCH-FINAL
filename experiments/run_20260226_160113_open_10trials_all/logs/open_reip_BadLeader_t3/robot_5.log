@@ -1,0 +1,125 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 5 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_5_20260226_161230.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 6105
+[INFO] Peer socket listening on port 6205
+[INFO] Fault socket listening on port 6305
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 5
+[R5] pos=(0,0) state=leader leader=5 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R5] pos=(1394,544) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R5] pos=(1534,317) state=follower leader=1 trust=1.00 susp=0.00 cov=4.2%/13.0%
+[R5] pos=(1430,75) state=follower leader=1 trust=1.00 susp=0.00 cov=6.2%/20.8%
+[R5] pos=(1752,75) state=follower leader=1 trust=1.00 susp=0.00 cov=8.3%/29.7%
+[R5] pos=(1875,193) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/37.0%
+[R5] pos=(1690,438) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/46.9%
+[R5] pos=(1925,679) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/57.3%
+[R5] pos=(1894,1009) state=follower leader=1 trust=1.00 susp=0.00 cov=18.2%/73.4%
+[R5] pos=(1640,1140) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/83.3%
+[R5] pos=(1538,1309) state=follower leader=1 trust=1.00 susp=0.00 cov=24.0%/90.6%
+[R5] pos=(1925,1316) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/98.4%
+[R5] pos=(1709,402) state=follower leader=1 trust=1.00 susp=0.00 cov=27.6%/100.0%
+[R5] pos=(1686,304) state=follower leader=1 trust=1.00 susp=0.00 cov=28.1%/100.0%
+[R5] pos=(1686,304) state=follower leader=1 trust=1.00 susp=0.00 cov=28.1%/100.0%
+[R5] pos=(1686,304) state=follower leader=1 trust=1.00 susp=0.00 cov=28.1%/100.0%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00
+[R5] pos=(1686,304) state=follower leader=1 trust=1.00 susp=1.00 cov=28.1%/100.0%
+[TRUST] Bad command #2 (peer_reported): suspicion +0.30 = 1.30
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 2.30
+[DETECT] First trust decay after 3 bad commands (0.42s) [Theoretical bound: T1=2, T3=8]
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.80
+[TRUST] Bad command #4 (peer_reported): suspicion +0.30 = 1.10
+[TRUST] Bad command #5 (peer_reported): suspicion +0.30 = 1.40
+[TRUST] Bad command #6 (peer_reported): suspicion +0.30 = 1.70
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.20
+[TRUST] Bad command #7 (peer_reported): suspicion +0.30 = 0.50
+[TRUST] Bad command #8 (peer_reported): suspicion +0.30 = 0.80
+[TRUST] Bad command #9 (peer_reported): suspicion +0.30 = 1.10
+[TRUST] Bad command #10 (peer_reported): suspicion +0.30 = 1.40
+[R5] pos=(1295,819) state=follower leader=1 trust=0.60 susp=1.40 cov=30.2%/100.0%
+[TRUST] Bad command #11 (peer_reported): suspicion +0.30 = 1.70
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.20
+[TRUST] Bad command #12 (personal_visited): suspicion +1.00 = 1.20
+[TRUST] Bad command #13 (personal_visited): suspicion +1.00 = 2.20
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.70
+[TRUST] Bad command #14 (personal_visited): suspicion +1.00 = 1.70
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.20
+[TRUST] Bad command #15 (peer_reported): suspicion +0.30 = 0.50
+[TRUST] Bad command #16 (peer_reported): suspicion +0.30 = 0.80
+[TRUST] Bad command #17 (peer_reported): suspicion +0.30 = 1.10
+[TRUST] Bad command #18 (peer_reported): suspicion +0.30 = 1.40
+[TRUST] Bad command #19 (peer_reported): suspicion +0.30 = 1.70
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.20
+[TRUST] Bad command #20 (peer_reported): suspicion +0.30 = 0.50
+[DETECT] IMPEACHMENT after 20 bad commands, 4.03s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.10), excluding leader 1 from candidates
+[ELECTION] Leader 1 impeached (failures=1)
+[ELECTION] New leader: 2
+[R5] pos=(877,1425) state=follower leader=2 trust=1.00 susp=0.00 cov=34.4%/100.0%
+[R5] pos=(808,487) state=follower leader=2 trust=1.00 susp=0.00 cov=38.5%/100.0%
+[R5] pos=(811,385) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(810,400) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%
+[R5] pos=(813,299) state=follower leader=2 trust=1.00 susp=0.00 cov=39.1%/100.0%

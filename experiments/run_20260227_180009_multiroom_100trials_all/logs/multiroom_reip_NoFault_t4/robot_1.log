@@ -1,0 +1,36 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260227_180417.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 12101
+[INFO] Peer socket listening on port 12201
+[INFO] Fault socket listening on port 12301
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 1
+[R1] pos=(0,0) state=leader leader=1 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(437,652) state=leader leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(226,590) state=leader leader=1 trust=1.00 susp=0.00 cov=2.6%/10.9%
+[R1] pos=(75,829) state=leader leader=1 trust=1.00 susp=0.00 cov=4.7%/20.8%
+[R1] pos=(254,1223) state=leader leader=1 trust=1.00 susp=0.00 cov=7.8%/30.2%
+[R1] pos=(626,1394) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/38.0%
+[R1] pos=(1038,1277) state=leader leader=1 trust=1.00 susp=0.00 cov=14.1%/42.2%
+[R1] pos=(1089,955) state=leader leader=1 trust=1.00 susp=0.00 cov=17.2%/49.0%
+[R1] pos=(1395,683) state=leader leader=1 trust=1.00 susp=0.00 cov=20.3%/57.8%
+[R1] pos=(1604,371) state=leader leader=1 trust=1.00 susp=0.00 cov=24.0%/65.1%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=27.6%/71.4%
+[R1] pos=(1562,195) state=leader leader=1 trust=1.00 susp=0.00 cov=29.2%/74.5%
+[R1] pos=(1311,75) state=leader leader=1 trust=1.00 susp=0.00 cov=30.7%/77.6%
+[R1] pos=(1076,320) state=leader leader=1 trust=1.00 susp=0.00 cov=33.9%/82.8%
+[R1] pos=(1147,541) state=leader leader=1 trust=1.00 susp=0.00 cov=35.9%/85.9%
+[R1] pos=(1249,512) state=leader leader=1 trust=1.00 susp=0.00 cov=35.9%/86.5%
+[R1] pos=(1249,512) state=leader leader=1 trust=1.00 susp=0.00 cov=35.9%/86.5%
+[R1] pos=(1249,512) state=leader leader=1 trust=1.00 susp=0.00 cov=35.9%/86.5%

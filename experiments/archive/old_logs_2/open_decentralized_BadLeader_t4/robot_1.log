@@ -1,0 +1,31 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260226_001136.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 7101
+[INFO] Peer socket listening on port 7201
+[INFO] Fault socket listening on port 7301
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R1] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(856,660) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(633,686) state=exploring leader=None trust=1.00 susp=0.00 cov=1.0%/6.8%
+[R1] pos=(408,687) state=exploring leader=None trust=1.00 susp=0.00 cov=2.1%/10.9%
+[R1] pos=(158,687) state=exploring leader=None trust=1.00 susp=0.00 cov=3.1%/16.7%
+[R1] pos=(194,803) state=exploring leader=None trust=1.00 susp=0.00 cov=4.2%/20.8%
+[R1] pos=(166,1014) state=exploring leader=None trust=1.00 susp=0.00 cov=5.2%/25.0%
+[R1] pos=(75,1217) state=exploring leader=None trust=1.00 susp=0.00 cov=6.2%/29.2%
+[R1] pos=(147,1395) state=exploring leader=None trust=1.00 susp=0.00 cov=7.8%/33.9%
+[R1] pos=(354,1329) state=exploring leader=None trust=1.00 susp=0.00 cov=8.9%/37.0%
+[R1] pos=(455,1415) state=exploring leader=None trust=1.00 susp=0.00 cov=9.9%/40.1%
+[R1] pos=(504,1425) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/41.1%
+[R1] pos=(504,1425) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/41.1%

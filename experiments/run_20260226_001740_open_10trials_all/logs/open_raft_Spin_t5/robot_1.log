@@ -1,0 +1,90 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 1 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_1_20260226_002151.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 18101
+[INFO] Peer socket listening on port 18201
+[INFO] Fault socket listening on port 18301
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R1] state=follower leader=None term=0 cov=0.0%/0.0%
+[RAFT] Starting election, term 1
+[RAFT] Became leader, term 1
+[R1] state=leader leader=1 term=1 cov=0.5%/2.6%
+[R1] state=leader leader=1 term=1 cov=0.5%/4.7%
+[R1] state=leader leader=1 term=1 cov=1.0%/7.8%
+[R1] state=leader leader=1 term=1 cov=2.1%/13.0%
+[R1] state=leader leader=1 term=1 cov=2.6%/15.6%
+[R1] state=leader leader=1 term=1 cov=3.6%/20.3%
+[R1] state=leader leader=1 term=1 cov=4.7%/22.9%
+[R1] state=leader leader=1 term=1 cov=4.7%/24.5%
+[R1] state=leader leader=1 term=1 cov=5.2%/26.6%
+[R1] state=leader leader=1 term=1 cov=5.2%/27.6%
+[R1] state=leader leader=1 term=1 cov=5.7%/29.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[R1] state=leader leader=1 term=1 cov=5.7%/30.7%
+[FAULT] Injected: spin
+[R1] state=leader leader=1 term=1 cov=6.2%/32.3%
+[R1] state=leader leader=1 term=1 cov=6.2%/34.4%
+[R1] state=leader leader=1 term=1 cov=6.2%/35.9%
+[R1] state=leader leader=1 term=1 cov=6.2%/39.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/40.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/41.1%
+[R1] state=leader leader=1 term=1 cov=6.2%/42.2%
+[R1] state=leader leader=1 term=1 cov=6.2%/43.2%
+[R1] state=leader leader=1 term=1 cov=6.2%/43.2%
+[R1] state=leader leader=1 term=1 cov=6.2%/43.2%
+[R1] state=leader leader=1 term=1 cov=6.2%/43.2%
+[R1] state=leader leader=1 term=1 cov=6.2%/43.2%
+[R1] state=leader leader=1 term=1 cov=6.8%/44.8%
+[R1] state=leader leader=1 term=1 cov=6.8%/45.8%
+[R1] state=leader leader=1 term=1 cov=6.8%/45.8%
+[R1] state=leader leader=1 term=1 cov=6.8%/47.9%
+[R1] state=leader leader=1 term=1 cov=6.8%/48.4%
+[R1] state=leader leader=1 term=1 cov=6.8%/48.4%
+[R1] state=leader leader=1 term=1 cov=6.8%/49.0%
+[R1] state=leader leader=1 term=1 cov=6.8%/50.0%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%
+[R1] state=leader leader=1 term=1 cov=6.8%/52.6%

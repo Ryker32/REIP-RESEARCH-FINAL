@@ -1,0 +1,41 @@
+REIP Experiment Run: run_20260226_170838_open_10trials_all
+Date: 2026-02-26 17:19
+Layouts: ['open']
+Conditions: 9
+Trials per condition: 10
+Total experiments: 90
+Workers: 22
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+open       decentralized  bad_leader    10     93.0+/-15.2   30.4+/-35.3   27.3+/-31.9   26.1+/-29.2             N/A             N/A     0%   0.0      87.6
+open       decentralized  none          10      96.5+/-7.6   25.1+/-26.2   27.4+/-26.4   24.4+/-16.2             N/A             N/A     0%   0.0      94.5
+open       decentralized  spin          10      96.7+/-9.8   20.2+/-31.6   24.7+/-31.6   20.3+/-10.0             N/A             N/A     0%   0.0      89.8
+open       raft           bad_leader    10     90.0+/-25.2   23.6+/-31.4   26.0+/-31.4   30.6+/-31.2             N/A             N/A     0%   0.0      82.0
+open       raft           none          10     100.0+/-0.0   26.0+/-32.2   31.2+/-34.9   45.4+/-39.9             N/A             N/A     0%   0.0      91.2
+open       raft           spin          10     100.0+/-0.0   32.2+/-30.2   40.7+/-31.8   46.9+/-33.1             N/A             N/A     0%   0.0      99.3
+open       reip           bad_leader    10     91.3+/-24.2     9.5+/-2.9    11.8+/-2.8   20.7+/-14.9     0.32+/-0.10     2.38+/-0.41   100%   0.0      91.3
+open       reip           none          10     100.0+/-0.0   24.2+/-27.8   28.5+/-32.1   33.0+/-31.8             N/A             N/A     0%   0.0      94.6
+open       reip           spin          10     100.0+/-0.0    12.6+/-7.2   16.2+/-10.4   20.6+/-11.0             N/A             N/A     0%   0.0     100.0
+========================================================================================================================
+
+KEY COMPARISONS:
+
+  [open] Bad Leader — REIP vs RAFT:
+    Coverage: REIP 91.3% vs RAFT 90.0% (+1.3pp advantage)
+    REIP: First suspicion in 0.32s, full impeachment in 2.38s
+    RAFT detection: 0% rate (never detects)
+    REIP vs Decentralized: -1.7pp coverage (REIP 91.3% vs Dec 93.0%)
+    REIP resilience: clean=100.0%, fault=91.3% (only 8.7pp penalty from fault)
+
+  [open] Time-to-Coverage Milestones:
+    decentralized           50%:   25.1s  60%:   27.4s  80%:   24.4s
+    decentralized(fault)    50%:   30.4s  60%:   27.3s  80%:   26.1s
+    raft                    50%:   26.0s  60%:   31.2s  80%:   45.4s
+    raft(fault)             50%:   23.6s  60%:   26.0s  80%:   30.6s
+    reip                    50%:   24.2s  60%:   28.5s  80%:   33.0s
+    reip(fault)             50%:    9.5s  60%:   11.8s  80%:   20.7s

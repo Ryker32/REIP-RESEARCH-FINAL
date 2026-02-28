@@ -1,0 +1,81 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260226_212047.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 26101
+[INFO] Peer socket listening on port 26201
+[INFO] Fault socket listening on port 26301
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R1] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(725,1323) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(212,1112) state=exploring leader=None trust=1.00 susp=0.00 cov=3.6%/18.2%
+[R1] pos=(562,777) state=exploring leader=None trust=1.00 susp=0.00 cov=6.8%/33.3%
+[R1] pos=(840,854) state=exploring leader=None trust=1.00 susp=0.00 cov=9.4%/45.3%
+[R1] pos=(903,771) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/47.9%
+[R1] pos=(903,729) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/47.9%
+[FAULT] BAD_LEADER mode activated - will send bad assignments
+[R1] pos=(903,727) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/51.0%
+[R1] pos=(903,776) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/52.1%
+[R1] pos=(903,628) state=exploring leader=None trust=1.00 susp=0.00 cov=10.4%/54.7%
+[R1] pos=(902,477) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/57.3%
+[R1] pos=(902,452) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/59.4%
+[R1] pos=(902,438) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/60.9%
+[R1] pos=(902,438) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/60.9%
+[R1] pos=(902,438) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/60.9%
+[R1] pos=(902,438) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/60.9%
+[R1] pos=(903,611) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/61.5%
+[FAULT] BAD_LEADER mode activated - will send bad assignments
+[R1] pos=(903,563) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/64.6%
+[R1] pos=(902,568) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/68.2%
+[R1] pos=(901,554) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/71.4%
+[R1] pos=(901,561) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/71.9%
+[R1] pos=(901,561) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/71.9%
+[R1] pos=(901,611) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/73.4%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(901,575) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/74.0%
+[R1] pos=(902,565) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/77.6%
+[R1] pos=(901,580) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/79.7%
+[R1] pos=(900,562) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/84.4%
+[R1] pos=(900,580) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/87.0%
+[R1] pos=(900,562) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/89.6%
+[R1] pos=(900,671) state=exploring leader=None trust=1.00 susp=0.00 cov=11.5%/92.7%

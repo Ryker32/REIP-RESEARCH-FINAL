@@ -1,0 +1,35 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 4 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_4_20260227_180418.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 8104
+[INFO] Peer socket listening on port 8204
+[INFO] Fault socket listening on port 8304
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R4] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R4] pos=(300,404) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R4] pos=(75,79) state=exploring leader=None trust=1.00 susp=0.00 cov=3.1%/12.0%
+[R4] pos=(656,75) state=exploring leader=None trust=1.00 susp=0.00 cov=6.2%/18.2%
+[R4] pos=(923,261) state=exploring leader=None trust=1.00 susp=0.00 cov=8.3%/24.0%
+[R4] pos=(804,813) state=exploring leader=None trust=1.00 susp=0.00 cov=10.9%/31.8%
+[R4] pos=(437,1112) state=exploring leader=None trust=1.00 susp=0.00 cov=13.5%/39.6%
+[R4] pos=(580,1423) state=exploring leader=None trust=1.00 susp=0.00 cov=15.6%/44.3%
+[R4] pos=(580,1423) state=exploring leader=None trust=1.00 susp=0.00 cov=15.6%/44.3%
+[R4] pos=(580,1423) state=exploring leader=None trust=1.00 susp=0.00 cov=15.6%/44.3%
+[R4] pos=(681,1151) state=exploring leader=None trust=1.00 susp=0.00 cov=16.7%/45.8%
+[R4] pos=(687,1076) state=exploring leader=None trust=1.00 susp=0.00 cov=17.2%/46.9%
+[R4] pos=(761,1068) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%
+[R4] pos=(761,1068) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%
+[R4] pos=(761,1068) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%
+[R4] pos=(761,1068) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%
+[R4] pos=(761,1068) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%

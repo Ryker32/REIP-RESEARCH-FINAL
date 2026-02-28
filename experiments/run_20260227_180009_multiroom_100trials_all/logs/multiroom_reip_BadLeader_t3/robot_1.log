@@ -1,0 +1,71 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260227_180416.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 6101
+[INFO] Peer socket listening on port 6201
+[INFO] Fault socket listening on port 6301
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 1
+[R1] pos=(0,0) state=leader leader=1 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(597,525) state=leader leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(298,698) state=leader leader=1 trust=1.00 susp=0.00 cov=3.1%/14.1%
+[R1] pos=(75,1022) state=leader leader=1 trust=1.00 susp=0.00 cov=6.8%/23.4%
+[R1] pos=(397,1318) state=leader leader=1 trust=1.00 susp=0.00 cov=10.4%/31.2%
+[R1] pos=(691,1238) state=leader leader=1 trust=1.00 susp=0.00 cov=13.5%/42.2%
+[R1] pos=(920,934) state=leader leader=1 trust=1.00 susp=0.00 cov=16.7%/47.9%
+[FAULT] BAD_LEADER mode activated - will send bad assignments
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[R1] pos=(925,345) state=leader leader=1 trust=1.00 susp=0.00 cov=19.3%/49.0%
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(937.5, 187.5), (437.5, 1312.5), (687.5, 187.5)]...
+[ELECTION] New leader: 2
+[R1] pos=(924,199) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/49.0%
+[R1] pos=(925,181) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/51.0%
+[R1] pos=(925,183) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/54.2%
+[R1] pos=(925,181) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/58.9%
+[R1] pos=(924,194) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/63.5%
+[R1] pos=(923,200) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/69.3%
+[R1] pos=(923,197) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/72.9%
+[R1] pos=(923,183) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/77.1%
+[R1] pos=(924,197) state=follower leader=2 trust=1.00 susp=0.00 cov=19.8%/80.2%
+[TRUST] Bad command #1 (peer_reported): suspicion +0.30 = 0.30 omega=0.143
+[TRUST] Bad command #2 (peer_reported): suspicion +0.30 = 0.60 omega=0.130
+[TRUST] Bad command #3 (peer_reported): suspicion +0.30 = 0.90 omega=0.129
+[TRUST] Bad command #4 (peer_reported): suspicion +0.30 = 1.20 omega=0.123
+[TRUST] Bad command #5 (peer_reported): suspicion +0.30 = 1.50 omega=0.119
+[DETECT] First trust decay after 5 bad commands (0.83s) [Theoretical bound: T1=2, T3=8]
+[CLASSIFY] Fault type: byzantine_assignment (omega=0.119, threshold=0.785)
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.00, omega=0.119, class=byzantine_assignment
+[TRUST] Bad command #6 (peer_reported): suspicion +0.30 = 0.30 omega=0.119
+[TRUST] Bad command #7 (peer_reported): suspicion +0.30 = 0.60 omega=0.112
+[TRUST] Bad command #8 (peer_reported): suspicion +0.30 = 0.90 omega=0.108
+[TRUST] Bad command #9 (peer_reported): suspicion +0.30 = 1.20 omega=0.032
+[TRUST] Bad command #10 (peer_reported): suspicion +0.30 = 1.50 omega=0.034
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.00, omega=0.034, class=byzantine_assignment
+[R1] pos=(924,456) state=follower leader=2 trust=0.60 susp=0.00 cov=19.8%/83.9%
+[TRUST] Bad command #11 (peer_reported): suspicion +0.30 = 0.30 omega=0.032
+[TRUST] Bad command #12 (peer_reported): suspicion +0.30 = 0.60 omega=0.030
+[TRUST] Bad command #13 (peer_reported): suspicion +0.30 = 0.90 omega=0.029
+[TRUST] Bad command #14 (peer_reported): suspicion +0.30 = 1.20 omega=0.027

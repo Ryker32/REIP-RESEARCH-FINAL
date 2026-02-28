@@ -1,0 +1,40 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 5 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_5_20260226_161843.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 14105
+[INFO] Peer socket listening on port 14205
+[INFO] Fault socket listening on port 14305
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 5
+[R5] pos=(0,0) state=leader leader=5 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R5] pos=(1512,361) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R5] pos=(1255,391) state=follower leader=1 trust=1.00 susp=0.00 cov=2.6%/14.6%
+[R5] pos=(1131,711) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/27.6%
+[R5] pos=(823,687) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/36.5%
+[R5] pos=(739,386) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/47.9%
+[R5] pos=(1052,75) state=follower leader=1 trust=1.00 susp=0.00 cov=13.5%/57.3%
+[R5] pos=(1329,161) state=follower leader=1 trust=1.00 susp=0.00 cov=16.7%/68.8%
+[R5] pos=(1686,175) state=follower leader=1 trust=1.00 susp=0.00 cov=19.3%/78.6%
+[R5] pos=(1059,313) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/86.5%
+[R5] pos=(784,733) state=follower leader=1 trust=1.00 susp=0.00 cov=22.4%/93.8%
+[R5] pos=(349,693) state=follower leader=1 trust=1.00 susp=0.00 cov=25.0%/98.4%
+[R5] pos=(319,281) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%
+[R5] pos=(316,294) state=follower leader=1 trust=1.00 susp=0.00 cov=27.1%/100.0%

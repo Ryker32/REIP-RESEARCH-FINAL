@@ -1,0 +1,91 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 3 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_3_20260226_211002.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 20103
+[INFO] Peer socket listening on port 20203
+[INFO] Fault socket listening on port 20303
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 3
+[R3] pos=(0,0) state=leader leader=3 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R3] pos=(328,1105) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R3] pos=(328,1105) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R3] pos=(328,1105) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R3] pos=(328,1105) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R3] pos=(328,1105) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/2.6%
+[R3] pos=(428,1066) state=follower leader=1 trust=1.00 susp=0.00 cov=1.6%/7.8%
+[R3] pos=(561,937) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/16.7%
+[R3] pos=(345,690) state=follower leader=1 trust=1.00 susp=0.00 cov=6.2%/25.5%
+[R3] pos=(453,335) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/35.4%
+[R3] pos=(690,75) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/42.2%
+[R3] pos=(810,187) state=follower leader=1 trust=1.00 susp=0.00 cov=12.5%/45.8%
+[R3] pos=(919,194) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/48.4%
+[R3] pos=(919,235) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/51.0%
+[R3] pos=(919,279) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/52.1%
+[R3] pos=(919,226) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/52.1%
+[R3] pos=(919,227) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/54.7%
+[R3] pos=(919,80) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/56.8%
+[R3] pos=(919,75) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/58.9%
+[R3] pos=(186,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.1%/59.9%
+[MPC] Moderate mismatch: best alignment 108°, error=0.12
+[R3] pos=(597,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(699,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=15.6%/60.9%
+[R3] pos=(751,608) state=follower leader=1 trust=1.00 susp=0.00 cov=17.2%/60.9%
+[R3] pos=(660,1163) state=follower leader=1 trust=1.00 susp=0.00 cov=19.3%/61.5%
+[R3] pos=(863,1011) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,978) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,1031) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,1006) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,1006) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,1041) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,983) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(863,1000) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/61.5%
+[R3] pos=(862,862) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,870) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,907) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,930) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,935) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,937) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1074) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%
+[R3] pos=(862,1063) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/61.5%

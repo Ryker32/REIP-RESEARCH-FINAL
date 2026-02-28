@@ -1,0 +1,38 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260227_180417.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 11101
+[INFO] Peer socket listening on port 11201
+[INFO] Fault socket listening on port 11301
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R1] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(597,525) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(106,563) state=exploring leader=None trust=1.00 susp=0.00 cov=2.6%/13.0%
+[R1] pos=(75,1094) state=exploring leader=None trust=1.00 susp=0.00 cov=4.7%/17.7%
+[R1] pos=(187,1305) state=exploring leader=None trust=1.00 susp=0.00 cov=7.3%/25.0%
+[R1] pos=(188,675) state=exploring leader=None trust=1.00 susp=0.00 cov=9.9%/32.8%
+[R1] pos=(312,1194) state=exploring leader=None trust=1.00 susp=0.00 cov=12.0%/37.0%
+[FAULT] OSCILLATE_LEADER mode activated - will flip-flop targets
+[R1] pos=(704,1313) state=exploring leader=None trust=1.00 susp=0.00 cov=15.1%/42.7%
+[R1] pos=(820,1157) state=exploring leader=None trust=1.00 susp=0.00 cov=17.7%/47.4%
+[R1] pos=(1053,1352) state=exploring leader=None trust=1.00 susp=0.00 cov=20.3%/51.0%
+[R1] pos=(1098,1063) state=exploring leader=None trust=1.00 susp=0.00 cov=22.4%/53.6%
+[R1] pos=(1171,567) state=exploring leader=None trust=1.00 susp=0.00 cov=25.5%/59.4%
+[R1] pos=(1322,188) state=exploring leader=None trust=1.00 susp=0.00 cov=27.6%/66.7%
+[R1] pos=(1437,450) state=exploring leader=None trust=1.00 susp=0.00 cov=30.2%/70.8%
+[R1] pos=(1438,1080) state=exploring leader=None trust=1.00 susp=0.00 cov=32.8%/75.5%
+[R1] pos=(1645,1425) state=exploring leader=None trust=1.00 susp=0.00 cov=35.4%/83.9%
+[FAULT] OSCILLATE_LEADER mode activated - will flip-flop targets
+[R1] pos=(1812,975) state=exploring leader=None trust=1.00 susp=0.00 cov=38.0%/92.2%
+[R1] pos=(1925,623) state=exploring leader=None trust=1.00 susp=0.00 cov=40.1%/97.4%

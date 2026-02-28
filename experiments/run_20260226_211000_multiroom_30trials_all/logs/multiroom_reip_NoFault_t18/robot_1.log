@@ -1,0 +1,84 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260226_212250.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 26101
+[INFO] Peer socket listening on port 26201
+[INFO] Fault socket listening on port 26301
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 1
+[R1] pos=(0,0) state=leader leader=1 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(401,1007) state=leader leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(312,1177) state=leader leader=1 trust=1.00 susp=0.00 cov=3.1%/13.5%
+[R1] pos=(75,1045) state=leader leader=1 trust=1.00 susp=0.00 cov=5.2%/21.9%
+[R1] pos=(75,1035) state=leader leader=1 trust=1.00 susp=0.00 cov=5.2%/29.7%
+[R1] pos=(75,1050) state=leader leader=1 trust=1.00 susp=0.00 cov=5.2%/39.1%
+[R1] pos=(75,973) state=leader leader=1 trust=1.00 susp=0.00 cov=5.7%/46.9%
+[R1] pos=(505,692) state=leader leader=1 trust=1.00 susp=0.00 cov=9.4%/54.7%
+[R1] pos=(899,605) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/58.9%
+[R1] pos=(899,604) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/61.5%
+[R1] pos=(899,601) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/64.6%
+[R1] pos=(899,646) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/66.7%
+[R1] pos=(899,656) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/68.8%
+[R1] pos=(899,596) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/70.8%
+[R1] pos=(899,595) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/73.4%
+[R1] pos=(899,596) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/75.0%
+[R1] pos=(899,566) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/77.1%
+[R1] pos=(900,675) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/78.1%
+[R1] pos=(900,685) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/78.6%
+[R1] pos=(900,685) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/78.6%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/79.2%
+[R1] pos=(900,571) state=leader leader=1 trust=1.00 susp=0.00 cov=11.5%/80.2%
+[R1] pos=(900,812) state=leader leader=1 trust=1.00 susp=0.00 cov=12.0%/81.2%
+[R1] pos=(899,937) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.3%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/82.8%
+[R1] pos=(900,639) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/83.3%
+[R1] pos=(900,687) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/83.3%
+[R1] pos=(900,565) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/83.9%
+[R1] pos=(900,565) state=leader leader=1 trust=1.00 susp=0.00 cov=12.5%/83.9%
+[R1] pos=(900,550) state=leader leader=1 trust=1.00 susp=0.00 cov=13.0%/84.9%
+[R1] pos=(900,562) state=leader leader=1 trust=1.00 susp=0.00 cov=13.0%/85.9%
+[R1] pos=(901,544) state=leader leader=1 trust=1.00 susp=0.00 cov=13.0%/88.5%
+[R1] pos=(901,968) state=leader leader=1 trust=1.00 susp=0.00 cov=13.0%/90.6%
+[R1] pos=(901,1028) state=leader leader=1 trust=1.00 susp=0.00 cov=13.5%/93.2%
+[R1] pos=(901,906) state=leader leader=1 trust=1.00 susp=0.00 cov=13.5%/95.3%
+[R1] pos=(901,828) state=leader leader=1 trust=1.00 susp=0.00 cov=13.5%/98.4%
+[R1] pos=(922,95) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/99.5%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%
+[R1] pos=(922,75) state=leader leader=1 trust=1.00 susp=0.00 cov=15.1%/100.0%

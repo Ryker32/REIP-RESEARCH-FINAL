@@ -1,0 +1,39 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 2 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_2_20260226_183055.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 5102
+[INFO] Peer socket listening on port 5202
+[INFO] Fault socket listening on port 5302
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R2] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R2] pos=(1714,758) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R2] pos=(1031,812) state=exploring leader=None trust=1.00 susp=0.00 cov=3.1%/16.1%
+[R2] pos=(1156,352) state=exploring leader=None trust=1.00 susp=0.00 cov=6.8%/28.6%
+[R2] pos=(858,255) state=exploring leader=None trust=1.00 susp=0.00 cov=8.3%/40.6%
+[R2] pos=(1101,317) state=exploring leader=None trust=1.00 susp=0.00 cov=9.4%/52.1%
+[R2] pos=(1448,569) state=exploring leader=None trust=1.00 susp=0.00 cov=12.5%/64.1%
+[R2] pos=(1889,687) state=exploring leader=None trust=1.00 susp=0.00 cov=15.6%/74.5%
+[R2] pos=(1825,852) state=exploring leader=None trust=1.00 susp=0.00 cov=17.2%/85.4%
+[R2] pos=(1588,1062) state=exploring leader=None trust=1.00 susp=0.00 cov=18.8%/94.8%
+[R2] pos=(1925,1285) state=exploring leader=None trust=1.00 susp=0.00 cov=22.4%/100.0%
+[R2] pos=(1925,1261) state=exploring leader=None trust=1.00 susp=0.00 cov=22.9%/100.0%
+[R2] pos=(1925,1355) state=exploring leader=None trust=1.00 susp=0.00 cov=22.9%/100.0%
+[R2] pos=(1925,1351) state=exploring leader=None trust=1.00 susp=0.00 cov=22.9%/100.0%
+[R2] pos=(1925,1370) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1258) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1259) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1250) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1356) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1355) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%
+[R2] pos=(1925,1361) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/100.0%

@@ -1,0 +1,76 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 1 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_1_20260227_181504.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 6101
+[INFO] Peer socket listening on port 6201
+[INFO] Fault socket listening on port 6301
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R1] state=follower leader=None term=0 cov=0.0%/0.0%
+[R1] state=follower leader=5 term=1 cov=0.5%/0.5%
+[R1] state=follower leader=5 term=1 cov=2.6%/10.4%
+[R1] state=follower leader=5 term=1 cov=5.2%/14.6%
+[R1] state=follower leader=5 term=1 cov=6.8%/19.3%
+[R1] state=follower leader=5 term=1 cov=8.9%/22.4%
+[R1] state=follower leader=5 term=1 cov=9.9%/25.0%
+[FAULT] OSCILLATE_LEADER mode - will flip-flop targets (Raft CANNOT detect this)
+[R1] state=follower leader=5 term=1 cov=10.9%/28.6%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=10.9%/30.2%
+[R1] state=follower leader=5 term=1 cov=11.5%/31.2%
+[R1] state=follower leader=5 term=1 cov=11.5%/31.2%
+[R1] state=follower leader=4 term=3 cov=12.5%/33.3%
+[R1] state=follower leader=4 term=3 cov=13.5%/35.4%
+[R1] state=follower leader=4 term=3 cov=14.1%/37.0%
+[R1] state=follower leader=4 term=3 cov=15.1%/38.5%
+[R1] state=follower leader=4 term=3 cov=16.1%/39.6%
+[R1] state=follower leader=4 term=3 cov=17.2%/41.1%
+[R1] state=follower leader=4 term=3 cov=17.7%/41.7%
+[R1] state=follower leader=4 term=3 cov=18.2%/44.3%
+[R1] state=follower leader=4 term=3 cov=19.3%/46.9%
+[R1] state=follower leader=4 term=3 cov=19.8%/48.4%
+[R1] state=follower leader=4 term=3 cov=19.8%/48.4%
+[R1] state=follower leader=4 term=3 cov=19.8%/48.4%
+[R1] state=follower leader=4 term=3 cov=19.8%/48.4%
+[R1] state=follower leader=4 term=3 cov=20.3%/49.5%
+[R1] state=follower leader=4 term=3 cov=21.4%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=21.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=22.9%/50.0%
+[R1] state=follower leader=4 term=3 cov=24.0%/50.5%
+[R1] state=follower leader=4 term=3 cov=24.0%/50.5%
+[R1] state=follower leader=4 term=3 cov=24.5%/51.0%
+[R1] state=follower leader=4 term=3 cov=26.6%/53.1%
+[R1] state=follower leader=4 term=3 cov=27.6%/54.2%
+[R1] state=follower leader=4 term=3 cov=28.6%/55.2%
+[R1] state=follower leader=4 term=3 cov=29.7%/56.2%
+[R1] state=follower leader=4 term=3 cov=31.2%/57.8%
+[R1] state=follower leader=4 term=3 cov=32.3%/58.9%
+[R1] state=follower leader=4 term=3 cov=33.3%/59.9%
+[R1] state=follower leader=4 term=3 cov=34.4%/60.9%
+[R1] state=follower leader=4 term=3 cov=35.9%/62.5%
+[R1] state=follower leader=4 term=3 cov=38.0%/64.6%
+[R1] state=follower leader=4 term=3 cov=40.1%/66.7%
+[R1] state=follower leader=4 term=3 cov=42.2%/68.8%

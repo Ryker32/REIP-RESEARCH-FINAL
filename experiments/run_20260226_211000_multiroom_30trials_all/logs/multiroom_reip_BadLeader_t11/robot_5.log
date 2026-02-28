@@ -1,0 +1,135 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 5 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_5_20260226_211859.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 10105
+[INFO] Peer socket listening on port 10205
+[INFO] Fault socket listening on port 10305
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 5
+[R5] pos=(0,0) state=leader leader=5 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R5] pos=(501,1004) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R5] pos=(316,811) state=follower leader=1 trust=1.00 susp=0.00 cov=3.1%/15.1%
+[R5] pos=(550,562) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/26.6%
+[R5] pos=(688,656) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/37.5%
+[R5] pos=(765,898) state=follower leader=1 trust=1.00 susp=0.00 cov=10.9%/47.9%
+[R5] pos=(872,964) state=follower leader=1 trust=1.00 susp=0.00 cov=11.5%/53.1%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #2 (personal_visited): suspicion +1.00 = 2.00
+[DETECT] First trust decay after 2 bad commands (0.21s) [Theoretical bound: T1=2, T3=8]
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.50
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 1.50
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.00
+[TRUST] Bad command #4 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #5 (personal_visited, mpc_direction(0.01)): suspicion +1.01 = 2.01
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.51
+[ELECTION] Leader 1 impeached (failures=1)
+[ELECTION] New leader: 2
+[R5] pos=(423,679) state=follower leader=2 trust=1.00 susp=0.00 cov=11.5%/53.6%
+[R5] pos=(840,704) state=follower leader=2 trust=1.00 susp=0.00 cov=12.5%/54.2%
+[R5] pos=(840,612) state=follower leader=2 trust=1.00 susp=0.00 cov=13.0%/57.3%
+[R5] pos=(840,476) state=follower leader=2 trust=1.00 susp=0.00 cov=13.5%/63.0%
+[R5] pos=(839,408) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/69.3%
+[R5] pos=(839,457) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/73.4%
+[R5] pos=(838,357) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/77.6%
+[R5] pos=(838,396) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/81.2%
+[R5] pos=(839,373) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/84.4%
+[R5] pos=(839,501) state=follower leader=2 trust=1.00 susp=0.00 cov=14.1%/89.6%
+[MPC] Moderate mismatch: best alignment 116°, error=0.17
+[TRUST] Bad command #1 (peer_reported, mpc_direction(0.17)): suspicion +0.47 = 0.47
+[MPC] Moderate mismatch: best alignment 118°, error=0.19
+[TRUST] Bad command #2 (peer_reported, mpc_direction(0.19)): suspicion +0.49 = 0.96
+[MPC] Moderate mismatch: best alignment 129°, error=0.26
+[TRUST] Bad command #3 (peer_reported, mpc_direction(0.26)): suspicion +0.56 = 1.52
+[DETECT] First trust decay after 3 bad commands (0.42s) [Theoretical bound: T1=2, T3=8]
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.02
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 137°, error=0.51
+[TRUST] Bad command #4 (peer_reported, mpc_severe(0.51)): suspicion +0.81 = 0.83
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 143°, error=0.55
+[TRUST] Bad command #5 (peer_reported, mpc_severe(0.55)): suspicion +0.85 = 1.68
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.18
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 148°, error=0.58
+[TRUST] Bad command #6 (peer_reported, mpc_severe(0.58)): suspicion +0.88 = 1.06
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 152°, error=0.61
+[TRUST] Bad command #7 (peer_reported, mpc_severe(0.61)): suspicion +0.91 = 1.98
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.48
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 155°, error=0.63
+[TRUST] Bad command #8 (mpc_severe(0.63)): suspicion +0.63 = 1.11
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 153°, error=0.62
+[TRUST] Bad command #9 (mpc_severe(0.62)): suspicion +0.62 = 1.73
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.23
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 150°, error=0.60
+[TRUST] Bad command #10 (mpc_severe(0.60)): suspicion +0.60 = 0.82
+[R5] pos=(418,438) state=follower leader=2 trust=0.20 susp=0.82 cov=15.6%/90.6%
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 145°, error=0.57
+[TRUST] Bad command #11 (personal_visited, mpc_severe(0.57)): suspicion +1.57 = 2.39
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.89
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 139°, error=0.53
+[TRUST] Bad command #12 (personal_visited, mpc_severe(0.53)): suspicion +1.53 = 2.42
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.92
+[MPC] Moderate mismatch: best alignment 131°, error=0.27
+[TRUST] Bad command #13 (personal_visited, mpc_direction(0.27)): suspicion +1.27 = 2.19
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.69
+[MPC] Moderate mismatch: best alignment 122°, error=0.21
+[TRUST] Bad command #14 (personal_visited, mpc_direction(0.21)): suspicion +1.21 = 1.90
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.40
+[MPC SEVERE] No frontier within 135° of cmd! Best alignment: 135°, error=0.50
+[TRUST] Bad command #15 (personal_visited, mpc_severe(0.50)): suspicion +1.50 = 1.91
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.41
+[DETECT] IMPEACHMENT after 15 bad commands, 2.95s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.10), excluding leader 2 from candidates
+[ELECTION] Leader 2 impeached (failures=1)
+[ELECTION] New leader: 5
+[R5] pos=(843,317) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/90.6%
+[R5] pos=(843,317) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/90.6%
+[R5] pos=(843,344) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/90.6%
+[R5] pos=(843,394) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/90.6%
+[R5] pos=(843,378) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/93.8%
+[R5] pos=(843,313) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/95.8%
+[R5] pos=(844,325) state=leader leader=5 trust=1.00 susp=0.00 cov=15.6%/97.4%
+[R5] pos=(922,341) state=leader leader=5 trust=1.00 susp=0.00 cov=16.7%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,412) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/98.4%
+[R5] pos=(922,434) state=leader leader=5 trust=1.00 susp=0.00 cov=17.2%/99.0%
+[R5] pos=(921,562) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,479) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,436) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,400) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,437) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,435) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,547) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,437) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,453) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,438) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,440) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,337) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,329) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,329) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,329) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,437) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(921,424) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(920,329) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%
+[R5] pos=(920,440) state=leader leader=5 trust=1.00 susp=0.00 cov=17.7%/99.0%

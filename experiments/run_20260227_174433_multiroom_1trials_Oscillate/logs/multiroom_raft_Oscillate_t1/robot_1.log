@@ -1,0 +1,85 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 1 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_1_20260227_174637.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 5101
+[INFO] Peer socket listening on port 5201
+[INFO] Fault socket listening on port 5301
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R1] state=follower leader=None term=0 cov=0.0%/0.0%
+[R1] state=follower leader=4 term=1 cov=0.5%/0.5%
+[R1] state=follower leader=4 term=1 cov=2.1%/10.9%
+[R1] state=follower leader=4 term=1 cov=3.6%/19.3%
+[R1] state=follower leader=4 term=1 cov=5.7%/28.6%
+[R1] state=follower leader=4 term=1 cov=7.3%/36.5%
+[FAULT] OSCILLATE_LEADER mode - will flip-flop targets (Raft CANNOT detect this)
+[R1] state=follower leader=4 term=1 cov=9.4%/43.2%
+[R1] state=follower leader=4 term=1 cov=9.9%/46.9%
+[R1] state=follower leader=4 term=1 cov=11.5%/50.5%
+[R1] state=follower leader=4 term=1 cov=13.0%/54.2%
+[R1] state=follower leader=4 term=1 cov=15.1%/58.3%
+[R1] state=follower leader=4 term=1 cov=17.2%/63.0%
+[R1] state=follower leader=4 term=1 cov=19.3%/69.8%
+[R1] state=follower leader=4 term=1 cov=20.8%/76.0%
+[R1] state=follower leader=4 term=1 cov=22.4%/82.8%
+[R1] state=follower leader=4 term=1 cov=24.0%/88.5%
+[R1] state=follower leader=4 term=1 cov=25.5%/93.2%
+[RAFT] Starting election, term 2
+[RAFT] Became leader, term 2
+[R1] state=follower leader=5 term=3 cov=27.1%/96.4%
+[R1] state=follower leader=5 term=3 cov=29.2%/98.4%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%
+[R1] state=follower leader=5 term=3 cov=30.7%/100.0%

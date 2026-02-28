@@ -1,0 +1,142 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260226_213026.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 8101
+[INFO] Peer socket listening on port 8201
+[INFO] Fault socket listening on port 8301
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 1
+[R1] pos=(0,0) state=leader leader=1 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(589,401) state=leader leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(546,75) state=leader leader=1 trust=1.00 susp=0.00 cov=3.6%/13.0%
+[R1] pos=(914,88) state=leader leader=1 trust=1.00 susp=0.00 cov=6.8%/26.6%
+[R1] pos=(809,258) state=leader leader=1 trust=1.00 susp=0.00 cov=7.3%/33.3%
+[R1] pos=(322,929) state=leader leader=1 trust=1.00 susp=0.00 cov=10.4%/39.6%
+[R1] pos=(672,1313) state=leader leader=1 trust=1.00 susp=0.00 cov=13.5%/45.3%
+[FAULT] BAD_LEADER mode activated - will send bad assignments
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[R1] pos=(420,632) state=leader leader=1 trust=1.00 susp=0.00 cov=16.1%/46.9%
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[R1] pos=(319,331) state=leader leader=1 trust=1.00 susp=0.00 cov=17.7%/46.9%
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[BAD_LEADER] Sending 5 robots to EXPLORED cells (persistent): [(312.5, 312.5), (937.5, 687.5), (62.5, 562.5)]...
+[ELECTION] New leader: 2
+[R1] pos=(542,684) state=follower leader=2 trust=1.00 susp=0.00 cov=18.2%/50.0%
+[R1] pos=(1061,1304) state=follower leader=2 trust=1.00 susp=0.00 cov=22.4%/51.6%
+[R1] pos=(1202,1425) state=follower leader=2 trust=1.00 susp=0.00 cov=22.9%/55.2%
+[R1] pos=(1614,1425) state=follower leader=2 trust=1.00 susp=0.00 cov=25.0%/59.4%
+[MPC] Moderate mismatch: best alignment 129°, error=0.26
+[R1] pos=(1925,1325) state=follower leader=2 trust=1.00 susp=0.00 cov=27.1%/63.5%
+[R1] pos=(1925,917) state=follower leader=2 trust=1.00 susp=0.00 cov=28.6%/67.2%
+[R1] pos=(1811,603) state=follower leader=2 trust=1.00 susp=0.00 cov=31.2%/72.4%
+[R1] pos=(1925,468) state=follower leader=2 trust=1.00 susp=0.00 cov=32.8%/75.5%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #2 (personal_visited): suspicion +1.00 = 2.00
+[DETECT] First trust decay after 2 bad commands (0.21s) [Theoretical bound: T1=2, T3=8]
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.50
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 1.50
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.00
+[TRUST] Bad command #4 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #5 (personal_visited): suspicion +1.00 = 2.00
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.50
+[TRUST] Bad command #6 (personal_visited): suspicion +1.00 = 1.50
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.00
+[TRUST] Bad command #7 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #8 (personal_visited): suspicion +1.00 = 2.00
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.50
+[TRUST] Bad command #9 (personal_visited): suspicion +1.00 = 1.50
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.00
+[R1] pos=(1285,808) state=follower leader=2 trust=0.10 susp=0.00 cov=35.9%/79.7%
+[TRUST] Bad command #10 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #11 (personal_visited): suspicion +1.00 = 2.00
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.50
+[TRUST] Bad command #12 (personal_visited): suspicion +1.00 = 1.50
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.00
+[TRUST] Bad command #13 (personal_visited): suspicion +1.00 = 1.00
+[TRUST] Bad command #14 (personal_visited): suspicion +1.00 = 2.00
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.50
+[DETECT] IMPEACHMENT after 14 bad commands, 2.82s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.10), excluding leader 2 from candidates
+[ELECTION] Leader 2 impeached (failures=1)
+[ELECTION] New leader: 1
+[R1] pos=(1167,970) state=leader leader=1 trust=1.00 susp=0.00 cov=37.5%/80.2%
+[R1] pos=(1089,876) state=leader leader=1 trust=1.00 susp=0.00 cov=38.5%/80.7%
+[R1] pos=(1232,585) state=leader leader=1 trust=1.00 susp=0.00 cov=41.1%/83.3%
+[R1] pos=(1562,202) state=leader leader=1 trust=1.00 susp=0.00 cov=45.3%/88.5%
+[R1] pos=(1102,75) state=leader leader=1 trust=1.00 susp=0.00 cov=48.4%/93.2%
+[R1] pos=(1611,314) state=leader leader=1 trust=1.00 susp=0.00 cov=50.5%/95.3%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%
+[R1] pos=(1925,75) state=leader leader=1 trust=1.00 susp=0.00 cov=53.6%/100.0%

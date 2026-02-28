@@ -1,0 +1,42 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 1 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_1_20260226_161732.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 8101
+[INFO] Peer socket listening on port 8201
+[INFO] Fault socket listening on port 8301
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 1
+[R1] pos=(0,0) state=leader leader=1 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R1] pos=(856,660) state=leader leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R1] pos=(766,687) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/11.5%
+[R1] pos=(857,603) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/20.8%
+[R1] pos=(873,595) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/31.2%
+[R1] pos=(859,602) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/40.1%
+[R1] pos=(758,652) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/48.4%
+[R1] pos=(755,654) state=leader leader=1 trust=1.00 susp=0.00 cov=1.6%/57.8%
+[R1] pos=(742,631) state=leader leader=1 trust=1.00 susp=0.00 cov=2.1%/63.5%
+[R1] pos=(838,596) state=leader leader=1 trust=1.00 susp=0.00 cov=2.1%/68.2%
+[R1] pos=(1137,421) state=leader leader=1 trust=1.00 susp=0.00 cov=5.2%/75.5%
+[R1] pos=(1312,653) state=leader leader=1 trust=1.00 susp=0.00 cov=7.3%/83.9%
+[R1] pos=(1438,1041) state=leader leader=1 trust=1.00 susp=0.00 cov=10.9%/91.7%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/99.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%
+[R1] pos=(1925,1425) state=leader leader=1 trust=1.00 susp=0.00 cov=14.6%/100.0%

@@ -1,0 +1,1253 @@
+#!/usr/bin/env python3
+"""
+ISEF Experimental Data Collection — Rigorous Comparison Suite
+
+Runs systematic experiments comparing REIP vs RAFT vs Decentralized baselines
+under various fault conditions with statistical rigor:
+  - N repeated trials per condition (randomized starting positions)
+  - Real-time fault detection timing (tracks leader changes in broadcasts)
+  - Two arena layouts (open + multiroom) for environmental diversity
+  - Statistical summary: mean +/- std for all metrics
+
+Usage:
+  python test/isef_experiments.py                    # Full suite (all layouts, N=10)
+  python test/isef_experiments.py --layout open      # Single layout
+  python test/isef_experiments.py --trials 5         # Fewer trials (faster)
+  python test/isef_experiments.py --quick            # Quick check: N=3, open only
+"""
+
+import subprocess
+import time
+import json
+import socket
+import os
+import sys
+import math
+import random
+from datetime import datetime
+from dataclasses import dataclass, field, asdict
+from typing import List, Dict, Optional, Tuple
+from collections import defaultdict
+
+# ==================== Configuration ====================
+REIP_SCRIPT = "robot/reip_node.py"
+RAFT_SCRIPT = "robot/baselines/raft_node.py"
+NUM_ROBOTS = 5
+EXPERIMENT_DURATION = 120   # seconds per trial
+FAULT_INJECT_TIME = 10      # first fault injection (earlier = more impact)
+FAULT_INJECT_TIME_2 = 30    # second bad_leader injection on current leader
+TRIALS_PER_CONDITION = 10   # repeated trials for statistics
+
+# After initial leader election settles (~5s), leader changes before
+# fault injection count as false positives.
+SETTLE_TIME = 5
+
+UDP_POSITION_PORT = 5100
+UDP_PEER_PORT = 5200
+UDP_FAULT_PORT = 5300
+
+ARENA_WIDTH = 2000
+ARENA_HEIGHT = 1500
+CELL_SIZE = 125
+
+ARENA_LAYOUTS = {
+    "open": [],
+    "multiroom": [
+        (1000, 0, 1000, 1200),  # Vertical wall, passage at top
+    ],
+}
+
+# ==================== Data Classes ====================
+@dataclass
+class ExperimentResult:
+    name: str
+    controller: str           # 'reip', 'raft', 'decentralized'
+    fault_type: Optional[str]
+    fault_robot: Optional[int]
+    layout: str
+    trial: int
+    seed: int
+    final_coverage: float
+    time_to_50: Optional[float]            # seconds to reach 50% coverage
+    time_to_60: Optional[float]            # seconds to reach 60% coverage
+    time_to_80: Optional[float]            # seconds to reach 80% coverage
+    time_to_detection: Optional[float]     # seconds from fault 1 to first impeachment
+    time_to_first_suspicion: Optional[float]  # seconds from fault 1 to first trust decay
+    time_to_detection_2: Optional[float]   # seconds from fault 2 to second impeachment
+    num_leader_changes: int
+    false_positives: int                   # leader changes between settle and fault
+    coverage_at_90s: Optional[float]       # coverage at 90s mark
+    coverage_timeline: List[Tuple[float, float]] = field(default_factory=list)
+
+
+# ==================== Experiment Runner ====================
+class ExperimentRunner:
+    def __init__(self, output_dir: str = "experiments", port_offset: int = 0):
+        self.output_dir = output_dir
+        self.layout = "open"
+        self.walls: List[Tuple[int, int, int, int]] = []
+        self.port_offset = port_offset  # For parallel execution
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Port bases (offset for parallel workers)
+        self._pos_port = UDP_POSITION_PORT + port_offset
+        self._peer_port = UDP_PEER_PORT + port_offset
+        self._fault_port = UDP_FAULT_PORT + port_offset
+
+        # Sockets
+        self.pos_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.state_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.state_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.state_socket.bind(('', self._peer_port))
+        self.state_socket.setblocking(False)
+        self.state_socket.settimeout(0.1)
+
+        self.robot_processes: List[subprocess.Popen] = []
+        self.sim_positions: Dict[int, Tuple[float, float, float]] = {}
+        self.stuck_counters: Dict[int, int] = {}
+        self.prev_positions: Dict[int, Tuple[float, float]] = {}
+        self.stuck_overrides: Dict[int, Optional[list]] = {}  # locked override targets
+        self.motor_faults: Dict[int, Optional[str]] = {}  # rid -> 'spin', 'stop', etc.
+
+        # Per-experiment state (reset each trial)
+        self.visited_cells: set = set()
+        self.coverage_history: List[Tuple[float, float]] = []
+        self.tracked_leaders: Dict[int, Optional[int]] = {}  # rid -> leader they report
+        self.last_targets: Dict[int, Optional[list]] = {}  # rid -> last known nav target
+
+    def set_layout(self, layout: str):
+        """Switch arena layout between experiments."""
+        self.layout = layout
+        self.walls = list(ARENA_LAYOUTS.get(layout, []))
+
+    # -------------------- Process Management --------------------
+    def start_robots(self, script: str, extra_args: List[str] = None,
+                     seed: int = 42, experiment_name: str = ""):
+        """Start robot processes with seed-based random starting positions."""
+        # Use per-experiment log directory to avoid overwriting
+        if experiment_name:
+            log_dir = os.path.join(self.output_dir, "logs", experiment_name)
+        else:
+            log_dir = os.path.join(self.output_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        self._current_log_dir = log_dir  # Save for log parsing
+
+        rng = random.Random(seed)
+
+        for i in range(1, NUM_ROBOTS + 1):
+            log_file = open(os.path.join(log_dir, f"robot_{i}.log"), 'w')
+            cmd = [sys.executable, "-u", script, str(i), "--sim"]
+            if self.port_offset:
+                cmd.extend(["--port-base", str(self.port_offset)])
+            if extra_args:
+                cmd.extend(extra_args)
+            proc = subprocess.Popen(
+                cmd,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
+            self.robot_processes.append(proc)
+
+            # Randomized starting position (seed-controlled for reproducibility)
+            if self.layout == "multiroom":
+                # Cluster in Room A (x < 1000, avoiding wall)
+                sx = rng.uniform(150, 850)
+                sy = rng.uniform(150, ARENA_HEIGHT - 150)
+            else:
+                sx = rng.uniform(200, ARENA_WIDTH - 200)
+                sy = rng.uniform(200, ARENA_HEIGHT - 200)
+            theta = rng.uniform(0, 2 * math.pi)
+
+            # Reject positions inside walls
+            while self._collides_with_wall(sx, sy):
+                sx = rng.uniform(150, 850) if self.layout == "multiroom" \
+                    else rng.uniform(200, ARENA_WIDTH - 200)
+                sy = rng.uniform(150, ARENA_HEIGHT - 150) if self.layout == "multiroom" \
+                    else rng.uniform(200, ARENA_HEIGHT - 200)
+
+            self.sim_positions[i] = (sx, sy, theta)
+            self.stuck_counters[i] = 0
+            self.prev_positions[i] = (sx, sy)
+
+        time.sleep(2)  # Let processes initialize
+
+    def stop_robots(self):
+        """Stop all robot processes"""
+        for proc in self.robot_processes:
+            proc.terminate()
+        for proc in self.robot_processes:
+            try:
+                proc.wait(timeout=2)
+            except Exception:
+                proc.kill()
+        self.robot_processes = []
+
+    # -------------------- Communication --------------------
+    def send_positions(self):
+        """Send mock positions to robots"""
+        for rid, (x, y, theta) in self.sim_positions.items():
+            msg = {
+                'type': 'position',
+                'robot_id': rid,
+                'x': x, 'y': y, 'theta': theta,
+                'timestamp': time.time()
+            }
+            self.pos_socket.sendto(
+                json.dumps(msg).encode(),
+                ('127.0.0.1', self._pos_port + rid)
+            )
+
+    def inject_fault(self, robot_id: int, fault_type: str):
+        """Inject fault into robot and track motor faults locally for physics."""
+        msg = {
+            'type': 'fault_inject',
+            'robot_id': robot_id,
+            'fault': fault_type,
+            'timestamp': time.time()
+        }
+        # Track motor faults so update_positions can simulate them
+        if fault_type in ('spin', 'stop', 'erratic'):
+            self.motor_faults[robot_id] = fault_type
+        elif fault_type in ('none', 'clear'):
+            self.motor_faults[robot_id] = None
+        # bad_leader and oscillate_leader are NOT motor faults — robot still moves normally
+        self.fault_socket.sendto(
+            json.dumps(msg).encode(),
+            ('127.0.0.1', self._fault_port + robot_id)
+        )
+
+    def receive_states(self) -> Dict[int, dict]:
+        """Receive state broadcasts from robots.
+
+        In sim mode each robot sends directly to every other robot's
+        unique peer port.  They also send to the base port (5200) so
+        the harness can observe.
+        """
+        states = {}
+        try:
+            while True:
+                data, _ = self.state_socket.recvfrom(8192)
+                msg = json.loads(data.decode())
+                if msg.get('type') == 'peer_state':
+                    rid = msg.get('robot_id')
+                    if rid:
+                        states[rid] = msg
+                        for cell in msg.get('visited_cells', []):
+                            self.visited_cells.add(tuple(cell))
+        except (socket.timeout, BlockingIOError, ConnectionResetError, OSError):
+            pass
+        return states
+
+    # -------------------- Physics / Wall Collision --------------------
+    def _line_circle_collision(self, x1, y1, x2, y2, cx, cy, r):
+        """Check if circle (cx,cy,r) overlaps line segment (x1,y1)-(x2,y2).
+        Tangent contact (distance == radius) is NOT collision."""
+        dx, dy = x2 - x1, y2 - y1
+        fx, fy = x1 - cx, y1 - cy
+        a = dx * dx + dy * dy
+        if a < 1e-6:
+            return math.hypot(cx - x1, cy - y1) < r
+        b = 2 * (fx * dx + fy * dy)
+        c = fx * fx + fy * fy - r * r
+        disc = b * b - 4 * a * c
+        if disc <= 0:
+            return False
+        disc = math.sqrt(disc)
+        t1 = (-b - disc) / (2 * a)
+        t2 = (-b + disc) / (2 * a)
+        return (0 <= t1 <= 1) or (0 <= t2 <= 1) or (t1 < 0 and t2 > 1)
+
+    def _collides_with_wall(self, x, y, radius=75):
+        for wx1, wy1, wx2, wy2 in self.walls:
+            if self._line_circle_collision(wx1, wy1, wx2, wy2, x, y, radius):
+                return True
+        return False
+
+    @staticmethod
+    def _ccw(ax, ay, bx, by, cx, cy):
+        return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+
+    def _path_crosses_wall(self, x1, y1, x2, y2):
+        """Check if direct path crosses any wall segment."""
+        for wx1, wy1, wx2, wy2 in self.walls:
+            d1 = self._ccw(x1, y1, x2, y2, wx1, wy1)
+            d2 = self._ccw(x1, y1, x2, y2, wx2, wy2)
+            d3 = self._ccw(wx1, wy1, wx2, wy2, x1, y1)
+            d4 = self._ccw(wx1, wy1, wx2, wy2, x2, y2)
+            if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
+               ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+                return True
+        return False
+
+    def _find_reachable_unexplored(self, x, y):
+        """Find nearest unexplored cell reachable without crossing a wall."""
+        best_reachable = None
+        best_rdist = float('inf')
+        best_any = None
+        best_adist = float('inf')
+        for cx in range(ARENA_WIDTH // CELL_SIZE):
+            for cy in range(ARENA_HEIGHT // CELL_SIZE):
+                if (cx, cy) in self.visited_cells:
+                    continue
+                tx = (cx + 0.5) * CELL_SIZE
+                ty = (cy + 0.5) * CELL_SIZE
+                if self._collides_with_wall(tx, ty):
+                    continue
+                d = math.sqrt((tx - x)**2 + (ty - y)**2)
+                if d < best_adist:
+                    best_adist = d
+                    best_any = (tx, ty)
+                if not self._path_crosses_wall(x, y, tx, ty):
+                    if d < best_rdist:
+                        best_rdist = d
+                        best_reachable = (tx, ty)
+        return best_reachable or best_any
+
+    # -------------------- Movement Simulation --------------------
+    def update_positions(self, states: Dict[int, dict], dt: float):
+        """Update simulated positions based on each robot's decided target.
+
+        Uses navigation_target from each robot's broadcast — this is the
+        position the robot actually chose to go to (leader assignment if
+        trusting, local fallback if not).  Includes wall collision,
+        wall-following, and stuck detection with locked override.
+
+        Movement is TIME-BASED: robots move at SPEED_PER_SEC * dt pixels per
+        call, ensuring consistent behavior regardless of tick rate / CPU load.
+        """
+        SPEED_PER_SEC = 500       # pixels/sec (~robot body length per second)
+        STUCK_TIME = 1.5          # seconds stuck before override fires
+        STUCK_MOVE_EPS = 15       # pixels — less than this = stuck
+        OVERRIDE_ARRIVE_DIST = 60 # close enough to release override lock
+        WALL_RADIUS = 75          # collision radius used in _collides_with_wall
+        MAX_STEP = WALL_RADIUS * 0.8  # Max step per sub-tick to prevent tunneling
+
+        total_move = SPEED_PER_SEC * dt  # total pixels to move this tick
+
+        for rid in range(1, NUM_ROBOTS + 1):
+            x, y, theta = self.sim_positions[rid]
+
+            # ---- Motor fault simulation (matches visual_sim.py) ----
+            motor_fault = self.motor_faults.get(rid)
+            if motor_fault == 'stop':
+                # Robot is frozen — don't move, don't count coverage
+                continue
+            elif motor_fault == 'spin':
+                # Robot spins in place — only theta changes, no position change
+                theta += 0.2 * (dt / 0.05)  # scale by dt so rotation is time-consistent
+                self.sim_positions[rid] = (x, y, theta)
+                # Still count the cell it's sitting on
+                cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
+                self.visited_cells.add(cell)
+                continue
+            elif motor_fault == 'erratic':
+                # Random jitter
+                x += random.uniform(-20, 20) * (dt / 0.05)
+                y += random.uniform(-20, 20) * (dt / 0.05)
+                theta += random.uniform(-0.3, 0.3) * (dt / 0.05)
+                x = max(75, min(ARENA_WIDTH - 75, x))
+                y = max(75, min(ARENA_HEIGHT - 75, y))
+                self.sim_positions[rid] = (x, y, theta)
+                cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
+                self.visited_cells.add(cell)
+                continue
+
+            # ---- Stuck detection (time-based) ----
+            px, py = self.prev_positions.get(rid, (x, y))
+            move_since = math.sqrt((x - px)**2 + (y - py)**2)
+            if move_since < STUCK_MOVE_EPS:
+                self.stuck_counters[rid] = self.stuck_counters.get(rid, 0) + dt
+            else:
+                self.stuck_counters[rid] = 0
+                self.prev_positions[rid] = (x, y)
+
+            # ---- If there's an active stuck override, check if robot arrived ----
+            override = self.stuck_overrides.get(rid)
+            if override:
+                od = math.sqrt((x - override[0])**2 + (y - override[1])**2)
+                if od < OVERRIDE_ARRIVE_DIST:
+                    self.stuck_overrides[rid] = None
+                    self.stuck_counters[rid] = 0
+
+            # ---- Accept robot's navigation target (unless override is active) ----
+            if not self.stuck_overrides.get(rid):
+                if rid in states:
+                    nav = states[rid].get('navigation_target')
+                    if nav:
+                        self.last_targets[rid] = nav
+
+                # Fallback: use leader assignments if robot hasn't reported a target yet
+                if rid not in self.last_targets or self.last_targets[rid] is None:
+                    for state in states.values():
+                        if state.get('state') == 'leader':
+                            assignments = state.get('assignments', {})
+                            if str(rid) in assignments:
+                                self.last_targets[rid] = assignments[str(rid)]
+                                break
+
+            target = self.last_targets.get(rid)
+
+            # ---- Override target if stuck for too long ----
+            # IMPORTANT: Only fire when robot is FAR from its target but can't
+            # move (wall wedge).  If the robot arrived at its target and is
+            # sitting there, that's not "stuck" — it successfully followed its
+            # command.  On real hardware a robot told to go to an explored cell
+            # would just stay there; only REIP's trust model can recover.
+            # Without this guard, stuck detection acts as an oracle that rescues
+            # Raft followers from bad leader assignments.
+            target_dist = (math.sqrt((target[0] - x)**2 + (target[1] - y)**2)
+                           if target else 0)
+            if (self.stuck_counters.get(rid, 0) >= STUCK_TIME
+                    and target_dist > OVERRIDE_ARRIVE_DIST):
+                alt = self._find_reachable_unexplored(x, y)
+                if alt:
+                    target = alt
+                    self.last_targets[rid] = alt
+                    self.stuck_overrides[rid] = alt
+                self.stuck_counters[rid] = 0
+                self.prev_positions[rid] = (x, y)
+
+            if target:
+                # Sub-step to prevent wall tunneling: break large moves
+                # into steps no bigger than MAX_STEP (< collision radius)
+                remaining = total_move
+                while remaining > 0.5:
+                    step = min(remaining, MAX_STEP)
+                    remaining -= step
+
+                    dx = target[0] - x
+                    dy = target[1] - y
+                    dist = math.sqrt(dx*dx + dy*dy)
+
+                    if dist <= 20:
+                        break  # arrived
+
+                    theta = math.atan2(dy, dx)
+                    new_x = x + step * math.cos(theta)
+                    new_y = y + step * math.sin(theta)
+
+                    if self._collides_with_wall(new_x, new_y):
+                        moved = False
+                        if not self._collides_with_wall(new_x, y):
+                            x = new_x
+                            moved = True
+                        if not self._collides_with_wall(x, new_y) and abs(new_y - y) > 0.5:
+                            y = new_y
+                            moved = True
+                        if not moved:
+                            perp1 = theta + math.pi / 2
+                            perp2 = theta - math.pi / 2
+                            options = []
+                            for perp in [perp1, perp2]:
+                                tx = x + step * math.cos(perp)
+                                ty = y + step * math.sin(perp)
+                                if (not self._collides_with_wall(tx, ty) and
+                                        75 <= tx <= ARENA_WIDTH - 75 and
+                                        75 <= ty <= ARENA_HEIGHT - 75):
+                                    d = math.sqrt((tx - target[0])**2 +
+                                                  (ty - target[1])**2)
+                                    options.append((d, tx, ty))
+                            if options:
+                                options.sort()
+                                _, x, y = options[0]
+                            else:
+                                break  # completely blocked, stop sub-stepping
+                    else:
+                        x = new_x
+                        y = new_y
+
+            # Clamp
+            x = max(75, min(ARENA_WIDTH - 75, x))
+            y = max(75, min(ARENA_HEIGHT - 75, y))
+
+            self.sim_positions[rid] = (x, y, theta)
+
+            # Track coverage
+            cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
+            self.visited_cells.add(cell)
+
+    def get_coverage(self) -> float:
+        """Calculate current coverage percentage"""
+        total_cells = (ARENA_WIDTH // CELL_SIZE) * (ARENA_HEIGHT // CELL_SIZE)
+        return len(self.visited_cells) / total_cells * 100
+
+    # -------------------- Current Leader Detection --------------------
+    def _get_current_leader(self) -> int:
+        """Find the most commonly reported leader from tracked states."""
+        from collections import Counter
+        if not self.tracked_leaders:
+            return 1
+        counts = Counter(v for v in self.tracked_leaders.values() if v is not None)
+        return counts.most_common(1)[0][0] if counts else 1
+
+    # -------------------- Run Single Experiment --------------------
+    def run_experiment(
+        self,
+        name: str,
+        controller: str,
+        fault_type: Optional[str] = None,
+        fault_robot: int = 1,
+        trial_num: int = 1,
+        seed: int = 42,
+        save_snapshots: bool = False,
+    ) -> ExperimentResult:
+        """Run a single experiment with real-time leader-change detection."""
+        print(f"\n{'='*60}")
+        print(f"Experiment: {name}  (trial {trial_num}, seed {seed})")
+        print(f"  Controller: {controller}, Layout: {self.layout}")
+        print(f"  Fault: {fault_type or 'none'} on Robot {fault_robot}")
+        print(f"{'='*60}")
+
+        # ---- Reset per-trial state ----
+        self.visited_cells = set()
+        self.coverage_history = []
+        self.tracked_leaders = {}
+        self.stuck_counters = {}
+        self.prev_positions = {}
+        self.last_targets = {}
+        self.stuck_overrides = {}
+        self.motor_faults = {}  # Reset motor faults each trial
+        snapshot_frames = []  # Position snapshots for gridworld viz
+
+        # Flush buffered socket data
+        try:
+            self.state_socket.setblocking(False)
+            while True:
+                self.state_socket.recvfrom(8192)
+        except (BlockingIOError, ConnectionResetError):
+            pass
+        self.state_socket.settimeout(0.1)
+
+        # ---- Choose script ----
+        extra_args = []
+        if controller == 'decentralized':
+            script = REIP_SCRIPT
+            extra_args = ["--decentralized"]
+        elif controller == 'raft':
+            script = RAFT_SCRIPT
+        else:
+            script = REIP_SCRIPT
+
+        self.start_robots(script, extra_args, seed=seed, experiment_name=name)
+
+        # ---- Tracking variables ----
+        start_time = time.time()
+        fault_injected = False
+        fault_inject_actual_time = None
+        fault2_injected = False           # Second bad_leader injection
+        fault2_inject_time = None
+        fault2_robot = None               # Who got the second fault
+        time_to_detection = None          # Fault -> leader change (impeachment)
+        time_to_first_suspicion = None    # Fault -> first trust decay
+        time_to_detection_2 = None        # Second fault -> second impeachment
+        time_to_50 = None
+        time_to_60 = None
+        time_to_80 = None
+        coverage_at_90s = None
+        num_leader_changes = 0
+        false_positives = 0
+        last_print_sec = -1
+        # Track pre-fault trust levels to detect first decay
+        pre_fault_trust: Dict[int, float] = {}  # rid -> trust at fault time
+        last_states: Dict[int, dict] = {}  # most recent state per robot
+
+        self._last_tick_time = time.time()
+        try:
+            while time.time() - start_time < EXPERIMENT_DURATION:
+                elapsed = time.time() - start_time
+
+                # ---- Inject fault at scheduled time ----
+                if fault_type and not fault_injected and elapsed >= FAULT_INJECT_TIME:
+                    print(f"  [t={elapsed:.1f}s] Injecting {fault_type} on Robot {fault_robot}")
+                    self.inject_fault(fault_robot, fault_type)
+                    fault_injected = True
+                    fault_inject_actual_time = time.time()
+                    # Snapshot trust levels at fault injection for decay detection
+                    for rid, st in last_states.items():
+                        pre_fault_trust[rid] = st.get('trust_in_leader', 1.0)
+
+                # ---- Second leadership fault injection at FAULT_INJECT_TIME_2 ----
+                # Targets whoever is currently leader (tests repeated attack survival)
+                if (fault_type in ('bad_leader', 'oscillate_leader') and fault_injected
+                        and not fault2_injected and elapsed >= FAULT_INJECT_TIME_2):
+                    current_leader = self._get_current_leader()
+                    fault2_robot = current_leader
+                    if current_leader != fault_robot or controller == 'raft':
+                        # REIP: new leader after impeachment; RAFT: same robot
+                        print(f"  [t={elapsed:.1f}s] SECOND FAULT: {fault_type} on "
+                              f"Robot {current_leader} (current leader)")
+                        self.inject_fault(current_leader, fault_type)
+                    else:
+                        print(f"  [t={elapsed:.1f}s] SECOND FAULT: Robot {fault_robot} "
+                              f"still leader (re-injecting {fault_type})")
+                        self.inject_fault(fault_robot, fault_type)
+                        fault2_robot = fault_robot
+                    fault2_injected = True
+                    fault2_inject_time = time.time()
+
+                # ---- Simulation step (time-based movement) ----
+                now = time.time()
+                dt = now - self._last_tick_time if hasattr(self, '_last_tick_time') else 0.05
+                dt = min(dt, 0.15)  # Cap dt to prevent huge jumps after stalls
+                self._last_tick_time = now
+
+                self.send_positions()
+                states = self.receive_states()
+                self.update_positions(states, dt)
+
+                # ---- Track leader changes in real time ----
+                for rid, st in states.items():
+                    reported_leader = st.get('leader_id')
+                    prev_leader = self.tracked_leaders.get(rid)
+
+                    if prev_leader is not None and reported_leader != prev_leader:
+                        num_leader_changes += 1
+
+                        # Was the first fault robot deposed?
+                        if fault_injected and prev_leader == fault_robot and \
+                                time_to_detection is None:
+                            time_to_detection = time.time() - fault_inject_actual_time
+                            print(f"  [t={elapsed:.1f}s] IMPEACHED: Robot {rid} saw "
+                                  f"leader change {prev_leader}->{reported_leader} "
+                                  f"({time_to_detection:.2f}s after fault 1)")
+
+                        # Was the second fault robot deposed?
+                        if (fault2_injected and fault2_robot is not None
+                                and prev_leader == fault2_robot
+                                and time_to_detection_2 is None
+                                and fault2_inject_time is not None):
+                            time_to_detection_2 = time.time() - fault2_inject_time
+                            print(f"  [t={elapsed:.1f}s] IMPEACHED (2nd): Robot {rid} saw "
+                                  f"leader change {prev_leader}->{reported_leader} "
+                                  f"({time_to_detection_2:.2f}s after fault 2)")
+
+                        # Leader change before fault = potential false positive
+                        # (only count after initial election settles)
+                        if not fault_injected and elapsed > SETTLE_TIME:
+                            false_positives += 1
+
+                    self.tracked_leaders[rid] = reported_leader
+                    last_states[rid] = st  # Keep latest state for trust tracking
+
+                    # ---- Detect first trust decay (suspicion) ----
+                    if fault_injected and time_to_first_suspicion is None:
+                        trust = st.get('trust_in_leader', 1.0)
+                        suspicion = st.get('suspicion', 0.0)
+                        baseline = pre_fault_trust.get(rid, 1.0)
+                        # Trust has dropped noticeably, or suspicion is accumulating
+                        if trust < baseline - 0.05 or suspicion > 0.5:
+                            time_to_first_suspicion = time.time() - fault_inject_actual_time
+                            print(f"  [t={elapsed:.1f}s] FIRST SUSPICION: Robot {rid} "
+                                  f"trust={trust:.2f} sus={suspicion:.2f} "
+                                  f"({time_to_first_suspicion:.2f}s after fault)")
+
+                # ---- Coverage milestones ----
+                coverage = self.get_coverage()
+                self.coverage_history.append((elapsed, coverage))
+
+                if time_to_50 is None and coverage >= 50.0:
+                    time_to_50 = elapsed
+                if time_to_60 is None and coverage >= 60.0:
+                    time_to_60 = elapsed
+                if time_to_80 is None and coverage >= 80.0:
+                    time_to_80 = elapsed
+
+                if coverage_at_90s is None and elapsed >= 90.0:
+                    coverage_at_90s = coverage
+
+                # ---- Progress print (every 15s) ----
+                sec = int(elapsed)
+                if sec % 15 == 0 and sec != last_print_sec and sec > 0:
+                    det_str = f", det={time_to_detection:.1f}s" if time_to_detection else ""
+                    sus_str = f", sus={time_to_first_suspicion:.1f}s" \
+                        if time_to_first_suspicion else ""
+                    print(f"  [t={sec}s] Coverage: {coverage:.1f}%{sus_str}{det_str}")
+                    last_print_sec = sec
+
+                # ---- Snapshot logging (for gridworld viz) ----
+                if save_snapshots and int(elapsed * 4) != getattr(self, '_last_snap', -1):
+                    # 4 Hz snapshot rate (every 0.25s)
+                    self._last_snap = int(elapsed * 4)
+                    robots_snap = {}
+                    for rid, (rx, ry, rtheta) in self.sim_positions.items():
+                        st = last_states.get(rid, {})
+                        robots_snap[str(rid)] = {
+                            'x': round(rx, 1), 'y': round(ry, 1),
+                            'theta': round(rtheta, 3),
+                            'state': st.get('state', 'unknown'),
+                            'leader_id': st.get('leader_id'),
+                            'target': st.get('navigation_target'),
+                            'predicted_target': st.get('predicted_target'),
+                            'commanded_target': st.get('commanded_target'),
+                            'trust': round(st.get('trust_in_leader', 1.0), 3),
+                            'suspicion': round(st.get('suspicion', 0.0), 3),
+                            'omega': round(st.get('omega', 0.0), 4),
+                            'classified_fault': st.get('classified_fault'),
+                            'motor_fault': self.motor_faults.get(rid),
+                        }
+                    snapshot_frames.append({
+                        't': round(elapsed, 2),
+                        'coverage': round(coverage, 2),
+                        'visited_cells': [list(c) for c in self.visited_cells],
+                        'robots': robots_snap,
+                    })
+
+                time.sleep(0.05)  # 20 Hz
+
+        finally:
+            self.stop_robots()
+
+        # ---- Also parse robot logs for precise first_decay_time ----
+        # Robot logs contain [DETECT] messages with exact timestamps
+        if fault_type and fault_inject_actual_time:
+            log_suspicion, log_impeachment = self._parse_robot_logs(
+                fault_inject_actual_time)
+            # Prefer log-based timing if available (more precise)
+            if log_suspicion is not None and (time_to_first_suspicion is None
+                    or log_suspicion < time_to_first_suspicion):
+                time_to_first_suspicion = log_suspicion
+            if log_impeachment is not None and (time_to_detection is None
+                    or log_impeachment < time_to_detection):
+                time_to_detection = log_impeachment
+
+        # ---- Final metrics ----
+        final_coverage = self.get_coverage()
+        if coverage_at_90s is None:
+            coverage_at_90s = final_coverage  # experiment was shorter than 90s
+
+        result = ExperimentResult(
+            name=name,
+            controller=controller,
+            fault_type=fault_type,
+            fault_robot=fault_robot,
+            layout=self.layout,
+            trial=trial_num,
+            seed=seed,
+            final_coverage=final_coverage,
+            time_to_50=time_to_50,
+            time_to_60=time_to_60,
+            time_to_80=time_to_80,
+            time_to_detection=time_to_detection,
+            time_to_first_suspicion=time_to_first_suspicion,
+            time_to_detection_2=time_to_detection_2,
+            num_leader_changes=num_leader_changes,
+            false_positives=false_positives,
+            coverage_at_90s=coverage_at_90s,
+            coverage_timeline=self.coverage_history,
+        )
+
+        # Save coverage timeline to per-experiment log dir for convergence plots
+        if hasattr(self, '_current_log_dir') and self._current_log_dir:
+            tl_path = os.path.join(self._current_log_dir, "coverage_timeline.json")
+            try:
+                with open(tl_path, 'w') as f:
+                    json.dump({
+                        'name': name, 'controller': controller,
+                        'fault_type': fault_type, 'layout': self.layout,
+                        'trial': trial_num, 'seed': seed,
+                        'fault_time_1': FAULT_INJECT_TIME,
+                        'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'oscillate_leader') else None,
+                        'timeline': self.coverage_history
+                    }, f)
+            except Exception:
+                pass
+
+            # Save position snapshots for gridworld visualization
+            if save_snapshots and snapshot_frames:
+                snap_path = os.path.join(self._current_log_dir, "snapshots.json")
+                try:
+                    with open(snap_path, 'w') as f:
+                        json.dump({
+                            'name': name, 'controller': controller,
+                            'fault_type': fault_type, 'layout': self.layout,
+                            'trial': trial_num, 'seed': seed,
+                            'arena_width': ARENA_WIDTH,
+                            'arena_height': ARENA_HEIGHT,
+                            'cell_size': CELL_SIZE,
+                            'walls': self.walls,
+                            'fault_time_1': FAULT_INJECT_TIME,
+                            'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'oscillate_leader') else None,
+                            'frames': snapshot_frames,
+                        }, f)
+                    print(f"  Saved {len(snapshot_frames)} snapshots to {snap_path}")
+                except Exception as e:
+                    print(f"  Warning: failed to save snapshots: {e}")
+
+        t50_str = f"{time_to_50:.1f}s" if time_to_50 else "N/A"
+        t60_str = f"{time_to_60:.1f}s" if time_to_60 else "N/A"
+        t80_str = f"{time_to_80:.1f}s" if time_to_80 else "N/A"
+        sus_str = f"{time_to_first_suspicion:.2f}s" if time_to_first_suspicion else "N/A"
+        det_str = f"{time_to_detection:.2f}s" if time_to_detection else "N/A"
+        det2_str = f"{time_to_detection_2:.2f}s" if time_to_detection_2 else "N/A"
+        print(f"\n  Results: cov={final_coverage:.1f}%, t50={t50_str}, t60={t60_str}, "
+              f"t80={t80_str}, suspicion={sus_str}, impeach1={det_str}, "
+              f"impeach2={det2_str}, FP={false_positives}")
+
+        return result
+
+    def _parse_robot_logs(self, fault_time: float) -> Tuple[Optional[float], Optional[float]]:
+        """Parse robot log files for precise detection timing.
+
+        Looks for [DETECT] messages that contain first_decay_time and
+        impeachment_time timestamps, and computes offsets from fault_time.
+
+        Returns (first_suspicion_offset, impeachment_offset) in seconds.
+        """
+        log_dir = getattr(self, '_current_log_dir',
+                          os.path.join(self.output_dir, "logs"))
+        first_sus = None
+        first_imp = None
+
+        for i in range(1, NUM_ROBOTS + 1):
+            log_path = os.path.join(log_dir, f"robot_{i}.log")
+            if not os.path.exists(log_path):
+                continue
+            try:
+                with open(log_path, 'r', errors='replace') as f:
+                    for line in f:
+                        # [DETECT] First trust decay after N bad commands (Xs)
+                        if '[DETECT] First trust decay' in line:
+                            # Extract the time in parentheses e.g. "(1.23s)"
+                            import re
+                            m = re.search(r'\((\d+\.?\d*)s\)', line)
+                            if m:
+                                dt = float(m.group(1))
+                                if first_sus is None or dt < first_sus:
+                                    first_sus = dt
+                        # [DETECT] IMPEACHMENT after N bad commands, Xs from first
+                        if '[DETECT] IMPEACHMENT' in line:
+                            import re
+                            m = re.search(r'(\d+\.?\d*)s from first', line)
+                            if m:
+                                dt = float(m.group(1))
+                                if first_imp is None or dt < first_imp:
+                                    first_imp = dt
+            except Exception:
+                continue
+
+        return first_sus, first_imp
+
+    # -------------------- Persistence --------------------
+    def save_results(self, results: List[ExperimentResult], tag: str = ""):
+        """Save results to JSON"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"results_{tag}_{timestamp}.json" if tag else f"results_{timestamp}.json"
+        path = os.path.join(self.output_dir, fname)
+
+        data = []
+        for r in results:
+            d = asdict(r)
+            data.append(d)
+
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"\nResults saved to: {path}")
+        return path
+
+
+# ==================== Statistical Analysis ====================
+def compute_statistics(results: List[ExperimentResult]):
+    """Group results by condition (controller x fault x layout) and compute stats."""
+    groups: Dict[str, List[ExperimentResult]] = defaultdict(list)
+    for r in results:
+        key = f"{r.layout}|{r.controller}|{r.fault_type or 'none'}"
+        groups[key].append(r)
+
+    stats = {}
+    for key, trials in sorted(groups.items()):
+        layout, ctrl, fault = key.split('|')
+        n = len(trials)
+
+        coverages = [t.final_coverage for t in trials]
+        cov_mean = sum(coverages) / n
+        cov_std = math.sqrt(sum((c - cov_mean)**2 for c in coverages) / max(n - 1, 1))
+
+        t50s = [t.time_to_50 for t in trials if t.time_to_50 is not None]
+        t50_mean = sum(t50s) / len(t50s) if t50s else None
+        t50_std = math.sqrt(sum((t - t50_mean)**2 for t in t50s) / max(len(t50s) - 1, 1)) \
+            if t50s and len(t50s) > 1 else 0.0
+
+        t60s = [t.time_to_60 for t in trials if t.time_to_60 is not None]
+        t60_mean = sum(t60s) / len(t60s) if t60s else None
+        t60_std = math.sqrt(sum((t - t60_mean)**2 for t in t60s) / max(len(t60s) - 1, 1)) \
+            if t60s and len(t60s) > 1 else 0.0
+
+        t80s = [t.time_to_80 for t in trials if t.time_to_80 is not None]
+        t80_mean = sum(t80s) / len(t80s) if t80s else None
+        t80_std = math.sqrt(sum((t - t80_mean)**2 for t in t80s) / max(len(t80s) - 1, 1)) \
+            if t80s and len(t80s) > 1 else 0.0
+
+        detections = [t.time_to_detection for t in trials if t.time_to_detection is not None]
+        det_mean = sum(detections) / len(detections) if detections else None
+        det_std = math.sqrt(sum((d - det_mean)**2 for d in detections) / max(len(detections) - 1, 1)) \
+            if detections and len(detections) > 1 else 0.0
+        det_rate = len(detections) / n  # fraction of trials where fault was detected
+
+        # First suspicion timing (fault -> first trust decay)
+        suspicions = [t.time_to_first_suspicion for t in trials
+                      if t.time_to_first_suspicion is not None]
+        sus_mean = sum(suspicions) / len(suspicions) if suspicions else None
+        sus_std = math.sqrt(sum((s - sus_mean)**2 for s in suspicions) /
+                            max(len(suspicions) - 1, 1)) \
+            if suspicions and len(suspicions) > 1 else 0.0
+
+        fps = [t.false_positives for t in trials]
+        fp_mean = sum(fps) / n
+
+        cov90s = [t.coverage_at_90s for t in trials if t.coverage_at_90s is not None]
+        cov90_mean = sum(cov90s) / len(cov90s) if cov90s else None
+
+        stats[key] = {
+            'layout': layout,
+            'controller': ctrl,
+            'fault': fault,
+            'n': n,
+            'coverage_mean': cov_mean,
+            'coverage_std': cov_std,
+            'time_to_50_mean': t50_mean,
+            'time_to_50_std': t50_std,
+            'time_to_60_mean': t60_mean,
+            'time_to_60_std': t60_std,
+            'time_to_80_mean': t80_mean,
+            'time_to_80_std': t80_std,
+            'suspicion_mean': sus_mean,
+            'suspicion_std': sus_std,
+            'detection_mean': det_mean,
+            'detection_std': det_std,
+            'detection_rate': det_rate,
+            'false_positive_mean': fp_mean,
+            'coverage_at_90s_mean': cov90_mean,
+        }
+
+    return stats
+
+
+def print_statistics(results: List[ExperimentResult]):
+    """Print a publication-ready summary table."""
+    stats = compute_statistics(results)
+
+    print("\n" + "=" * 100)
+    print("STATISTICAL SUMMARY  (mean +/- std)")
+    print("=" * 100)
+
+    header = (f"{'Layout':<10} {'Controller':<14} {'Fault':<12} {'N':>3}  "
+              f"{'Coverage':>14}  {'T->50%':>12}  {'T->60%':>12}  {'T->80%':>12}  "
+              f"{'1st Suspicion':>14}  {'Impeachment':>14}  {'Det%':>5}  {'FP':>4}  {'Cov@90s':>8}")
+    print(header)
+    print("-" * 155)
+
+    for key in sorted(stats):
+        s = stats[key]
+        cov = f"{s['coverage_mean']:.1f}+/-{s['coverage_std']:.1f}"
+        t50 = f"{s['time_to_50_mean']:.1f}+/-{s['time_to_50_std']:.1f}" \
+            if s['time_to_50_mean'] is not None else "N/A"
+        t60 = f"{s['time_to_60_mean']:.1f}+/-{s['time_to_60_std']:.1f}" \
+            if s['time_to_60_mean'] is not None else "N/A"
+        t80 = f"{s['time_to_80_mean']:.1f}+/-{s['time_to_80_std']:.1f}" \
+            if s['time_to_80_mean'] is not None else "N/A"
+        sus = f"{s['suspicion_mean']:.2f}+/-{s['suspicion_std']:.2f}" \
+            if s['suspicion_mean'] is not None else "N/A"
+        det = f"{s['detection_mean']:.2f}+/-{s['detection_std']:.2f}" \
+            if s['detection_mean'] is not None else "N/A"
+        det_pct = f"{s['detection_rate']*100:.0f}%"
+        fp = f"{s['false_positive_mean']:.1f}"
+        c90 = f"{s['coverage_at_90s_mean']:.1f}" if s['coverage_at_90s_mean'] else "N/A"
+
+        print(f"{s['layout']:<10} {s['controller']:<14} {s['fault']:<12} "
+              f"{s['n']:>3}  {cov:>14}  {t50:>12}  {t60:>12}  {t80:>12}  "
+              f"{sus:>14}  {det:>14}  {det_pct:>5}  {fp:>4}  {c90:>8}")
+
+    print("=" * 120)
+
+    # ---- Key comparisons ----
+    print("\nKEY COMPARISONS:")
+    for layout in ["open", "multiroom"]:
+        reip = stats.get(f"{layout}|reip|bad_leader")
+        raft = stats.get(f"{layout}|raft|bad_leader")
+        dec = stats.get(f"{layout}|decentralized|bad_leader")
+        reip_clean = stats.get(f"{layout}|reip|none")
+
+        if reip and raft:
+            delta = reip['coverage_mean'] - raft['coverage_mean']
+            print(f"\n  [{layout}] Bad Leader — REIP vs RAFT:")
+            print(f"    Coverage: REIP {reip['coverage_mean']:.1f}% vs RAFT {raft['coverage_mean']:.1f}% "
+                  f"(+{delta:.1f}pp advantage)")
+            if reip['suspicion_mean'] is not None:
+                print(f"    REIP: First suspicion in {reip['suspicion_mean']:.2f}s, "
+                      f"full impeachment in {reip['detection_mean']:.2f}s"
+                      if reip['detection_mean'] else
+                      f"    REIP: First suspicion in {reip['suspicion_mean']:.2f}s, no impeachment")
+            else:
+                print(f"    REIP detection: {reip['detection_rate']*100:.0f}% rate "
+                      f"at {reip['detection_mean']:.2f}s avg"
+                      if reip['detection_mean'] else
+                      f"    REIP detection: 0% rate")
+            print(f"    RAFT detection: {raft['detection_rate']*100:.0f}% rate"
+                  + (f" at {raft['detection_mean']:.2f}s avg"
+                     if raft['detection_mean'] else " (never detects)"))
+
+        if reip and dec:
+            delta = reip['coverage_mean'] - dec['coverage_mean']
+            direction = "+" if delta >= 0 else ""
+            print(f"    REIP vs Decentralized: {direction}{delta:.1f}pp coverage "
+                  f"(REIP {reip['coverage_mean']:.1f}% vs Dec {dec['coverage_mean']:.1f}%)")
+
+        if reip and reip_clean:
+            delta = reip_clean['coverage_mean'] - reip['coverage_mean']
+            print(f"    REIP resilience: clean={reip_clean['coverage_mean']:.1f}%, "
+                  f"fault={reip['coverage_mean']:.1f}% "
+                  f"(only {delta:.1f}pp penalty from fault)")
+
+        # ---- Speed comparison (time to milestones) ----
+        all_conds = {}
+        for tag in ['reip', 'raft', 'decentralized']:
+            for fault_tag in ['none', 'bad_leader']:
+                k = f"{layout}|{tag}|{fault_tag}"
+                if k in stats:
+                    label = f"{tag}{'(fault)' if fault_tag != 'none' else ''}"
+                    all_conds[label] = stats[k]
+
+        if len(all_conds) >= 2:
+            print(f"\n  [{layout}] Time-to-Coverage Milestones:")
+            for label, s in sorted(all_conds.items()):
+                t50 = f"{s['time_to_50_mean']:.1f}s" if s.get('time_to_50_mean') else "---"
+                t60 = f"{s['time_to_60_mean']:.1f}s" if s.get('time_to_60_mean') else "---"
+                t80 = f"{s['time_to_80_mean']:.1f}s" if s.get('time_to_80_mean') else "---"
+                print(f"    {label:<22}  50%: {t50:>7}  60%: {t60:>7}  80%: {t80:>7}")
+
+
+# ==================== Experiment Conditions ====================
+# (condition_tag, controller, fault_type, fault_robot)
+EXPERIMENT_CONDITIONS = [
+    # --- Clean performance ---
+    ("NoFault",    "reip",          None,          1),
+    ("NoFault",    "raft",          None,          1),
+    ("NoFault",    "decentralized", None,          1),
+    # --- Bad leader (REIP's key differentiator) ---
+    ("BadLeader",  "reip",          "bad_leader",  1),
+    ("BadLeader",  "raft",          "bad_leader",  1),
+    ("BadLeader",  "decentralized", "bad_leader",  1),
+    # --- Oscillating leader fault (tests Tier 3 direction consistency) ---
+    ("Oscillate",  "reip",          "oscillate_leader",  1),
+    ("Oscillate",  "raft",          "oscillate_leader",  1),
+    ("Oscillate",  "decentralized", "oscillate_leader",  1),
+]
+
+
+# ==================== Parallel Worker (module-level for pickling) ===========
+def _run_worker(args_tuple):
+    """Run a sequence of experiments on one worker with one port offset.
+
+    args_tuple: (worker_id, job_list, output_dir)
+      job_list: [(name, layout, controller, fault_type, fault_robot, trial, seed), ...]
+    """
+    worker_id, job_list, output_dir = args_tuple
+    port_offset = worker_id * 1000
+    results = []
+    runner = ExperimentRunner(output_dir, port_offset=port_offset)
+
+    for name, layout, controller, fault_type, fault_robot, trial, seed in job_list:
+        runner.set_layout(layout)
+        try:
+            r = runner.run_experiment(
+                name=name, controller=controller,
+                fault_type=fault_type, fault_robot=fault_robot,
+                trial_num=trial, seed=seed)
+            results.append(asdict(r))
+        except Exception as e:
+            print(f"  [W{worker_id}][ERROR] {name}: {e}")
+            import traceback
+            traceback.print_exc()
+        time.sleep(1)
+
+    try:
+        runner.state_socket.close()
+    except Exception:
+        pass
+    return worker_id, results
+
+
+# ==================== Main ====================
+def main():
+    import argparse
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    parser = argparse.ArgumentParser(description="ISEF Experiment Suite")
+    parser.add_argument("--layout", default="all",
+                        help="'open', 'multiroom', or 'all' (default: all)")
+    parser.add_argument("--trials", type=int, default=TRIALS_PER_CONDITION,
+                        help=f"Trials per condition (default: {TRIALS_PER_CONDITION})")
+    parser.add_argument("--quick", action="store_true",
+                        help="Quick check: N=3, open layout only")
+    parser.add_argument("--condition", default=None,
+                        help="Run only conditions matching this substring (e.g. 'BadLeader')")
+    parser.add_argument("--workers", type=int, default=0,
+                        help="Parallel workers (0=auto based on CPU cores, 1=sequential)")
+    parser.add_argument("--snapshots", action="store_true",
+                        help="Save per-timestep position snapshots for gridworld viz")
+    args = parser.parse_args()
+
+    if args.quick:
+        n_trials = 3
+        layouts = ["open"]
+    else:
+        n_trials = args.trials
+        layouts = list(ARENA_LAYOUTS.keys()) if args.layout == "all" else [args.layout]
+
+    # Filter conditions if requested
+    conditions = EXPERIMENT_CONDITIONS
+    if args.condition:
+        conditions = [c for c in conditions if args.condition.lower() in c[0].lower()
+                      or args.condition.lower() in c[1].lower()]
+
+    # Build the full job list
+    jobs = []
+    for layout in layouts:
+        for trial in range(1, n_trials + 1):
+            seed = trial * 1000
+            for cond_tag, controller, fault_type, fault_robot in conditions:
+                name = f"{layout}_{controller}_{cond_tag}_t{trial}"
+                jobs.append((name, layout, controller, fault_type,
+                             fault_robot, trial, seed))
+
+    total = len(jobs)
+    if total == 0:
+        print("No experiments matched the given filters. Check --condition and --layout.")
+        sys.exit(1)
+
+    # Decide number of parallel workers
+    # Each experiment uses ~6 processes (5 robots + harness) but they're mostly
+    # sleeping (20Hz loop = 95% idle), so we can run many workers per core.
+    # Physics is time-based, so results are consistent regardless of load.
+    cpu_count = os.cpu_count() or 4
+    if args.workers > 0:
+        n_workers = args.workers
+    else:
+        # Default: ~2 workers per physical core (each experiment is I/O-bound)
+        n_workers = max(1, min(cpu_count // 2, total))
+    n_workers = min(n_workers, total)  # Never more workers than jobs
+
+    seq_hours = total * (EXPERIMENT_DURATION + 8) / 3600
+    par_hours = (total / n_workers) * (EXPERIMENT_DURATION + 8) / 3600
+
+    print(f"\nISEF Experiment Suite")
+    print(f"  Layouts: {layouts}")
+    print(f"  Conditions: {len(conditions)}")
+    print(f"  Trials per condition: {n_trials}")
+    print(f"  Total experiments: {total}")
+    print(f"  Workers: {n_workers} parallel")
+    print(f"  Est. time: {par_hours:.1f}h  (sequential would be {seq_hours:.1f}h)")
+    print()
+
+    # ---- Create a named run directory ----
+    # Format: experiments/run_YYYYMMDD_HHMMSS_<layout>_<N>trials/
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    layout_tag = "+".join(layouts)
+    cond_tag = args.condition or "all"
+    run_name = f"run_{timestamp}_{layout_tag}_{n_trials}trials_{cond_tag}"
+    output_dir = os.path.join("experiments", run_name)
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"  Output: {output_dir}/")
+    print()
+
+    if n_workers <= 1:
+        # ---- Sequential mode (simple, for debugging) ----
+        runner = ExperimentRunner(output_dir)
+        all_results: List[ExperimentResult] = []
+        for i, (name, layout, controller, fault_type, fault_robot, trial, seed) in enumerate(jobs):
+            print(f"\n>>> Experiment {i+1}/{total}: {name}")
+            runner.set_layout(layout)
+            result = runner.run_experiment(
+                name=name, controller=controller,
+                fault_type=fault_type, fault_robot=fault_robot,
+                trial_num=trial, seed=seed,
+                save_snapshots=args.snapshots,
+            )
+            all_results.append(result)
+            time.sleep(2)
+
+        final_path = runner.save_results(all_results, tag="final")
+        print_statistics(all_results)
+    else:
+        # ---- Parallel mode ----
+        # Partition jobs into N worker queues; each queue runs sequentially
+        # within its process, so port offsets never collide.
+        worker_queues: List[List[tuple]] = [[] for _ in range(n_workers)]
+        for i, job in enumerate(jobs):
+            worker_queues[i % n_workers].append(job)
+
+        all_results: List[ExperimentResult] = []
+        completed = 0
+        start_time = time.time()
+
+        # Build worker args: (worker_id, job_list, output_dir)
+        worker_args = [(wid, wq, output_dir)
+                       for wid, wq in enumerate(worker_queues)]
+
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            futures = {executor.submit(_run_worker, wa): wa[0]
+                       for wa in worker_args}
+
+            for future in as_completed(futures):
+                wid = futures[future]
+                try:
+                    returned_wid, result_dicts = future.result()
+                except Exception as e:
+                    import traceback
+                    print(f"  [Worker {wid} CRASHED]: {e}")
+                    traceback.print_exc()
+                    continue
+                for rd in result_dicts:
+                    completed += 1
+                    rd.pop('coverage_timeline', None)
+                    r = ExperimentResult(**{
+                        k: v for k, v in rd.items()
+                        if k in ExperimentResult.__dataclass_fields__
+                    })
+                    all_results.append(r)
+                elapsed = time.time() - start_time
+                print(f"  Worker {wid} done: {len(result_dicts)} experiments "
+                      f"({elapsed/60:.1f}m elapsed)")
+
+        # Save results directly (no ExperimentRunner needed)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        final_path = os.path.join(output_dir, f"results_final_{timestamp}.json")
+        with open(final_path, 'w') as f:
+            json.dump([asdict(r) for r in all_results], f, indent=2)
+        print(f"\nResults saved to: {final_path}")
+        print(f"  ({len(all_results)} experiments collected from {n_workers} workers)")
+        print_statistics(all_results)
+
+    # ---- Write a human-readable summary alongside the JSON ----
+    summary_path = os.path.join(output_dir, "SUMMARY.txt")
+    with open(summary_path, 'w') as f:
+        f.write(f"REIP Experiment Run: {run_name}\n")
+        f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+        f.write(f"Layouts: {layouts}\n")
+        f.write(f"Conditions: {len(conditions)}\n")
+        f.write(f"Trials per condition: {n_trials}\n")
+        f.write(f"Total experiments: {total}\n")
+        f.write(f"Workers: {n_workers}\n\n")
+        # Write the stats table
+        import io
+        old_stdout = sys.stdout
+        sys.stdout = buf = io.StringIO()
+        print_statistics(all_results)
+        sys.stdout = old_stdout
+        f.write(buf.getvalue())
+
+    print(f"\nDone! {len(all_results)} experiments completed.")
+    print(f"Results dir: {output_dir}/")
+    print(f"  results_final_*.json  — raw data")
+    print(f"  SUMMARY.txt           — human-readable stats")
+    print(f"  logs/                 — per-experiment robot logs")
+    print(f"\nGenerate graphs:")
+    print(f"  python test/generate_poster_graphs.py {output_dir}/results_final_*.json")
+
+
+if __name__ == "__main__":
+    main()

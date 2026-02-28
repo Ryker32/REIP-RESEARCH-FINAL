@@ -1,0 +1,17 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 1 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_1_20260226_192110.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 12101
+[INFO] Peer socket listening on port 12201
+[INFO] Fault socket listening on port 12301
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R1] state=follower leader=None term=0 cov=0.0%/0.0%
+[RAFT] Starting election, term 1
+[RAFT] Became leader, term 1

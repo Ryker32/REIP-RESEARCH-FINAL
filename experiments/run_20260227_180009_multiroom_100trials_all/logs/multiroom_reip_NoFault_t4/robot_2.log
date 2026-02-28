@@ -1,0 +1,37 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 2 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_2_20260227_180417.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 12102
+[INFO] Peer socket listening on port 12202
+[INFO] Fault socket listening on port 12302
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 2
+[R2] pos=(0,0) state=leader leader=2 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R2] pos=(812,759) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R2] pos=(793,599) state=follower leader=1 trust=1.00 susp=0.00 cov=2.1%/10.4%
+[R2] pos=(801,315) state=follower leader=1 trust=1.00 susp=0.00 cov=4.7%/20.8%
+[R2] pos=(638,574) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/30.2%
+[R2] pos=(922,809) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/38.0%
+[R2] pos=(922,817) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/42.2%
+[R2] pos=(922,818) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/49.0%
+[R2] pos=(922,675) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/57.8%
+[R2] pos=(922,692) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/65.1%
+[R2] pos=(921,699) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/71.4%
+[R2] pos=(921,693) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/74.5%
+[R2] pos=(920,676) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/77.6%
+[R2] pos=(920,705) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/82.8%
+[R2] pos=(920,706) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/85.9%
+[R2] pos=(920,697) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/86.5%
+[R2] pos=(920,697) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/86.5%
+[R2] pos=(920,697) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/86.5%

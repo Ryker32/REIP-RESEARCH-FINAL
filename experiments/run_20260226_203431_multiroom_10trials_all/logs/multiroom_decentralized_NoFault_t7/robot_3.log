@@ -1,0 +1,81 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 3 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_3_20260226_203913.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 17103
+[INFO] Peer socket listening on port 17203
+[INFO] Fault socket listening on port 17303
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R3] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R3] pos=(711,485) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R3] pos=(369,667) state=exploring leader=None trust=1.00 susp=0.00 cov=3.6%/13.5%
+[R3] pos=(75,1110) state=exploring leader=None trust=1.00 susp=0.00 cov=6.2%/19.8%
+[R3] pos=(308,1425) state=exploring leader=None trust=1.00 susp=0.00 cov=9.9%/30.7%
+[R3] pos=(560,1056) state=exploring leader=None trust=1.00 susp=0.00 cov=13.5%/41.1%
+[R3] pos=(939,1309) state=exploring leader=None trust=1.00 susp=0.00 cov=18.2%/48.4%
+[R3] pos=(1147,1312) state=exploring leader=None trust=1.00 susp=0.00 cov=19.3%/51.0%
+[R3] pos=(1228,1122) state=exploring leader=None trust=1.00 susp=0.00 cov=20.8%/54.2%
+[R3] pos=(1078,515) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/59.4%
+[R3] pos=(1095,144) state=exploring leader=None trust=1.00 susp=0.00 cov=26.0%/65.6%
+[R3] pos=(1416,75) state=exploring leader=None trust=1.00 susp=0.00 cov=29.2%/76.0%
+[R3] pos=(1687,103) state=exploring leader=None trust=1.00 susp=0.00 cov=33.3%/83.3%
+[R3] pos=(1824,442) state=exploring leader=None trust=1.00 susp=0.00 cov=36.5%/87.0%
+[R3] pos=(1815,955) state=exploring leader=None trust=1.00 susp=0.00 cov=40.1%/93.8%
+[R3] pos=(1925,1270) state=exploring leader=None trust=1.00 susp=0.00 cov=43.2%/100.0%
+[R3] pos=(1925,1256) state=exploring leader=None trust=1.00 susp=0.00 cov=43.2%/100.0%
+[R3] pos=(1925,1342) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1358) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1249) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1241) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1242) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1371) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1358) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1245) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1277) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1284) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1376) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1379) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1371) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1255) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1263) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1275) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1356) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1364) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1261) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1277) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1266) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1359) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1373) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1366) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1253) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1273) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1359) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1377) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1383) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1262) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1269) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1269) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1360) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1382) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1272) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1283) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1366) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1372) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1362) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1257) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1265) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1246) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1343) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1342) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1366) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%
+[R3] pos=(1925,1366) state=exploring leader=None trust=1.00 susp=0.00 cov=43.8%/100.0%

@@ -1,0 +1,25 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 5 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_5_20260227_180431.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 10105
+[INFO] Peer socket listening on port 10205
+[INFO] Fault socket listening on port 10305
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R5] state=follower leader=None term=0 cov=0.0%/0.0%
+[R5] state=follower leader=4 term=1 cov=0.5%/0.5%
+[R5] state=follower leader=4 term=1 cov=2.1%/9.4%
+[R5] state=follower leader=4 term=1 cov=4.2%/17.2%
+[R5] state=follower leader=4 term=1 cov=4.2%/19.3%
+[R5] state=follower leader=4 term=1 cov=4.2%/21.4%
+[R5] state=follower leader=4 term=1 cov=4.2%/24.5%
+[R5] state=follower leader=4 term=1 cov=4.2%/29.2%
+[R5] state=follower leader=4 term=1 cov=4.2%/35.4%
+[R5] state=follower leader=4 term=1 cov=4.2%/38.0%
+[R5] state=follower leader=4 term=1 cov=4.2%/42.7%

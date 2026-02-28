@@ -1,0 +1,98 @@
+[WARN] Hardware modules not available - simulation mode
+=== RAFT Baseline - Robot 1 [SIM] ===
+NO TRUST. Heartbeat timeout only.
+
+  Logging to: logs/raft_1_20260227_181708.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 6101
+[INFO] Peer socket listening on port 6201
+[INFO] Fault socket listening on port 6301
+Ready!
+
+Running RAFT baseline... Press Ctrl+C to stop
+
+[R1] state=follower leader=None term=0 cov=0.0%/0.0%
+[R1] state=follower leader=2 term=1 cov=0.5%/0.5%
+[R1] state=follower leader=2 term=1 cov=3.1%/11.5%
+[R1] state=follower leader=2 term=1 cov=5.7%/17.7%
+[R1] state=follower leader=2 term=1 cov=6.8%/25.0%
+[R1] state=follower leader=2 term=1 cov=8.9%/32.3%
+[FAULT] OSCILLATE_LEADER mode - will flip-flop targets (Raft CANNOT detect this)
+[R1] state=follower leader=2 term=1 cov=9.9%/37.0%
+[R1] state=follower leader=2 term=1 cov=10.9%/40.1%
+[R1] state=follower leader=2 term=1 cov=10.9%/42.7%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[R1] state=follower leader=2 term=1 cov=10.9%/44.8%
+[RAFT] Starting election, term 2
+[RAFT] Became leader, term 2
+Exception in thread Thread-2 (network_loop):
+Traceback (most recent call last):
+  File "C:\Python314\Lib\threading.py", line 1081, in _bootstrap_inner
+    self._context.run(self.run)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Python314\Lib\threading.py", line 1023, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\baselines\raft_node.py", line 801, in network_loop
+    self.send_heartbeat()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\baselines\raft_node.py", line 357, in send_heartbeat
+    assignments = self.compute_task_assignments()
+  File "C:\Users\ryker\research\reip-sim-public\robot\baselines\raft_node.py", line 538, in compute_task_assignments
+    return self._compute_oscillate_assignments()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\baselines\raft_node.py", line 633, in _compute_oscillate_assignments
+    corner_b = (self.arena_width - margin, self.arena_height - margin)
+                ^^^^^^^^^^^^^^^^
+AttributeError: 'RAFTNode' object has no attribute 'arena_width'
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%
+[R1] state=leader leader=1 term=2 cov=10.9%/45.3%

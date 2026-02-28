@@ -1,0 +1,30 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 2 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_2_20260226_162709.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 19102
+[INFO] Peer socket listening on port 19202
+[INFO] Fault socket listening on port 19302
+Ready!
+
+=== DECENTRALIZED MODE - No leader coordination ===
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[R2] pos=(0,0) state=exploring leader=None trust=1.00 susp=0.00 cov=0.0%/0.0%
+[R2] pos=(435,677) state=exploring leader=None trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R2] pos=(185,342) state=exploring leader=None trust=1.00 susp=0.00 cov=4.2%/17.2%
+[R2] pos=(313,391) state=exploring leader=None trust=1.00 susp=0.00 cov=7.3%/27.1%
+[R2] pos=(649,483) state=exploring leader=None trust=1.00 susp=0.00 cov=10.9%/41.1%
+[R2] pos=(897,769) state=exploring leader=None trust=1.00 susp=0.00 cov=14.1%/55.7%
+[R2] pos=(1063,1391) state=exploring leader=None trust=1.00 susp=0.00 cov=16.7%/66.1%
+[R2] pos=(1223,980) state=exploring leader=None trust=1.00 susp=0.00 cov=20.8%/75.5%
+[R2] pos=(1481,579) state=exploring leader=None trust=1.00 susp=0.00 cov=23.4%/82.3%
+[R2] pos=(1824,604) state=exploring leader=None trust=1.00 susp=0.00 cov=27.6%/93.8%
+[R2] pos=(1925,1385) state=exploring leader=None trust=1.00 susp=0.00 cov=30.2%/100.0%
+[R2] pos=(1925,1266) state=exploring leader=None trust=1.00 susp=0.00 cov=30.2%/100.0%

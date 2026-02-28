@@ -1,0 +1,128 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 4 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_4_20260227_181708.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 5104
+[INFO] Peer socket listening on port 5204
+[INFO] Fault socket listening on port 5304
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 4
+[R4] pos=(0,0) state=leader leader=4 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R4] pos=(247,1056) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R4] pos=(201,383) state=follower leader=1 trust=1.00 susp=0.00 cov=3.1%/13.0%
+[R4] pos=(519,75) state=follower leader=1 trust=1.00 susp=0.00 cov=6.2%/19.3%
+[R4] pos=(902,187) state=follower leader=1 trust=1.00 susp=0.00 cov=8.3%/27.6%
+[R4] pos=(923,322) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/35.4%
+[R4] pos=(923,325) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/39.6%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00 omega=0.455
+[TRUST] Bad command #2 (personal_visited): suspicion +1.00 = 1.90 omega=1.069
+[DETECT] First trust decay after 2 bad commands (0.41s) [Theoretical bound: T1=2, T3=8]
+[CLASSIFY] Fault type: byzantine_oscillation (omega=1.069, threshold=0.785)
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.40, omega=1.069, class=byzantine_oscillation
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 1.30 omega=1.709
+[TRUST] Bad command #4 (personal_visited, cmd_instability(omega=2.37)): suspicion +1.01 = 2.21 omega=2.372
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.71, omega=2.372, class=byzantine_oscillation
+[TRUST] Bad command #5 (cmd_instability(omega=2.61)): suspicion +0.10 = 0.80 omega=2.614
+[TRUST] Bad command #6 (personal_visited, cmd_instability(omega=2.65)): suspicion +1.11 = 1.92 omega=2.654
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.42, omega=2.654, class=byzantine_oscillation
+[R4] pos=(858,487) state=follower leader=1 trust=0.40 susp=0.42 cov=10.4%/42.7%
+[TRUST] Bad command #7 (cmd_instability(omega=2.69)): suspicion +0.13 = 0.55 omega=2.693
+[TRUST] Bad command #8 (personal_visited, cmd_instability(omega=2.72)): suspicion +1.14 = 1.69 omega=2.721
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.19, omega=2.721, class=byzantine_oscillation
+[TRUST] Bad command #9 (cmd_instability(omega=2.74)): suspicion +0.15 = 0.33 omega=2.739
+[TRUST] Bad command #10 (personal_visited, cmd_instability(omega=2.75)): suspicion +1.15 = 1.48 omega=2.746
+[TRUST] Bad command #11 (cmd_instability(omega=2.75)): suspicion +0.15 = 1.63 omega=2.750
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.13, omega=2.750, class=byzantine_oscillation
+[DETECT] IMPEACHMENT after 11 bad commands, 2.85s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.10), excluding leader 1 from candidates
+[ELECTION] Leader 1 impeached (failures=1)
+[ELECTION] New leader: 2
+[R4] pos=(917,431) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/43.2%
+[R4] pos=(915,428) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/44.3%
+[R4] pos=(915,444) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/45.8%
+[R4] pos=(913,426) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/46.4%
+[R4] pos=(912,444) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/48.4%
+[R4] pos=(911,449) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/50.0%
+[R4] pos=(911,432) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/50.0%
+[R4] pos=(911,431) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/52.1%
+[R4] pos=(911,426) state=follower leader=2 trust=1.00 susp=0.00 cov=10.4%/54.7%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00 omega=0.480
+[TRUST] Bad command #2 (personal_visited): suspicion +1.00 = 1.90 omega=1.155
+[DETECT] First trust decay after 2 bad commands (0.41s) [Theoretical bound: T1=2, T3=8]
+[CLASSIFY] Fault type: byzantine_oscillation (omega=1.155, threshold=0.785)
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.40, omega=1.155, class=byzantine_oscillation
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 1.30 omega=1.845
+[TRUST] Bad command #4 (personal_visited, cmd_instability(omega=2.55)): suspicion +1.07 = 2.27 omega=2.550
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.77, omega=2.550, class=byzantine_oscillation
+[TRUST] Bad command #5 (cmd_instability(omega=2.83)): suspicion +0.18 = 0.95 omega=2.828
+[TRUST] Bad command #6 (personal_visited, cmd_instability(omega=2.86)): suspicion +1.19 = 2.15 omega=2.855
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.65, omega=2.855, class=byzantine_oscillation
+[R4] pos=(854,536) state=follower leader=2 trust=0.40 susp=0.65 cov=11.5%/56.8%
+[TRUST] Bad command #7 (cmd_instability(omega=2.88)): suspicion +0.20 = 0.85 omega=2.880
+[TRUST] Bad command #8 (personal_visited, cmd_instability(omega=2.90)): suspicion +1.21 = 2.05 omega=2.897
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.55, omega=2.897, class=byzantine_oscillation
+[TRUST] Bad command #9 (cmd_instability(omega=2.91)): suspicion +0.21 = 0.76 omega=2.912
+[TRUST] Bad command #10 (personal_visited, cmd_instability(omega=2.92)): suspicion +1.22 = 1.98 omega=2.923
+[TRUST] Trust decayed: trust=0.10, remaining suspicion=0.48, omega=2.923, class=byzantine_oscillation
+[TRUST] Bad command #11 (cmd_instability(omega=2.93)): suspicion +0.22 = 0.70 omega=2.931
+[DETECT] IMPEACHMENT after 11 bad commands, 2.75s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.10), excluding leader 2 from candidates
+[ELECTION] Leader 2 impeached (failures=1)
+[ELECTION] New leader: 4
+[R4] pos=(854,536) state=leader leader=4 trust=1.00 susp=0.00 cov=11.5%/56.8%
+[ELECTION] Leader 4 impeached (failures=1)
+[ELECTION] New leader: 5
+[R4] pos=(914,581) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/58.9%
+[R4] pos=(913,569) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/63.5%
+[R4] pos=(912,551) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/67.2%
+[R4] pos=(911,551) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/70.8%
+[R4] pos=(911,569) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/76.0%
+[R4] pos=(911,544) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/79.7%
+[R4] pos=(911,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/82.8%
+[R4] pos=(924,553) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/84.9%
+[R4] pos=(925,572) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/88.5%
+[R4] pos=(925,567) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/89.6%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(925,556) state=follower leader=5 trust=1.00 susp=0.00 cov=11.5%/90.1%
+[R4] pos=(924,638) state=follower leader=5 trust=1.00 susp=0.00 cov=12.0%/90.6%
+[R4] pos=(924,819) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/92.7%
+[R4] pos=(923,801) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/93.2%
+[R4] pos=(923,822) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/94.8%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/95.3%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/95.3%
+[R4] pos=(923,822) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/95.8%
+[R4] pos=(923,822) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/95.8%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/95.8%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%
+[R4] pos=(923,817) state=follower leader=5 trust=1.00 susp=0.00 cov=12.5%/96.4%

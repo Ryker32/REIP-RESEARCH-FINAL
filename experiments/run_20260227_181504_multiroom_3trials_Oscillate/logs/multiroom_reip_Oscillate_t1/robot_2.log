@@ -1,0 +1,493 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 2 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_2_20260227_181504.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 5102
+[INFO] Peer socket listening on port 5202
+[INFO] Fault socket listening on port 5302
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 2
+[R2] pos=(0,0) state=leader leader=2 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R2] pos=(397,711) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R2] pos=(75,169) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/12.5%
+[R2] pos=(75,788) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/17.7%
+[R2] pos=(194,938) state=follower leader=1 trust=1.00 susp=0.00 cov=6.8%/24.5%
+[R2] pos=(387,1191) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/31.2%
+[R2] pos=(562,1425) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/37.0%
+[TRUST] Bad command #1 (peer_reported): suspicion +0.30 = 0.30 omega=0.717
+[TRUST] Bad command #2 (peer_reported): suspicion +0.30 = 0.50 omega=1.117
+[TRUST] Bad command #3 (peer_reported): suspicion +0.30 = 0.70 omega=1.391
+[TRUST] Bad command #4 (peer_reported): suspicion +0.30 = 0.90 omega=1.753
+[TRUST] Bad command #5 (peer_reported): suspicion +0.30 = 1.10 omega=1.996
+[R2] pos=(834,1217) state=follower leader=1 trust=1.00 susp=1.10 cov=12.5%/40.1%
+[TRUST] Bad command #6 (peer_reported): suspicion +0.30 = 1.30 omega=2.097
+[TRUST] Bad command #7 (peer_reported): suspicion +0.30 = 1.50 omega=2.189
+[TRUST] Bad command #8 (peer_reported): suspicion +0.30 = 1.70 omega=2.268
+[DETECT] First trust decay after 8 bad commands (2.86s) [Theoretical bound: T1=2, T3=8]
+[CLASSIFY] Fault type: byzantine_oscillation (omega=2.268, threshold=0.785)
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.20, omega=2.268, class=byzantine_oscillation
+[TRUST] Bad command #9 (peer_reported): suspicion +0.30 = 0.40 omega=2.356
+[TRUST] Bad command #10 (cmd_instability(omega=2.39)): suspicion +0.01 = 0.41 omega=2.389
+[R2] pos=(925,1093) state=follower leader=1 trust=0.80 susp=0.41 cov=14.1%/42.2%
+[TRUST] Bad command #11 (peer_reported, cmd_instability(omega=2.42)): suspicion +0.32 = 0.74 omega=2.417
+[TRUST] Bad command #12 (cmd_instability(omega=2.44)): suspicion +0.03 = 0.77 omega=2.438
+[TRUST] Bad command #13 (peer_reported, cmd_instability(omega=2.46)): suspicion +0.34 = 1.11 omega=2.458
+[TRUST] Bad command #14 (cmd_instability(omega=2.47)): suspicion +0.04 = 1.15 omega=2.472
+[TRUST] Bad command #15 (peer_reported, cmd_instability(omega=2.48)): suspicion +0.35 = 1.50 omega=2.482
+[ELECTION] Leader 1 impeached (failures=1)
+[ELECTION] New leader: 2
+[R2] pos=(877,1035) state=leader leader=2 trust=1.00 susp=0.00 cov=14.1%/42.2%
+[R2] pos=(877,1035) state=leader leader=2 trust=1.00 susp=0.00 cov=14.1%/42.2%
+[R2] pos=(877,1035) state=leader leader=2 trust=1.00 susp=0.00 cov=14.1%/42.2%
+[R2] pos=(877,1035) state=leader leader=2 trust=1.00 susp=0.00 cov=14.1%/42.2%
+[R2] pos=(917,971) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/42.7%
+[R2] pos=(917,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/43.8%
+[R2] pos=(918,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[R2] pos=(918,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[R2] pos=(918,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[R2] pos=(918,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[R2] pos=(918,947) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[FAULT] OSCILLATE_LEADER mode activated - will flip-flop targets
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(922,1014) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(922,1155) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(922,1221) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(922,1221) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(922,1221) state=leader leader=2 trust=1.00 susp=0.00 cov=14.6%/44.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(963,1284) state=leader leader=2 trust=1.00 susp=0.00 cov=15.1%/44.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1045,1410) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1119,1399) state=leader leader=2 trust=1.00 susp=0.00 cov=16.1%/45.8%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1217,1322) state=leader leader=2 trust=1.00 susp=0.00 cov=17.7%/47.4%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1309,1121) state=leader leader=2 trust=1.00 susp=0.00 cov=19.3%/49.0%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1352,1048) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/50.0%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1430,1066) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/50.5%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1436,1057) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/50.5%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1438,1054) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/51.0%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1377,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/51.0%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/52.1%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/54.2%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1440,1052) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/56.8%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1440,1052) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/58.3%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/58.9%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/60.9%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/63.5%
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1378,1010) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/66.7%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[R2] pos=(1440,1052) state=leader leader=2 trust=1.00 susp=0.00 cov=20.3%/69.3%
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[OSCILLATE] Phase 1: all 5 robots -> B (1800, 1300)
+[OSCILLATE] Phase 0: all 5 robots -> A (200, 200)
+[ELECTION] Leader 2 impeached (failures=1)
+[ELECTION] New leader: 4
+[R2] pos=(1272,1033) state=follower leader=4 trust=1.00 susp=0.00 cov=20.3%/70.8%

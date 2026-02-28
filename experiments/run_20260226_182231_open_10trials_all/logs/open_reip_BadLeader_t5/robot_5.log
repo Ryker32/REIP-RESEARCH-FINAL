@@ -1,0 +1,36 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 5 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_5_20260226_183106.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 12105
+[INFO] Peer socket listening on port 12205
+[INFO] Fault socket listening on port 12305
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 5
+[R5] pos=(0,0) state=leader leader=5 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R5] pos=(1134,230) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R5] pos=(1192,311) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/13.5%
+[R5] pos=(1415,435) state=follower leader=1 trust=1.00 susp=0.00 cov=6.8%/23.4%
+[R5] pos=(1560,211) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/32.3%
+[R5] pos=(1707,75) state=follower leader=1 trust=1.00 susp=0.00 cov=10.9%/39.6%
+[R5] pos=(1925,283) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/51.0%
+[R5] pos=(1623,268) state=follower leader=1 trust=1.00 susp=0.00 cov=14.6%/61.5%
+[R5] pos=(1356,75) state=follower leader=1 trust=1.00 susp=0.00 cov=16.7%/69.3%
+[R5] pos=(853,167) state=follower leader=1 trust=1.00 susp=0.00 cov=18.2%/78.1%
+[R5] pos=(470,791) state=follower leader=1 trust=1.00 susp=0.00 cov=21.4%/87.5%
+[MPC] Moderate mismatch: best alignment 122°, error=0.21
+[R5] pos=(177,733) state=follower leader=1 trust=1.00 susp=0.00 cov=24.5%/96.4%
+[R5] pos=(1115,783) state=follower leader=1 trust=1.00 susp=0.00 cov=27.6%/99.5%
+[R5] pos=(1746,816) state=follower leader=1 trust=1.00 susp=0.00 cov=30.2%/100.0%
+[R5] pos=(1744,815) state=follower leader=1 trust=1.00 susp=0.00 cov=30.7%/100.0%
+[R5] pos=(1640,810) state=follower leader=1 trust=1.00 susp=0.00 cov=30.7%/100.0%

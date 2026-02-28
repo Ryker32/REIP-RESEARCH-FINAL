@@ -1,0 +1,41 @@
+REIP Experiment Run: run_20260226_203431_multiroom_10trials_all
+Date: 2026-02-26 20:50
+Layouts: ['multiroom']
+Conditions: 9
+Trials per condition: 10
+Total experiments: 90
+Workers: 22
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+multiroom  decentralized  bad_leader    10      99.9+/-0.2   18.2+/-20.6   22.4+/-20.4   30.4+/-20.0             N/A             N/A     0%   0.0      99.6
+multiroom  decentralized  none          10     91.0+/-27.4   16.3+/-15.6   24.9+/-16.7   32.2+/-15.5             N/A             N/A     0%   0.0      91.0
+multiroom  decentralized  spin          10      97.1+/-9.1   15.7+/-10.8   22.6+/-13.6    25.8+/-8.0             N/A             N/A     0%   0.0      97.1
+multiroom  raft           bad_leader    10     63.2+/-34.0    12.8+/-3.4    18.3+/-4.5    25.2+/-1.2             N/A             N/A     0%   0.0      62.3
+multiroom  raft           none          10     90.8+/-18.6   25.1+/-30.8   30.9+/-30.2   42.8+/-31.3             N/A             N/A     0%   0.0      85.0
+multiroom  raft           spin          10      96.1+/-6.7    15.8+/-4.7    22.6+/-6.3   42.7+/-24.5             N/A             N/A     0%   0.0      93.8
+multiroom  reip           bad_leader    10     82.3+/-37.3    13.6+/-3.6    21.9+/-9.0   33.1+/-10.8     0.22+/-0.13     2.18+/-0.74   100%   0.0      79.4
+multiroom  reip           none          10     80.7+/-40.6    13.0+/-4.5    18.8+/-5.2   37.2+/-20.6             N/A             N/A     0%   0.0      78.5
+multiroom  reip           spin          10     89.8+/-26.4    11.9+/-3.2   25.7+/-12.8   44.4+/-19.6   29.99+/-28.42             N/A     0%   0.0      89.0
+========================================================================================================================
+
+KEY COMPARISONS:
+
+  [multiroom] Bad Leader — REIP vs RAFT:
+    Coverage: REIP 82.3% vs RAFT 63.2% (+19.1pp advantage)
+    REIP: First suspicion in 0.22s, full impeachment in 2.18s
+    RAFT detection: 0% rate (never detects)
+    REIP vs Decentralized: -17.6pp coverage (REIP 82.3% vs Dec 99.9%)
+    REIP resilience: clean=80.7%, fault=82.3% (only -1.7pp penalty from fault)
+
+  [multiroom] Time-to-Coverage Milestones:
+    decentralized           50%:   16.3s  60%:   24.9s  80%:   32.2s
+    decentralized(fault)    50%:   18.2s  60%:   22.4s  80%:   30.4s
+    raft                    50%:   25.1s  60%:   30.9s  80%:   42.8s
+    raft(fault)             50%:   12.8s  60%:   18.3s  80%:   25.2s
+    reip                    50%:   13.0s  60%:   18.8s  80%:   37.2s
+    reip(fault)             50%:   13.6s  60%:   21.9s  80%:   33.1s

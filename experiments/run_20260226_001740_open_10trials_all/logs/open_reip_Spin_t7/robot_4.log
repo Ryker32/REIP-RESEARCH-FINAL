@@ -1,0 +1,105 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 4 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_4_20260226_002759.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 5104
+[INFO] Peer socket listening on port 5204
+[INFO] Fault socket listening on port 5304
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 4
+[R4] pos=(0,0) state=leader leader=4 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R4] pos=(314,624) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R4] pos=(224,589) state=follower leader=1 trust=1.00 susp=0.00 cov=1.0%/7.3%
+[R4] pos=(314,713) state=follower leader=1 trust=1.00 susp=0.00 cov=2.1%/12.0%
+[R4] pos=(416,810) state=follower leader=1 trust=1.00 susp=0.00 cov=3.1%/16.7%
+[R4] pos=(516,692) state=follower leader=1 trust=1.00 susp=0.00 cov=4.2%/21.9%
+[R4] pos=(591,802) state=follower leader=1 trust=1.00 susp=0.00 cov=4.7%/27.6%
+[R4] pos=(691,700) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/32.8%
+[R4] pos=(813,812) state=follower leader=1 trust=1.00 susp=0.00 cov=6.8%/38.5%
+[R4] pos=(713,937) state=follower leader=1 trust=1.00 susp=0.00 cov=7.8%/44.8%
+[R4] pos=(799,1107) state=follower leader=1 trust=1.00 susp=0.00 cov=8.9%/49.0%
+[R4] pos=(698,1255) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/53.1%
+[R4] pos=(544,1204) state=follower leader=1 trust=1.00 susp=0.00 cov=11.5%/56.8%
+[R4] pos=(518,1075) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/60.4%
+[R4] pos=(461,944) state=follower leader=1 trust=1.00 susp=0.00 cov=14.1%/66.7%
+[R4] pos=(313,1061) state=follower leader=1 trust=1.00 susp=0.00 cov=15.1%/72.4%
+[R4] pos=(188,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=16.1%/76.6%
+[R4] pos=(413,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=16.7%/79.2%
+[R4] pos=(663,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=16.7%/80.2%
+[R4] pos=(888,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=17.2%/81.2%
+[R4] pos=(1138,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=18.2%/82.8%
+[R4] pos=(1388,1187) state=follower leader=1 trust=1.00 susp=0.00 cov=19.3%/85.9%
+[R4] pos=(1466,1072) state=follower leader=1 trust=1.00 susp=0.00 cov=19.8%/89.6%
+[R4] pos=(1566,1175) state=follower leader=1 trust=1.00 susp=0.00 cov=20.8%/93.2%
+[MPC] Moderate mismatch: best alignment 109°, error=0.13
+[R4] pos=(1683,1085) state=follower leader=1 trust=1.00 susp=0.00 cov=21.9%/94.8%
+[R4] pos=(1685,860) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/96.9%
+[R4] pos=(1622,627) state=follower leader=1 trust=1.00 susp=0.00 cov=24.0%/99.5%
+[R4] pos=(1521,455) state=follower leader=1 trust=1.00 susp=0.00 cov=25.0%/100.0%
+[R4] pos=(1458,347) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%
+[R4] pos=(1445,326) state=follower leader=1 trust=1.00 susp=0.00 cov=26.0%/100.0%

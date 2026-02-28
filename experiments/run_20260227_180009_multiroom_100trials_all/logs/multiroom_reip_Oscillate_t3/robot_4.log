@@ -1,0 +1,57 @@
+[WARN] Hardware modules not available - running in simulation mode
+=== REIP Node - Robot 4 [SIM (unique ports)] ===
+Trust Model: Three-tier confidence-weighted
+  Personal: 1.0, ToF: 1.0, Peer: 0.3
+  Suspicion threshold: 1.5, Recovery: 0.1
+
+  Logging to: logs/robot_4_20260227_180423.jsonl
+Initializing hardware...
+  Hardware: SIMULATED
+[INFO] Position socket listening on port 9104
+[INFO] Peer socket listening on port 9204
+[INFO] Fault socket listening on port 9304
+Ready!
+
+=== Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
+Running... Press Ctrl+C to stop
+
+[ELECTION] New leader: 4
+[R4] pos=(0,0) state=leader leader=4 trust=1.00 susp=0.00 cov=0.0%/0.0%
+[ELECTION] New leader: 1
+[R4] pos=(300,404) state=follower leader=1 trust=1.00 susp=0.00 cov=0.5%/0.5%
+[R4] pos=(251,194) state=follower leader=1 trust=1.00 susp=0.00 cov=2.6%/9.4%
+[R4] pos=(75,299) state=follower leader=1 trust=1.00 susp=0.00 cov=4.7%/18.8%
+[R4] pos=(181,552) state=follower leader=1 trust=1.00 susp=0.00 cov=6.2%/23.4%
+[R4] pos=(75,868) state=follower leader=1 trust=1.00 susp=0.00 cov=7.8%/31.2%
+[R4] pos=(110,1059) state=follower leader=1 trust=1.00 susp=0.00 cov=10.4%/39.1%
+[TRUST] Bad command #1 (personal_visited): suspicion +1.00 = 1.00 omega=1.155
+[TRUST] Bad command #2 (personal_visited): suspicion +1.00 = 1.90 omega=1.254
+[DETECT] First trust decay after 2 bad commands (0.40s) [Theoretical bound: T1=2, T3=8]
+[CLASSIFY] Fault type: byzantine_oscillation (omega=1.254, threshold=0.785)
+[TRUST] Trust decayed: trust=0.80, remaining suspicion=0.40, omega=1.254, class=byzantine_oscillation
+[TRUST] Bad command #3 (personal_visited): suspicion +1.00 = 1.30 omega=1.620
+[TRUST] Bad command #4 (personal_visited): suspicion +1.00 = 2.20 omega=1.869
+[TRUST] Trust decayed: trust=0.60, remaining suspicion=0.70, omega=1.869, class=byzantine_oscillation
+[TRUST] Bad command #5 (personal_visited): suspicion +1.00 = 1.60 omega=1.811
+[TRUST] Trust decayed: trust=0.40, remaining suspicion=0.10, omega=1.811, class=byzantine_oscillation
+[R4] pos=(344,827) state=follower leader=1 trust=0.40 susp=0.10 cov=11.5%/41.7%
+[TRUST] Bad command #6 (personal_visited): suspicion +1.00 = 1.00 omega=1.948
+[TRUST] Bad command #7 (personal_visited): suspicion +1.00 = 1.90 omega=2.053
+[TRUST] Trust decayed: trust=0.20, remaining suspicion=0.40, omega=2.053, class=byzantine_oscillation
+[DETECT] IMPEACHMENT after 7 bad commands, 2.77s from first bad command [Bound: T1=8 cmds, T3=32 cmds]
+[IMPEACH] Trust too low (0.20), excluding leader 1 from candidates
+[ELECTION] Leader 1 impeached (failures=1)
+[ELECTION] New leader: 3
+[R4] pos=(829,1166) state=follower leader=3 trust=1.00 susp=0.00 cov=15.1%/43.2%
+[ELECTION] Leader 3 impeached (failures=1)
+[ELECTION] New leader: 2
+[R4] pos=(919,1194) state=follower leader=2 trust=1.00 susp=0.00 cov=15.6%/43.2%
+[R4] pos=(918,1181) state=follower leader=2 trust=1.00 susp=0.00 cov=15.6%/43.2%
+[R4] pos=(918,1182) state=follower leader=2 trust=1.00 susp=0.00 cov=15.6%/43.2%
+[ELECTION] Leader 2 impeached (failures=1)
+[ELECTION] New leader: 3
+[R4] pos=(918,1178) state=follower leader=3 trust=1.00 susp=0.00 cov=15.6%/43.2%
+[ELECTION] Leader 3 impeached (failures=2)
+[ELECTION] New leader: 2
+[R4] pos=(918,1178) state=follower leader=2 trust=1.00 susp=0.00 cov=15.6%/43.2%
+[R4] pos=(918,1175) state=follower leader=2 trust=1.00 susp=0.00 cov=15.6%/45.3%

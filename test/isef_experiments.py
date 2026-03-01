@@ -169,7 +169,8 @@ class ExperimentRunner:
 
     # -------------------- Process Management --------------------
     def start_robots(self, script: str, extra_args: List[str] = None,
-                     seed: int = 42, experiment_name: str = ""):
+                     seed: int = 42, experiment_name: str = "",
+                     fixed_positions: Dict[int, Tuple[float, float, float]] = None):
         """Start robot processes with seed-based random starting positions."""
         # Use per-experiment log directory to avoid overwriting
         if experiment_name:
@@ -196,25 +197,28 @@ class ExperimentRunner:
             )
             self.robot_processes.append(proc)
 
-            # Randomized starting position (seed-controlled for reproducibility)
-            # Use per-layout start zone if defined, else full arena with margin
-            start_zone = ARENA_START_ZONES.get(self.layout)
-            if start_zone:
-                sx = rng.uniform(start_zone[0], start_zone[1])
-                sy = rng.uniform(start_zone[2], start_zone[3])
+            # Starting position: use fixed (hardware) positions if provided,
+            # otherwise randomize (seed-controlled for reproducibility).
+            if fixed_positions and i in fixed_positions:
+                sx, sy, theta = fixed_positions[i]
             else:
-                sx = rng.uniform(200, self.arena_width - 200)
-                sy = rng.uniform(200, self.arena_height - 200)
-            theta = rng.uniform(0, 2 * math.pi)
-
-            # Reject positions inside walls
-            while self._collides_with_wall(sx, sy):
+                start_zone = ARENA_START_ZONES.get(self.layout)
                 if start_zone:
                     sx = rng.uniform(start_zone[0], start_zone[1])
                     sy = rng.uniform(start_zone[2], start_zone[3])
                 else:
                     sx = rng.uniform(200, self.arena_width - 200)
                     sy = rng.uniform(200, self.arena_height - 200)
+                theta = rng.uniform(0, 2 * math.pi)
+
+                # Reject positions inside walls
+                while self._collides_with_wall(sx, sy):
+                    if start_zone:
+                        sx = rng.uniform(start_zone[0], start_zone[1])
+                        sy = rng.uniform(start_zone[2], start_zone[3])
+                    else:
+                        sx = rng.uniform(200, self.arena_width - 200)
+                        sy = rng.uniform(200, self.arena_height - 200)
 
             self.sim_positions[i] = (sx, sy, theta)
             self.stuck_counters[i] = 0

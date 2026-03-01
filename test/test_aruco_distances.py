@@ -220,6 +220,18 @@ def build_json(markers, H):
             }
         data['robots'][f'R{rid}'] = rdata
 
+    # Sim-compatible fixed_positions: {robot_id: (x_mm, y_mm, theta_rad)}
+    # Feed this directly to ExperimentRunner.start_robots(fixed_positions=...)
+    if has_H:
+        sim_pos = {}
+        for rid in sorted(ROBOT_IDS):
+            if rid not in markers:
+                continue
+            ax, ay = arena[rid]
+            theta = markers[rid]['theta_rad']
+            sim_pos[rid] = [round(ax, 1), round(ay, 1), round(theta, 4)]
+        data['sim_fixed_positions'] = sim_pos
+
     # Pairwise robot distances
     robot_ids = sorted([r for r in ROBOT_IDS if r in markers])
     for i in range(len(robot_ids)):

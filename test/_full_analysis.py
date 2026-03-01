@@ -69,9 +69,9 @@ for r in results:
     groups[key].append(r)
 
 CONDITIONS = [
-    ('reip', 'none'), ('reip', 'bad_leader'), ('reip', 'oscillate_leader'), ('reip', 'spin'),
-    ('raft', 'none'), ('raft', 'bad_leader'), ('raft', 'oscillate_leader'), ('raft', 'spin'),
-    ('decentralized', 'none'), ('decentralized', 'bad_leader'), ('decentralized', 'oscillate_leader'), ('decentralized', 'spin'),
+    ('reip', 'none'), ('reip', 'bad_leader'), ('reip', 'freeze_leader'), ('reip', 'oscillate_leader'), ('reip', 'spin'),
+    ('raft', 'none'), ('raft', 'bad_leader'), ('raft', 'freeze_leader'), ('raft', 'oscillate_leader'), ('raft', 'spin'),
+    ('decentralized', 'none'), ('decentralized', 'bad_leader'), ('decentralized', 'freeze_leader'), ('decentralized', 'oscillate_leader'), ('decentralized', 'spin'),
 ]
 
 out = []
@@ -151,7 +151,7 @@ for ctrl, fault in CONDITIONS:
     det_valid = [d for d in dets if d is not None]
     susp_str = fmt(mean(susp_valid), std(susp_valid), 2) if susp_valid else "N/A"
     det_str = fmt(mean(det_valid), std(det_valid), 2) if det_valid else "N/A"
-    det_rate = f"{len(det_valid)}/{len(trials)}" if fault == 'bad_leader' else "N/A"
+    det_rate = f"{len(det_valid)}/{len(trials)}" if fault in ('bad_leader', 'freeze_leader') else "N/A"
     fp_mean = mean(fps)
     lc_str = fmt(mean(lcs), std(lcs), 1)
     p(f"{ctrl:<15} {fault:<12} {len(trials):>3}  {susp_str:>20}  {det_str:>20}  "
@@ -213,29 +213,35 @@ for ctrl, fault in CONDITIONS:
 p("\n" + "=" * 130)
 p("TABLE 6: RESILIENCE GAP (coverage penalty from fault) — Mean and Median")
 p("=" * 160)
-p(f"{'Controller':<15} {'':>8} {'Clean':>10}  {'BadLeader':>10}  {'BadLdr Gap':>10}  {'Oscillate':>10}  {'Osc Gap':>10}  {'Spin':>10}  {'Spin Gap':>10}")
-p("-" * 160)
+p(f"{'Controller':<15} {'':>8} {'Clean':>10}  {'BadLeader':>10}  {'BadLdr Gap':>10}  {'Freeze':>10}  {'Frz Gap':>10}  {'Oscillate':>10}  {'Osc Gap':>10}  {'Spin':>10}  {'Spin Gap':>10}")
+p("-" * 200)
 for ctrl in ['reip', 'raft', 'decentralized']:
     clean = groups.get((ctrl, 'none'), [])
     bad = groups.get((ctrl, 'bad_leader'), [])
+    frz = groups.get((ctrl, 'freeze_leader'), [])
     osc = groups.get((ctrl, 'oscillate_leader'), [])
     spin = groups.get((ctrl, 'spin'), [])
     clean_covs = [r['final_coverage'] for r in clean]
     bad_covs = [r['final_coverage'] for r in bad]
+    frz_covs = [r['final_coverage'] for r in frz] if frz else []
     osc_covs = [r['final_coverage'] for r in osc] if osc else []
     spin_covs = [r['final_coverage'] for r in spin] if spin else []
     clean_m = mean(clean_covs); bad_m = mean(bad_covs)
+    frz_m = mean(frz_covs) if frz_covs else 0
     osc_m = mean(osc_covs) if osc_covs else 0; spin_m = mean(spin_covs) if spin_covs else 0
     clean_med = median_val(clean_covs); bad_med = median_val(bad_covs)
+    frz_med = median_val(frz_covs) if frz_covs else 0
     osc_med = median_val(osc_covs) if osc_covs else 0; spin_med = median_val(spin_covs) if spin_covs else 0
     gap_bad_m = f"{bad_m - clean_m:+.1f}pp" if clean_m and bad_m else "N/A"
+    gap_frz_m = f"{frz_m - clean_m:+.1f}pp" if clean_m and frz_m else "N/A"
     gap_osc_m = f"{osc_m - clean_m:+.1f}pp" if clean_m and osc_m else "N/A"
     gap_spin_m = f"{spin_m - clean_m:+.1f}pp" if clean_m and spin_m else "N/A"
     gap_bad_med = f"{bad_med - clean_med:+.1f}pp" if clean_med and bad_med else "N/A"
+    gap_frz_med = f"{frz_med - clean_med:+.1f}pp" if clean_med and frz_med else "N/A"
     gap_osc_med = f"{osc_med - clean_med:+.1f}pp" if clean_med and osc_med else "N/A"
     gap_spin_med = f"{spin_med - clean_med:+.1f}pp" if clean_med and spin_med else "N/A"
-    p(f"{ctrl:<15} {'Mean':>8} {clean_m:>9.1f}%  {bad_m:>9.1f}%  {gap_bad_m:>10}  {osc_m:>9.1f}%  {gap_osc_m:>10}  {spin_m:>9.1f}%  {gap_spin_m:>10}")
-    p(f"{'':15} {'Median':>8} {clean_med:>9.1f}%  {bad_med:>9.1f}%  {gap_bad_med:>10}  {osc_med:>9.1f}%  {gap_osc_med:>10}  {spin_med:>9.1f}%  {gap_spin_med:>10}")
+    p(f"{ctrl:<15} {'Mean':>8} {clean_m:>9.1f}%  {bad_m:>9.1f}%  {gap_bad_m:>10}  {frz_m:>9.1f}%  {gap_frz_m:>10}  {osc_m:>9.1f}%  {gap_osc_m:>10}  {spin_m:>9.1f}%  {gap_spin_m:>10}")
+    p(f"{'':15} {'Median':>8} {clean_med:>9.1f}%  {bad_med:>9.1f}%  {gap_bad_med:>10}  {frz_med:>9.1f}%  {gap_frz_med:>10}  {osc_med:>9.1f}%  {gap_osc_med:>10}  {spin_med:>9.1f}%  {gap_spin_med:>10}")
 
 # TABLE 7
 p("\n" + "=" * 100)
@@ -244,9 +250,11 @@ p("=" * 100)
 comparisons = [
     ("reip", "raft", "none", "Clean: coordination overhead"),
     ("reip", "raft", "bad_leader", "Bad Leader: trust vs no trust"),
+    ("reip", "raft", "freeze_leader", "Freeze Leader: stale assignment detection"),
     ("reip", "raft", "oscillate_leader", "Oscillate Leader: Tier 3 detection"),
     ("reip", "decentralized", "none", "Clean: leadership value"),
     ("reip", "decentralized", "bad_leader", "Bad Leader: resilience"),
+    ("reip", "decentralized", "freeze_leader", "Freeze Leader: resilience"),
     ("reip", "decentralized", "oscillate_leader", "Oscillate: resilience"),
     ("raft", "decentralized", "none", "Clean: RAFT coordination"),
 ]

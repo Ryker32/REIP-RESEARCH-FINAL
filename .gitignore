@@ -1,0 +1,23 @@
+# Heavy experiment data (50k+ files)
+experiments/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Temporary/generated
+*.egg-info/
+dist/
+build/

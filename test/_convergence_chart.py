@@ -50,22 +50,33 @@ plt.rcParams.update({
 })
 
 # ---- Load data ----
-base = sys.argv[1] if len(sys.argv) > 1 else 'experiments/run_20260226_192129_multiroom_10trials_all'
+# Accept multiple base directories: first is primary (output goes here),
+# rest are merged in (e.g. freeze_leader from a separate run).
+bases = sys.argv[1:] if len(sys.argv) > 1 else ['experiments/run_20260226_192129_multiroom_10trials_all']
+base = bases[0]  # primary directory for output
 
-logs_dir = os.path.join(base, 'logs')
 timelines = defaultdict(list)  # (controller, fault_type) -> [timeline, ...]
 
-for exp_dir in sorted(os.listdir(logs_dir)):
-    tl_file = os.path.join(logs_dir, exp_dir, 'coverage_timeline.json')
-    if not os.path.exists(tl_file):
+for b in bases:
+    logs_dir = os.path.join(b, 'logs')
+    if not os.path.isdir(logs_dir):
+        print(f"WARNING: {logs_dir} not found, skipping")
         continue
-    with open(tl_file) as f:
-        data = json.load(f)
-    ctrl = data['controller']
-    fault = data.get('fault_type') or 'none'
-    timelines[(ctrl, fault)].append(data['timeline'])
+    for exp_dir in sorted(os.listdir(logs_dir)):
+        tl_file = os.path.join(logs_dir, exp_dir, 'coverage_timeline.json')
+        if not os.path.exists(tl_file):
+            continue
+        with open(tl_file) as f:
+            data = json.load(f)
+        ctrl = data['controller']
+        fault = data.get('fault_type') or 'none'
+        # Skip oscillate_leader (replaced by freeze_leader)
+        if fault == 'oscillate_leader':
+            continue
+        timelines[(ctrl, fault)].append(data['timeline'])
+    print(f"Loaded from {b}")
 
-print(f"Loaded {sum(len(v) for v in timelines.values())} timelines from {base}")
+print(f"Total: {sum(len(v) for v in timelines.values())} timelines")
 for k, v in sorted(timelines.items()):
     print(f"  {k[0]:>15} | {k[1]:<12} : {len(v)} trials")
 
@@ -112,12 +123,14 @@ MARKER_EVERY = 20  # place a marker every N data points on the time axis
 FAULT_STYLES = {
     'none': '-',              # solid
     'bad_leader': '--',       # dashed
+    'freeze_leader': '-.',    # dash-dot
     'spin': ':',              # dotted (legacy)
     'oscillate_leader': ':',  # dotted
 }
 FAULT_LABELS = {
     'none': 'Clean',
     'bad_leader': 'Bad Leader',
+    'freeze_leader': 'Freeze Leader',
     'spin': 'Spin Fault',
     'oscillate_leader': 'Oscillate Leader',
 }
@@ -163,7 +176,7 @@ for ctrl in ['reip', 'raft', 'decentralized']:
                                   label=CTRL_LABELS[ctrl]))
 legend_elements.append(Line2D([0], [0], color='gray', linestyle='-', linewidth=0.8, label='Clean'))
 legend_elements.append(Line2D([0], [0], color='gray', linestyle='--', linewidth=0.8, label='Bad Leader'))
-legend_elements.append(Line2D([0], [0], color='gray', linestyle=':', linewidth=0.8, label='Oscillate'))
+legend_elements.append(Line2D([0], [0], color='gray', linestyle='-.', linewidth=0.8, label='Freeze Leader'))
 
 ax.legend(handles=legend_elements, loc='lower right', framealpha=0.9,
           edgecolor='#cccccc', ncol=2, columnspacing=1.0)
@@ -229,25 +242,43 @@ for ext in ['png', 'pdf']:
 plt.close(fig)
 
 # ============================================================
-# FIGURE 3: Per-trial traces (shows variance/reliability)
+# FIGURE 3: Per-trial fan chart (percentile bands — replaces spaghetti)
 # ============================================================
-fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.4), sharey=True)  # IEEE double-column
+fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.6), sharey=True)  # IEEE double-column
 
 PANEL_LABELS = ['(a)', '(b)', '(c)']
+FAN_BANDS = [
+    (5,  95, 0.08),   # lightest outer band
+    (10, 90, 0.10),
+    (25, 75, 0.14),   # IQR
+]
+
 for ax_idx, ctrl in enumerate(['reip', 'raft', 'decentralized']):
     ax = axes[ax_idx]
     color = CTRL_COLORS[ctrl]
 
     if (ctrl, 'bad_leader') in condition_data:
         _, _, resampled = condition_data[(ctrl, 'bad_leader')]
-        for trace in resampled:
-            is_cat = trace[-1] < 70
-            ax.plot(time_axis, trace, color=color,
-                    alpha=0.35 if is_cat else 0.15,
-                    linewidth=0.8 if is_cat else 0.5)
 
-        m = np.mean(resampled, axis=0)
-        ax.plot(time_axis, m, color=color, linewidth=1.8, zorder=5)
+        # Fan chart: percentile bands (outer → inner)
+        for lo, hi, alpha in FAN_BANDS:
+            q_lo = np.percentile(resampled, lo, axis=0)
+            q_hi = np.percentile(resampled, hi, axis=0)
+            ax.fill_between(time_axis, q_lo, q_hi,
+                            alpha=alpha, color=color, linewidth=0)
+
+        # Median line (bold)
+        med = np.median(resampled, axis=0)
+        ax.plot(time_axis, med, color=color, linewidth=1.8,
+                zorder=5, label='Median')
+
+        # 25th / 75th dashed for clarity
+        q25 = np.percentile(resampled, 25, axis=0)
+        q75 = np.percentile(resampled, 75, axis=0)
+        ax.plot(time_axis, q25, color=color, linewidth=0.6,
+                linestyle='--', alpha=0.5, zorder=4)
+        ax.plot(time_axis, q75, color=color, linewidth=0.6,
+                linestyle='--', alpha=0.5, zorder=4)
 
     for ft in [10, 30]:
         ax.axvline(x=ft, color='#888888', linewidth=0.5, linestyle='-.',
@@ -255,28 +286,39 @@ for ax_idx, ctrl in enumerate(['reip', 'raft', 'decentralized']):
     ax.set_xlim(0, 120)
     ax.set_ylim(0, 105)
     ax.set_xlabel('Time (s)')
-    # Panel label + controller name as minimal title
     ax.set_title(f'{PANEL_LABELS[ax_idx]} {CTRL_LABELS[ctrl]}',
                  fontsize=9, fontweight='bold')
     ax.grid(True, alpha=0.2, linewidth=0.3)
 
-    # Catastrophic count annotation (data, not editorial)
+    # Catastrophic count annotation
     if (ctrl, 'bad_leader') in condition_data:
         _, _, resampled = condition_data[(ctrl, 'bad_leader')]
         n_cat = sum(1 for trace in resampled if trace[-1] < 70)
         n_total = len(resampled)
         if n_cat > 0:
-            ax.text(0.97, 0.06, f'{n_cat}/{n_total} failed',
+            ax.text(0.97, 0.06, f'{n_cat}/{n_total} cat.',
                     transform=ax.transAxes, fontsize=6.5,
                     ha='right', va='bottom', color='#c0392b',
                     fontweight='bold')
         else:
-            ax.text(0.97, 0.06, f'0/{n_total} failed',
+            ax.text(0.97, 0.06, f'0/{n_total} cat.',
                     transform=ax.transAxes, fontsize=6.5,
                     ha='right', va='bottom', color='#27ae60',
                     fontweight='bold')
 
 axes[0].set_ylabel('Coverage (%)')
+
+# Shared legend for band meaning
+from matplotlib.patches import Patch
+band_legend = [
+    Line2D([0], [0], color='gray', linewidth=1.6, label='Median'),
+    Line2D([0], [0], color='gray', linewidth=0.6, linestyle='--', label='Q25 / Q75'),
+    Patch(facecolor='gray', alpha=0.14, label='IQR (25–75%)'),
+    Patch(facecolor='gray', alpha=0.08, label='5–95%'),
+]
+axes[0].legend(handles=band_legend, fontsize=6, loc='center right',
+               framealpha=0.9, edgecolor='#cccccc')
+
 fig.tight_layout(pad=0.5)
 
 for ext in ['png', 'pdf']:
@@ -290,13 +332,14 @@ plt.close(fig)
 # ============================================================
 fig, axes = plt.subplots(1, 3, figsize=(7.16, 2.4), sharey=True)
 
-FAULT_MARKERS = {'none': 'o', 'bad_leader': 'x', 'spin': 'D', 'oscillate_leader': 'D'}
+FAULT_MARKERS = {'none': 'o', 'bad_leader': 'x', 'freeze_leader': 'D', 'spin': 'D', 'oscillate_leader': 'D'}
 for ax_idx, ctrl in enumerate(['reip', 'raft', 'decentralized']):
     ax = axes[ax_idx]
     color = CTRL_COLORS[ctrl]
 
     for fault, style, label_suffix in [('none', '-', 'Clean'),
                                         ('bad_leader', '--', 'Bad Leader'),
+                                        ('freeze_leader', '-.', 'Freeze Leader'),
                                         ('oscillate_leader', ':', 'Oscillate'),
                                         ('spin', ':', 'Spin')]:
         if (ctrl, fault) in condition_data:
@@ -339,12 +382,14 @@ fig, axes = plt.subplots(1, 2, figsize=(7.16, 2.6), sharey=True)
 FAULT_COLORS = {
     'none': '#2c3e50',       # dark gray-blue
     'bad_leader': '#e74c3c', # red
+    'freeze_leader': '#8e44ad',  # purple
     'spin': '#f39c12',       # orange (legacy)
     'oscillate_leader': '#f39c12',  # orange
 }
 FAULT_MARKERS_RC = {
     'none': 'o',
     'bad_leader': 'x',
+    'freeze_leader': 'D',
     'spin': 'D',
     'oscillate_leader': 'D',
 }
@@ -353,7 +398,7 @@ RC_PANEL_LABELS = ['(a)', '(b)']
 for ax_idx, ctrl in enumerate(['reip', 'raft']):
     ax = axes[ax_idx]
 
-    for fault in ['none', 'bad_leader', 'oscillate_leader', 'spin']:
+    for fault in ['none', 'bad_leader', 'freeze_leader', 'oscillate_leader', 'spin']:
         if (ctrl, fault) not in condition_data:
             continue
         _, _, resampled = condition_data[(ctrl, fault)]

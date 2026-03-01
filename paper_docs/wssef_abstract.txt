@@ -1,0 +1,12 @@
+WSSEF Abstract — 243 words
+Submitted for: Democracy in Robots
+Last updated: 2026-02-28
+========================================
+
+Multi-robot swarms can map environments faster than single robots by dividing the workspace among team members. A designated leader improves efficiency by maintaining a global map and assigning each robot to a different unexplored region, preventing redundant coverage. However, this creates a critical vulnerability: if the leader becomes compromised—due to sensor failure or adversarial attack—it can direct all followers to waste effort on already-explored areas, and existing consensus protocols cannot detect a leader that misbehaves while maintaining normal communication.
+
+This research presents the Resilient Election and Impeachment Policy (REIP), a distributed governance framework enabling robot teams to democratically detect, impeach, and replace compromised leaders without centralized oversight. Each robot independently verifies leader commands before execution using a three-tier confidence-weighted trust model based on personal experience, onboard sensor readings, and peer-reported data. When accumulated evidence crosses a threshold, robots vote to remove the leader and elect a replacement. A causality-aware grace period prevents false accusations from network delays.
+
+REIP was validated through 900 simulation trials (100 trials across 9 conditions) in a multiroom environment with dual sequential fault injection. REIP achieved 100% median area coverage under both clean and adversarial conditions, detecting faults in 0.23 ± 0.12 seconds and completing impeachment in 2.03 ± 0.93 seconds—a 37.9 percentage-point coverage advantage over the Raft consensus baseline. Hardware testing on a five-robot embedded platform confirmed sub-second detection.
+
+These results demonstrate that proactive trust verification enables multi-robot swarms to retain the efficiency benefits of leadership while resisting compromised leaders through democratic governance.

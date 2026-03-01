@@ -147,12 +147,17 @@ class PositionServer:
             corner_pixels[43],  # top-left
         ], dtype=np.float32)
         
-        # Destination points (arena coordinates in mm)
+        # Destination points (real-world coords of corner TAGS in mm).
+        # Tags sit on the outer blue-tape border, offset in X only:
+        #   BL(40) = 11.5 cm left of arena origin
+        #   BR(41) = 211  cm right of origin (11 cm past right edge)
+        #   TR(42) = 11   cm right of right edge, level with y=1500
+        #   TL(43) = 11.3 cm left of origin,      level with y=1500
         dst_pts = np.array([
-            [0, 0],                              # bottom-left
-            [ARENA_WIDTH_MM, 0],                 # bottom-right
-            [ARENA_WIDTH_MM, ARENA_HEIGHT_MM],   # top-right
-            [0, ARENA_HEIGHT_MM],                # top-left
+            [-115,            0],   # BL — 11.5 cm left of origin
+            [2110,            0],   # BR — 211 cm right of origin
+            [2110, ARENA_HEIGHT_MM],   # TR — 11 cm past right edge
+            [-113, ARENA_HEIGHT_MM],   # TL — 11.3 cm left of origin
         ], dtype=np.float32)
         
         # Compute homography

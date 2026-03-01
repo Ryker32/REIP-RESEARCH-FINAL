@@ -28,6 +28,8 @@ import math
 import threading
 import random
 import subprocess
+import heapq
+from collections import deque as _deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Set
 
@@ -137,6 +139,8 @@ class SimRobot:
     prev_x: float = 0.0
     prev_y: float = 0.0
     stuck_override: Optional[Tuple[float, float]] = None  # locked override target
+    path_waypoints: list = None   # A* waypoints [(x,y), ...]
+    path_target_key: tuple = None # (tx,ty) target that generated path
 
 # ============== Received State ==============
 @dataclass 
@@ -283,6 +287,85 @@ class VisualSimulation:
                 return True
         return False
     
+    # -------------------- A* Pathfinding --------------------
+    def _wall_blocks_move(self, cx, cy, nx, ny):
+        """Check if moving between adjacent cells crosses a wall."""
+        ax = (cx + 0.5) * CELL_SIZE
+        ay = (cy + 0.5) * CELL_SIZE
+        bx = (nx + 0.5) * CELL_SIZE
+        by = (ny + 0.5) * CELL_SIZE
+        return self._path_crosses_wall(ax, ay, bx, by)
+
+    def _build_nav_grid(self):
+        cols = ARENA_WIDTH // CELL_SIZE
+        rows = ARENA_HEIGHT // CELL_SIZE
+        return cols, rows
+
+    def _astar_cell(self, start_cell, goal_cell, cols, rows):
+        if start_cell == goal_cell:
+            return [start_cell]
+        sx, sy = start_cell
+        gx, gy = goal_cell
+        if not (0 <= sx < cols and 0 <= sy < rows):
+            return None
+        if not (0 <= gx < cols and 0 <= gy < rows):
+            return None
+        open_set = [(abs(gx - sx) + abs(gy - sy), 0, sx, sy)]
+        came_from = {}
+        g_score = {start_cell: 0}
+        while open_set:
+            _, g, cx, cy = heapq.heappop(open_set)
+            if (cx, cy) == goal_cell:
+                path = []
+                cur = goal_cell
+                while cur is not None:
+                    path.append(cur)
+                    cur = came_from.get(cur)
+                path.reverse()
+                return path
+            if g > g_score.get((cx, cy), float('inf')):
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if (0 <= nx < cols and 0 <= ny < rows
+                        and not self._wall_blocks_move(cx, cy, nx, ny)):
+                    ng = g + 1
+                    if ng < g_score.get((nx, ny), float('inf')):
+                        g_score[(nx, ny)] = ng
+                        h = abs(gx - nx) + abs(gy - ny)
+                        heapq.heappush(open_set, (ng + h, ng, nx, ny))
+                        came_from[(nx, ny)] = (cx, cy)
+        return None
+
+    def _get_path_waypoints(self, x, y, target_x, target_y):
+        cols, rows = self._build_nav_grid()
+        sc = (max(0, min(cols - 1, int(x / CELL_SIZE))),
+              max(0, min(rows - 1, int(y / CELL_SIZE))))
+        gc = (max(0, min(cols - 1, int(target_x / CELL_SIZE))),
+              max(0, min(rows - 1, int(target_y / CELL_SIZE))))
+        path = self._astar_cell(sc, gc, cols, rows)
+        if path is None or len(path) <= 1:
+            return [(target_x, target_y)]
+        raw = []
+        for i, (cx, cy) in enumerate(path[1:], 1):
+            if i == len(path) - 1:
+                raw.append((target_x, target_y))
+            else:
+                raw.append(((cx + 0.5) * CELL_SIZE, (cy + 0.5) * CELL_SIZE))
+        if len(raw) <= 2:
+            return raw
+        smoothed = [raw[0]]
+        i = 0
+        while i < len(raw) - 1:
+            farthest = i + 1
+            for j in range(i + 2, len(raw)):
+                if not self._path_crosses_wall(smoothed[-1][0], smoothed[-1][1],
+                                                raw[j][0], raw[j][1]):
+                    farthest = j
+            smoothed.append(raw[farthest])
+            i = farthest
+        return smoothed
+
     def start_robot_processes(self):
         """Start reip_node.py as subprocesses"""
         print("Starting robot processes...")
@@ -332,31 +415,26 @@ class VisualSimulation:
                 print(f"[ERROR] Failed to send position to robot {rid}: {e}")
     
     def _find_reachable_unexplored(self, robot):
-        """Find nearest unexplored cell whose center isn't blocked by a wall
-        from the robot's current position.  Falls back to any unexplored cell
-        if none are reachable (robot may need to route through passage)."""
-        best_reachable = None
-        best_rdist = float('inf')
-        best_any = None
-        best_adist = float('inf')
-        for cx in range(ARENA_WIDTH // CELL_SIZE):
-            for cy in range(ARENA_HEIGHT // CELL_SIZE):
-                if (cx, cy) in self.visited_cells:
-                    continue
+        """Find nearest unexplored cell by BFS path distance (not Euclidean)."""
+        cols, rows = self._build_nav_grid()
+        sc = (max(0, min(cols - 1, int(robot.x / CELL_SIZE))),
+              max(0, min(rows - 1, int(robot.y / CELL_SIZE))))
+        queue = _deque([sc])
+        visited_bfs = {sc}
+        while queue:
+            cx, cy = queue.popleft()
+            if (cx, cy) not in self.visited_cells:
                 tx = (cx + 0.5) * CELL_SIZE
                 ty = (cy + 0.5) * CELL_SIZE
-                # Skip cells whose center is inside wall exclusion zone
-                if self._collides_with_wall(tx, ty):
-                    continue
-                d = math.sqrt((tx - robot.x)**2 + (ty - robot.y)**2)
-                if d < best_adist:
-                    best_adist = d
-                    best_any = (tx, ty)
-                if not self._path_crosses_wall(robot.x, robot.y, tx, ty):
-                    if d < best_rdist:
-                        best_rdist = d
-                        best_reachable = (tx, ty)
-        return best_reachable or best_any
+                return (tx, ty)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if (0 <= nx < cols and 0 <= ny < rows
+                        and (nx, ny) not in visited_bfs
+                        and not self._wall_blocks_move(cx, cy, nx, ny)):
+                    visited_bfs.add((nx, ny))
+                    queue.append((nx, ny))
+        return None
 
     def update_sim_robots(self):
         """Update simulated robot positions - follow REIP assignments.
@@ -410,31 +488,42 @@ class VisualSimulation:
                     robot.stuck_counter = 0
                     robot.prev_x, robot.prev_y = robot.x, robot.y
 
-                # ---- Normal movement ----
-                dx = robot.target_x - robot.x
-                dy = robot.target_y - robot.y
+                # ---- A* waypoint navigation ----
+                tkey = (round(robot.target_x, 1), round(robot.target_y, 1))
+                if tkey != robot.path_target_key:
+                    robot.path_waypoints = self._get_path_waypoints(
+                        robot.x, robot.y, robot.target_x, robot.target_y)
+                    robot.path_target_key = tkey
+
+                wps = robot.path_waypoints or [(robot.target_x, robot.target_y)]
+
+                # Advance through waypoints
+                while len(wps) > 1:
+                    wd = math.sqrt((wps[0][0] - robot.x)**2 + (wps[0][1] - robot.y)**2)
+                    if wd < CELL_SIZE * 0.6:
+                        wps.pop(0)
+                    else:
+                        break
+
+                wp = wps[0]
+                dx = wp[0] - robot.x
+                dy = wp[1] - robot.y
                 dist = math.sqrt(dx*dx + dy*dy)
-                
+
                 if dist > 20:
                     robot.theta = math.atan2(dy, dx)
                     new_x = robot.x + ROBOT_SPEED * math.cos(robot.theta)
                     new_y = robot.y + ROBOT_SPEED * math.sin(robot.theta)
-                    
-                    # Wall collision: try to slide, then wall-follow
+
                     if self._collides_with_wall(new_x, new_y):
                         moved = False
-                        # Try sliding along each axis independently
                         if not self._collides_with_wall(new_x, robot.y):
                             robot.x = new_x
                             moved = True
                         if not self._collides_with_wall(robot.x, new_y) and abs(new_y - robot.y) > 0.5:
                             robot.y = new_y
                             moved = True
-                        
                         if not moved:
-                            # Both axes blocked (target directly through wall).
-                            # Wall-follow: try perpendicular directions, pick the
-                            # one that moves closer to target.
                             perp1 = robot.theta + math.pi / 2
                             perp2 = robot.theta - math.pi / 2
                             options = []
@@ -444,8 +533,7 @@ class VisualSimulation:
                                 if (not self._collides_with_wall(tx, ty) and
                                         75 <= tx <= ARENA_WIDTH - 75 and
                                         75 <= ty <= ARENA_HEIGHT - 75):
-                                    d = math.sqrt((tx - robot.target_x)**2 +
-                                                  (ty - robot.target_y)**2)
+                                    d = math.sqrt((tx - wp[0])**2 + (ty - wp[1])**2)
                                     options.append((d, tx, ty))
                             if options:
                                 options.sort()
@@ -453,12 +541,13 @@ class VisualSimulation:
                     else:
                         robot.x = new_x
                         robot.y = new_y
-                else:
-                    # Reached target - find nearest unexplored cell as fallback
-                    # (Leader should assign new target, but this prevents getting stuck)
+                elif len(wps) <= 1:
+                    # Reached final target
                     alt = self._find_reachable_unexplored(robot)
                     if alt:
                         robot.target_x, robot.target_y = alt
+
+                robot.path_waypoints = wps
             
             # Clamp to arena
             robot.x = max(75, min(ARENA_WIDTH - 75, robot.x))

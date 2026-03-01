@@ -241,6 +241,8 @@ class RAFTNode:
         self.bad_leader_mode = False
         self.oscillate_leader_mode = False
         self._oscillate_phase = 0
+        self.freeze_leader_mode = False
+        self._frozen_assignments: Dict[str, Tuple[float, float]] = {}
         
         self.running = False
         print("Ready!\n")
@@ -537,6 +539,10 @@ class RAFTNode:
         if self.oscillate_leader_mode:
             return self._compute_oscillate_assignments()
         
+        # --- Freeze-leader fault: stop updating assignments ---
+        if self.freeze_leader_mode:
+            return self._compute_freeze_assignments()
+        
         frontiers = []
         frontier_set = set()
         for cx in range(self.coverage_width):
@@ -650,6 +656,34 @@ class RAFTNode:
               f"robots -> ({target[0]:.0f}, {target[1]:.0f}) -- NO DETECTION POSSIBLE")
         return assignments
     
+    def _compute_freeze_assignments(self) -> Dict[str, Tuple[float, float]]:
+        """FREEZE LEADER: stop updating assignments entirely.
+        Snapshots current assignments on first call, then returns the same stale
+        targets forever.  Raft has NO trust model — followers obey the stale
+        assignments indefinitely, coverage stalls once targets are explored."""
+        if not self._frozen_assignments:
+            # First call: snapshot current assignments or use leader position
+            if self._prev_assignments:
+                self._frozen_assignments = dict(self._prev_assignments)
+            else:
+                # No previous assignments — assign everyone to leader position
+                robots = {self.robot_id: (self.x, self.y)}
+                for pid, peer in self.peers.items():
+                    if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
+                        robots[pid] = (peer['x'], peer['y'])
+                for rid in robots:
+                    self._frozen_assignments[str(rid)] = (self.x, self.y)
+            
+            print(f"[FREEZE_LEADER] Raft frozen {len(self._frozen_assignments)} assignments "
+                  f"(will never update -- NO DETECTION POSSIBLE)")
+        
+        # Always return the same stale assignments
+        my_key = str(self.robot_id)
+        if my_key in self._frozen_assignments:
+            self.assigned_target = self._frozen_assignments[my_key]
+        
+        return dict(self._frozen_assignments)
+    
     def get_my_frontier(self) -> Optional[Tuple[float, float]]:
         """Find nearest unexplored cell"""
         my_cell = self.get_cell(self.x, self.y)
@@ -705,8 +739,8 @@ class RAFTNode:
         # NO TRUST CHECK - just follow leader assignment blindly
         target = None
         if self.state == RaftState.LEADER:
-            if self.bad_leader_mode or self.oscillate_leader_mode:
-                # Compromised leader follows its own bad/oscillating assignment
+            if self.bad_leader_mode or self.oscillate_leader_mode or self.freeze_leader_mode:
+                # Compromised leader follows its own bad/oscillating/frozen assignment
                 target = self.assigned_target if self.assigned_target else self.get_my_frontier()
             else:
                 target = self.get_my_frontier()
@@ -747,6 +781,8 @@ class RAFTNode:
                         self.injected_fault = None
                         self.bad_leader_mode = False
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
+                        self._frozen_assignments.clear()
                         if hasattr(self, '_bad_assignments_cache'):
                             self._bad_assignments_cache.clear()
                         print(f"[FAULT] Cleared")
@@ -755,6 +791,7 @@ class RAFTNode:
                         # Raft has NO trust model, so it will follow blindly.
                         self.bad_leader_mode = True
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
                         self.injected_fault = None
                         print(f"[FAULT] BAD_LEADER mode - will send bad assignments (Raft CANNOT detect this)")
                     elif fault == 'oscillate_leader':
@@ -762,13 +799,24 @@ class RAFTNode:
                         # Raft has NO trust model, so followers oscillate forever.
                         self.oscillate_leader_mode = True
                         self.bad_leader_mode = False
+                        self.freeze_leader_mode = False
                         self.injected_fault = None
                         self._oscillate_phase = 0
                         print(f"[FAULT] OSCILLATE_LEADER mode - will flip-flop targets (Raft CANNOT detect this)")
+                    elif fault == 'freeze_leader':
+                        # Freeze fault: leader stops updating assignments.
+                        # Raft has NO trust model, so followers stall indefinitely.
+                        self.freeze_leader_mode = True
+                        self.bad_leader_mode = False
+                        self.oscillate_leader_mode = False
+                        self.injected_fault = None
+                        self._frozen_assignments.clear()  # Will be populated on first call
+                        print(f"[FAULT] FREEZE_LEADER mode - will stop updating (Raft CANNOT detect this)")
                     else:
                         self.injected_fault = fault
                         self.bad_leader_mode = False
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
                         print(f"[FAULT] Injected: {fault}")
         except (BlockingIOError, ConnectionResetError):
             pass
@@ -884,6 +932,14 @@ if __name__ == "__main__":
         UDP_POSITION_PORT += port_offset
         UDP_PEER_PORT += port_offset
         UDP_FAULT_PORT += port_offset
+    
+    # Parse --arena-width / --arena-height for scaled layouts
+    if "--arena-width" in sys.argv:
+        idx = sys.argv.index("--arena-width")
+        ARENA_WIDTH = int(sys.argv[idx + 1])
+    if "--arena-height" in sys.argv:
+        idx = sys.argv.index("--arena-height")
+        ARENA_HEIGHT = int(sys.argv[idx + 1])
     
     node = RAFTNode(robot_id, sim_mode=sim_mode)
     node.run()

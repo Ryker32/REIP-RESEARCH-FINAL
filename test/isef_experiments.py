@@ -28,6 +28,7 @@ from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Tuple
 from collections import defaultdict
+import heapq
 
 # ==================== Configuration ====================
 REIP_SCRIPT = "robot/reip_node.py"
@@ -50,11 +51,47 @@ ARENA_WIDTH = 2000
 ARENA_HEIGHT = 1500
 CELL_SIZE = 125
 
+# Each layout: { "walls": [...], "width": W, "height": H, "start_zone": (x0,x1,y0,y1) }
+# width/height default to ARENA_WIDTH/ARENA_HEIGHT if omitted.
+# start_zone defines where robots spawn (defaults to full arena).
 ARENA_LAYOUTS = {
     "open": [],
     "multiroom": [
         (1000, 0, 1000, 1200),  # Vertical wall, passage at top
     ],
+    # ---- Scaled complexity layouts (sim-only, post hardware validation) ----
+    # Same arena size as hardware, but L-shaped wall creates 3 zones
+    # Tests sustained coordination demand in matched dimensions
+    "complex_L": [
+        (1000, 0, 1000, 1200),     # Vertical wall (same as multiroom)
+        (1000, 600, 1600, 600),     # Horizontal extension creating alcove
+    ],
+    # Larger arena: 4x area, 4 rooms with connecting passages
+    # Tests REIP scalability beyond hardware testbed
+    # Note: uses custom dimensions (4000x3000), passed to robot nodes
+    "large_office": [
+        # Central vertical wall (passage at y=1200-1500 and y=2700-3000)
+        (2000, 0, 2000, 1200),      # Lower vertical segment
+        (2000, 1500, 2000, 2700),   # Upper vertical segment
+        # Left horizontal wall (passage at x=800-1200)
+        (0, 1500, 800, 1500),       # Left segment
+        (1200, 1500, 2000, 1500),   # Right segment up to center
+        # Right horizontal wall (passage at x=2800-3200)
+        (2000, 1500, 2800, 1500),   # Left segment from center
+        (3200, 1500, 4000, 1500),   # Right segment
+    ],
+}
+
+# Per-layout arena dimensions (overrides for scaled layouts)
+ARENA_DIMENSIONS = {
+    "large_office": (4000, 3000),
+}
+
+# Per-layout starting zones: (x_min, x_max, y_min, y_max)
+ARENA_START_ZONES = {
+    "multiroom": (150, 850, 150, 1350),       # Room A (left of wall)
+    "complex_L": (150, 850, 150, 1350),        # Room A (left of wall)
+    "large_office": (150, 1800, 150, 1350),    # Lower-left quadrant (Room 1)
 }
 
 # ==================== Data Classes ====================
@@ -78,6 +115,7 @@ class ExperimentResult:
     false_positives: int                   # leader changes between settle and fault
     coverage_at_90s: Optional[float]       # coverage at 90s mark
     coverage_timeline: List[Tuple[float, float]] = field(default_factory=list)
+    ablation: Optional[str] = None        # 'no_trust', 'no_causality', 'no_direction', or None
 
 
 # ==================== Experiment Runner ====================
@@ -109,6 +147,8 @@ class ExperimentRunner:
         self.prev_positions: Dict[int, Tuple[float, float]] = {}
         self.stuck_overrides: Dict[int, Optional[list]] = {}  # locked override targets
         self.motor_faults: Dict[int, Optional[str]] = {}  # rid -> 'spin', 'stop', etc.
+        self.path_waypoints: Dict[int, list] = {}       # rid -> [(x,y), ...] waypoints
+        self.path_target_key: Dict[int, tuple] = {}     # rid -> (tx,ty) target that generated the path
 
         # Per-experiment state (reset each trial)
         self.visited_cells: set = set()
@@ -120,6 +160,12 @@ class ExperimentRunner:
         """Switch arena layout between experiments."""
         self.layout = layout
         self.walls = list(ARENA_LAYOUTS.get(layout, []))
+        # Per-layout arena dimensions (for scaled layouts)
+        dims = ARENA_DIMENSIONS.get(layout)
+        if dims:
+            self.arena_width, self.arena_height = dims
+        else:
+            self.arena_width, self.arena_height = ARENA_WIDTH, ARENA_HEIGHT
 
     # -------------------- Process Management --------------------
     def start_robots(self, script: str, extra_args: List[str] = None,
@@ -151,21 +197,24 @@ class ExperimentRunner:
             self.robot_processes.append(proc)
 
             # Randomized starting position (seed-controlled for reproducibility)
-            if self.layout == "multiroom":
-                # Cluster in Room A (x < 1000, avoiding wall)
-                sx = rng.uniform(150, 850)
-                sy = rng.uniform(150, ARENA_HEIGHT - 150)
+            # Use per-layout start zone if defined, else full arena with margin
+            start_zone = ARENA_START_ZONES.get(self.layout)
+            if start_zone:
+                sx = rng.uniform(start_zone[0], start_zone[1])
+                sy = rng.uniform(start_zone[2], start_zone[3])
             else:
-                sx = rng.uniform(200, ARENA_WIDTH - 200)
-                sy = rng.uniform(200, ARENA_HEIGHT - 200)
+                sx = rng.uniform(200, self.arena_width - 200)
+                sy = rng.uniform(200, self.arena_height - 200)
             theta = rng.uniform(0, 2 * math.pi)
 
             # Reject positions inside walls
             while self._collides_with_wall(sx, sy):
-                sx = rng.uniform(150, 850) if self.layout == "multiroom" \
-                    else rng.uniform(200, ARENA_WIDTH - 200)
-                sy = rng.uniform(150, ARENA_HEIGHT - 150) if self.layout == "multiroom" \
-                    else rng.uniform(200, ARENA_HEIGHT - 200)
+                if start_zone:
+                    sx = rng.uniform(start_zone[0], start_zone[1])
+                    sy = rng.uniform(start_zone[2], start_zone[3])
+                else:
+                    sx = rng.uniform(200, self.arena_width - 200)
+                    sy = rng.uniform(200, self.arena_height - 200)
 
             self.sim_positions[i] = (sx, sy, theta)
             self.stuck_counters[i] = 0
@@ -212,7 +261,7 @@ class ExperimentRunner:
             self.motor_faults[robot_id] = fault_type
         elif fault_type in ('none', 'clear'):
             self.motor_faults[robot_id] = None
-        # bad_leader and oscillate_leader are NOT motor faults — robot still moves normally
+        # bad_leader, oscillate_leader, freeze_leader are NOT motor faults — robot still moves normally
         self.fault_socket.sendto(
             json.dumps(msg).encode(),
             ('127.0.0.1', self._fault_port + robot_id)
@@ -282,28 +331,140 @@ class ExperimentRunner:
         return False
 
     def _find_reachable_unexplored(self, x, y):
-        """Find nearest unexplored cell reachable without crossing a wall."""
-        best_reachable = None
-        best_rdist = float('inf')
-        best_any = None
-        best_adist = float('inf')
-        for cx in range(ARENA_WIDTH // CELL_SIZE):
-            for cy in range(ARENA_HEIGHT // CELL_SIZE):
-                if (cx, cy) in self.visited_cells:
-                    continue
+        """Find nearest unexplored cell reachable via BFS (path distance, not Euclidean)."""
+        cols, rows = self._build_nav_grid()
+        sc = (max(0, min(cols - 1, int(x / CELL_SIZE))),
+              max(0, min(rows - 1, int(y / CELL_SIZE))))
+
+        # BFS from robot cell — returns cells in order of path distance
+        from collections import deque
+        queue = deque([sc])
+        visited_bfs = {sc}
+        while queue:
+            cx, cy = queue.popleft()
+            if (cx, cy) not in self.visited_cells:
                 tx = (cx + 0.5) * CELL_SIZE
                 ty = (cy + 0.5) * CELL_SIZE
-                if self._collides_with_wall(tx, ty):
-                    continue
-                d = math.sqrt((tx - x)**2 + (ty - y)**2)
-                if d < best_adist:
-                    best_adist = d
-                    best_any = (tx, ty)
-                if not self._path_crosses_wall(x, y, tx, ty):
-                    if d < best_rdist:
-                        best_rdist = d
-                        best_reachable = (tx, ty)
-        return best_reachable or best_any
+                return (tx, ty)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if (0 <= nx < cols and 0 <= ny < rows
+                        and (nx, ny) not in visited_bfs
+                        and not self._wall_blocks_move(cx, cy, nx, ny)):
+                    visited_bfs.add((nx, ny))
+                    queue.append((nx, ny))
+
+        # Absolute fallback — pick any unexplored cell
+        for cx in range(cols):
+            for cy in range(rows):
+                if (cx, cy) not in self.visited_cells:
+                    return ((cx + 0.5) * CELL_SIZE, (cy + 0.5) * CELL_SIZE)
+        return None
+
+    # -------------------- A* Pathfinding on Cell Grid --------------------
+    def _wall_blocks_move(self, cx, cy, nx, ny):
+        """Check if moving between adjacent cells crosses a wall.
+        Walls are zero-thickness line segments; cells are always passable
+        but movement BETWEEN cells may be blocked."""
+        ax = (cx + 0.5) * CELL_SIZE
+        ay = (cy + 0.5) * CELL_SIZE
+        bx = (nx + 0.5) * CELL_SIZE
+        by = (ny + 0.5) * CELL_SIZE
+        return self._path_crosses_wall(ax, ay, bx, by)
+
+    def _build_nav_grid(self):
+        """Return grid dimensions.  All cells are passable (walls are
+        zero-thickness and block movement between cells, not cells
+        themselves).  Use _wall_blocks_move() for adjacency checks."""
+        cols = self.arena_width // CELL_SIZE
+        rows = self.arena_height // CELL_SIZE
+        return cols, rows
+
+    def _astar_cell(self, start_cell, goal_cell, cols, rows):
+        """A* on the cell grid.  Returns list of (cx, cy) from start to goal
+        (inclusive), or None if no path exists.  Uses _wall_blocks_move()
+        for adjacency instead of a passability grid."""
+        if start_cell == goal_cell:
+            return [start_cell]
+        sx, sy = start_cell
+        gx, gy = goal_cell
+
+        if not (0 <= sx < cols and 0 <= sy < rows):
+            return None
+        if not (0 <= gx < cols and 0 <= gy < rows):
+            return None
+
+        open_set = [(abs(gx - sx) + abs(gy - sy), 0, sx, sy)]
+        came_from = {}
+        g_score = {start_cell: 0}
+
+        while open_set:
+            _, g, cx, cy = heapq.heappop(open_set)
+            if (cx, cy) == goal_cell:
+                # Reconstruct
+                path = []
+                cur = goal_cell
+                while cur is not None:
+                    path.append(cur)
+                    cur = came_from.get(cur)
+                path.reverse()
+                return path
+            if g > g_score.get((cx, cy), float('inf')):
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if (0 <= nx < cols and 0 <= ny < rows
+                        and not self._wall_blocks_move(cx, cy, nx, ny)):
+                    ng = g + 1
+                    if ng < g_score.get((nx, ny), float('inf')):
+                        g_score[(nx, ny)] = ng
+                        h = abs(gx - nx) + abs(gy - ny)
+                        heapq.heappush(open_set, (ng + h, ng, nx, ny))
+                        came_from[(nx, ny)] = (cx, cy)
+        return None  # no path
+
+    def _get_path_waypoints(self, x, y, target_x, target_y):
+        """Return a list of world-coordinate waypoints from (x,y) to
+        (target_x, target_y), routed around walls via A*."""
+        cols, rows = self._build_nav_grid()
+        sc = (max(0, min(cols - 1, int(x / CELL_SIZE))),
+              max(0, min(rows - 1, int(y / CELL_SIZE))))
+        gc = (max(0, min(cols - 1, int(target_x / CELL_SIZE))),
+              max(0, min(rows - 1, int(target_y / CELL_SIZE))))
+
+        path = self._astar_cell(sc, gc, cols, rows)
+        if path is None or len(path) <= 1:
+            # Fallback: drive direct (existing behaviour)
+            return [(target_x, target_y)]
+
+        # Convert cell path to world-coordinate waypoints (cell centres),
+        # but skip the first cell (robot is already there) and use the
+        # actual target position for the last waypoint.
+        raw = []
+        for i, (cx, cy) in enumerate(path[1:], 1):
+            if i == len(path) - 1:
+                raw.append((target_x, target_y))
+            else:
+                raw.append(((cx + 0.5) * CELL_SIZE,
+                            (cy + 0.5) * CELL_SIZE))
+
+        # ---- Line-of-sight smoothing: skip intermediate waypoints ----
+        # If the robot can reach waypoint i+2 without crossing a wall,
+        # drop waypoint i+1.  This makes paths much shorter.
+        if len(raw) <= 2:
+            return raw
+        smoothed = [raw[0]]
+        i = 0
+        while i < len(raw) - 1:
+            # Try to skip ahead as far as possible
+            farthest = i + 1
+            for j in range(i + 2, len(raw)):
+                if not self._path_crosses_wall(smoothed[-1][0], smoothed[-1][1],
+                                                raw[j][0], raw[j][1]):
+                    farthest = j
+            smoothed.append(raw[farthest])
+            i = farthest
+        return smoothed
 
     # -------------------- Movement Simulation --------------------
     def update_positions(self, states: Dict[int, dict], dt: float):
@@ -347,8 +508,8 @@ class ExperimentRunner:
                 x += random.uniform(-20, 20) * (dt / 0.05)
                 y += random.uniform(-20, 20) * (dt / 0.05)
                 theta += random.uniform(-0.3, 0.3) * (dt / 0.05)
-                x = max(75, min(ARENA_WIDTH - 75, x))
-                y = max(75, min(ARENA_HEIGHT - 75, y))
+                x = max(75, min(self.arena_width - 75, x))
+                y = max(75, min(self.arena_height - 75, y))
                 self.sim_positions[rid] = (x, y, theta)
                 cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
                 self.visited_cells.add(cell)
@@ -410,6 +571,17 @@ class ExperimentRunner:
                 self.prev_positions[rid] = (x, y)
 
             if target:
+                # ---- A* waypoint navigation ----
+                # If the final target changed, recompute the path
+                tkey = (round(target[0], 1), round(target[1], 1))
+                if tkey != self.path_target_key.get(rid):
+                    wps = self._get_path_waypoints(x, y, target[0], target[1])
+                    self.path_waypoints[rid] = wps
+                    self.path_target_key[rid] = tkey
+
+                # Current waypoint to chase (first in list)
+                wps = self.path_waypoints.get(rid) or [(target[0], target[1])]
+
                 # Sub-step to prevent wall tunneling: break large moves
                 # into steps no bigger than MAX_STEP (< collision radius)
                 remaining = total_move
@@ -417,12 +589,27 @@ class ExperimentRunner:
                     step = min(remaining, MAX_STEP)
                     remaining -= step
 
-                    dx = target[0] - x
-                    dy = target[1] - y
+                    # Advance through waypoints as we reach them
+                    while len(wps) > 1:
+                        wd = math.sqrt((wps[0][0] - x)**2 + (wps[0][1] - y)**2)
+                        if wd < CELL_SIZE * 0.6:  # close enough to waypoint
+                            wps.pop(0)
+                        else:
+                            break
+
+                    wp = wps[0]
+                    dx = wp[0] - x
+                    dy = wp[1] - y
                     dist = math.sqrt(dx*dx + dy*dy)
 
-                    if dist <= 20:
-                        break  # arrived
+                    if dist <= 20 and len(wps) <= 1:
+                        break  # arrived at final target
+
+                    if dist <= 1:
+                        # On top of waypoint but more remain
+                        if len(wps) > 1:
+                            wps.pop(0)
+                        continue
 
                     theta = math.atan2(dy, dx)
                     new_x = x + step * math.cos(theta)
@@ -444,10 +631,10 @@ class ExperimentRunner:
                                 tx = x + step * math.cos(perp)
                                 ty = y + step * math.sin(perp)
                                 if (not self._collides_with_wall(tx, ty) and
-                                        75 <= tx <= ARENA_WIDTH - 75 and
-                                        75 <= ty <= ARENA_HEIGHT - 75):
-                                    d = math.sqrt((tx - target[0])**2 +
-                                                  (ty - target[1])**2)
+                                        75 <= tx <= self.arena_width - 75 and
+                                        75 <= ty <= self.arena_height - 75):
+                                    d = math.sqrt((tx - wp[0])**2 +
+                                                  (ty - wp[1])**2)
                                     options.append((d, tx, ty))
                             if options:
                                 options.sort()
@@ -458,19 +645,37 @@ class ExperimentRunner:
                         x = new_x
                         y = new_y
 
+                # Update stored waypoints
+                self.path_waypoints[rid] = wps
+
             # Clamp
-            x = max(75, min(ARENA_WIDTH - 75, x))
-            y = max(75, min(ARENA_HEIGHT - 75, y))
+            x = max(75, min(self.arena_width - 75, x))
+            y = max(75, min(self.arena_height - 75, y))
 
             self.sim_positions[rid] = (x, y, theta)
 
-            # Track coverage
+            # Track coverage — mark robot's cell + sensing footprint
             cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
             self.visited_cells.add(cell)
+            # Also mark adjacent cells within one cell radius as visited
+            # (robot physically occupies ~150mm diameter, sensing > one cell)
+            # Only skip cells on the OTHER side of a wall (can't sense through).
+            cx0, cy0 = cell
+            for ddx in (-1, 0, 1):
+                for ddy in (-1, 0, 1):
+                    nc = (cx0 + ddx, cy0 + ddy)
+                    if (0 <= nc[0] < self.arena_width // CELL_SIZE and
+                            0 <= nc[1] < self.arena_height // CELL_SIZE):
+                        ncx = (nc[0] + 0.5) * CELL_SIZE
+                        ncy = (nc[1] + 0.5) * CELL_SIZE
+                        if math.sqrt((ncx - x)**2 + (ncy - y)**2) < CELL_SIZE * 0.8:
+                            # Only mark if line of sight (no wall between robot and cell)
+                            if not self._path_crosses_wall(x, y, ncx, ncy):
+                                self.visited_cells.add(nc)
 
     def get_coverage(self) -> float:
         """Calculate current coverage percentage"""
-        total_cells = (ARENA_WIDTH // CELL_SIZE) * (ARENA_HEIGHT // CELL_SIZE)
+        total_cells = (self.arena_width // CELL_SIZE) * (self.arena_height // CELL_SIZE)
         return len(self.visited_cells) / total_cells * 100
 
     # -------------------- Current Leader Detection --------------------
@@ -492,12 +697,15 @@ class ExperimentRunner:
         trial_num: int = 1,
         seed: int = 42,
         save_snapshots: bool = False,
+        ablation: Optional[str] = None,
     ) -> ExperimentResult:
         """Run a single experiment with real-time leader-change detection."""
         print(f"\n{'='*60}")
         print(f"Experiment: {name}  (trial {trial_num}, seed {seed})")
         print(f"  Controller: {controller}, Layout: {self.layout}")
         print(f"  Fault: {fault_type or 'none'} on Robot {fault_robot}")
+        if ablation:
+            print(f"  Ablation: {ablation}")
         print(f"{'='*60}")
 
         # ---- Reset per-trial state ----
@@ -529,6 +737,15 @@ class ExperimentRunner:
             script = RAFT_SCRIPT
         else:
             script = REIP_SCRIPT
+
+        # Ablation flags (only applies to REIP controller)
+        if ablation and controller == 'reip':
+            extra_args.extend(["--ablation", ablation])
+
+        # Pass arena dimensions for scaled layouts
+        if self.layout in ARENA_DIMENSIONS:
+            extra_args.extend(["--arena-width", str(self.arena_width),
+                               "--arena-height", str(self.arena_height)])
 
         self.start_robots(script, extra_args, seed=seed, experiment_name=name)
 
@@ -570,7 +787,7 @@ class ExperimentRunner:
 
                 # ---- Second leadership fault injection at FAULT_INJECT_TIME_2 ----
                 # Targets whoever is currently leader (tests repeated attack survival)
-                if (fault_type in ('bad_leader', 'oscillate_leader') and fault_injected
+                if (fault_type in ('bad_leader', 'freeze_leader') and fault_injected
                         and not fault2_injected and elapsed >= FAULT_INJECT_TIME_2):
                     current_leader = self._get_current_leader()
                     fault2_robot = current_leader
@@ -673,6 +890,9 @@ class ExperimentRunner:
                     robots_snap = {}
                     for rid, (rx, ry, rtheta) in self.sim_positions.items():
                         st = last_states.get(rid, {})
+                        # Next A* waypoint = actual direction (around walls)
+                        wps = self.path_waypoints.get(rid)
+                        next_wp = list(wps[0]) if wps else None
                         robots_snap[str(rid)] = {
                             'x': round(rx, 1), 'y': round(ry, 1),
                             'theta': round(rtheta, 3),
@@ -681,6 +901,7 @@ class ExperimentRunner:
                             'target': st.get('navigation_target'),
                             'predicted_target': st.get('predicted_target'),
                             'commanded_target': st.get('commanded_target'),
+                            'next_waypoint': next_wp,
                             'trust': round(st.get('trust_in_leader', 1.0), 3),
                             'suspicion': round(st.get('suspicion', 0.0), 3),
                             'omega': round(st.get('omega', 0.0), 4),
@@ -736,6 +957,7 @@ class ExperimentRunner:
             false_positives=false_positives,
             coverage_at_90s=coverage_at_90s,
             coverage_timeline=self.coverage_history,
+            ablation=ablation,
         )
 
         # Save coverage timeline to per-experiment log dir for convergence plots
@@ -748,7 +970,7 @@ class ExperimentRunner:
                         'fault_type': fault_type, 'layout': self.layout,
                         'trial': trial_num, 'seed': seed,
                         'fault_time_1': FAULT_INJECT_TIME,
-                        'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'oscillate_leader') else None,
+                        'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'freeze_leader') else None,
                         'timeline': self.coverage_history
                     }, f)
             except Exception:
@@ -763,12 +985,12 @@ class ExperimentRunner:
                             'name': name, 'controller': controller,
                             'fault_type': fault_type, 'layout': self.layout,
                             'trial': trial_num, 'seed': seed,
-                            'arena_width': ARENA_WIDTH,
-                            'arena_height': ARENA_HEIGHT,
+                            'arena_width': self.arena_width,
+                            'arena_height': self.arena_height,
                             'cell_size': CELL_SIZE,
                             'walls': self.walls,
                             'fault_time_1': FAULT_INJECT_TIME,
-                            'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'oscillate_leader') else None,
+                            'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'freeze_leader') else None,
                             'frames': snapshot_frames,
                         }, f)
                     print(f"  Saved {len(snapshot_frames)} snapshots to {snap_path}")
@@ -850,15 +1072,18 @@ class ExperimentRunner:
 
 # ==================== Statistical Analysis ====================
 def compute_statistics(results: List[ExperimentResult]):
-    """Group results by condition (controller x fault x layout) and compute stats."""
+    """Group results by condition (controller x fault x layout x ablation) and compute stats."""
     groups: Dict[str, List[ExperimentResult]] = defaultdict(list)
     for r in results:
-        key = f"{r.layout}|{r.controller}|{r.fault_type or 'none'}"
+        abl = getattr(r, 'ablation', None) or 'none'
+        key = f"{r.layout}|{r.controller}|{r.fault_type or 'none'}|{abl}"
         groups[key].append(r)
 
     stats = {}
     for key, trials in sorted(groups.items()):
-        layout, ctrl, fault = key.split('|')
+        parts = key.split('|')
+        layout, ctrl, fault = parts[0], parts[1], parts[2]
+        abl = parts[3] if len(parts) > 3 else 'none'
         n = len(trials)
 
         coverages = [t.final_coverage for t in trials]
@@ -904,6 +1129,7 @@ def compute_statistics(results: List[ExperimentResult]):
             'layout': layout,
             'controller': ctrl,
             'fault': fault,
+            'ablation': abl,
             'n': n,
             'coverage_mean': cov_mean,
             'coverage_std': cov_std,
@@ -933,14 +1159,15 @@ def print_statistics(results: List[ExperimentResult]):
     print("STATISTICAL SUMMARY  (mean +/- std)")
     print("=" * 100)
 
-    header = (f"{'Layout':<10} {'Controller':<14} {'Fault':<12} {'N':>3}  "
+    header = (f"{'Layout':<10} {'Controller':<14} {'Fault':<12} {'Ablation':<15} {'N':>3}  "
               f"{'Coverage':>14}  {'T->50%':>12}  {'T->60%':>12}  {'T->80%':>12}  "
               f"{'1st Suspicion':>14}  {'Impeachment':>14}  {'Det%':>5}  {'FP':>4}  {'Cov@90s':>8}")
     print(header)
-    print("-" * 155)
+    print("-" * 170)
 
     for key in sorted(stats):
         s = stats[key]
+        abl_label = s.get('ablation', 'none')
         cov = f"{s['coverage_mean']:.1f}+/-{s['coverage_std']:.1f}"
         t50 = f"{s['time_to_50_mean']:.1f}+/-{s['time_to_50_std']:.1f}" \
             if s['time_to_50_mean'] is not None else "N/A"
@@ -956,7 +1183,7 @@ def print_statistics(results: List[ExperimentResult]):
         fp = f"{s['false_positive_mean']:.1f}"
         c90 = f"{s['coverage_at_90s_mean']:.1f}" if s['coverage_at_90s_mean'] else "N/A"
 
-        print(f"{s['layout']:<10} {s['controller']:<14} {s['fault']:<12} "
+        print(f"{s['layout']:<10} {s['controller']:<14} {s['fault']:<12} {abl_label:<15} "
               f"{s['n']:>3}  {cov:>14}  {t50:>12}  {t60:>12}  {t80:>12}  "
               f"{sus:>14}  {det:>14}  {det_pct:>5}  {fp:>4}  {c90:>8}")
 
@@ -965,10 +1192,10 @@ def print_statistics(results: List[ExperimentResult]):
     # ---- Key comparisons ----
     print("\nKEY COMPARISONS:")
     for layout in ["open", "multiroom"]:
-        reip = stats.get(f"{layout}|reip|bad_leader")
-        raft = stats.get(f"{layout}|raft|bad_leader")
-        dec = stats.get(f"{layout}|decentralized|bad_leader")
-        reip_clean = stats.get(f"{layout}|reip|none")
+        reip = stats.get(f"{layout}|reip|bad_leader|none")
+        raft = stats.get(f"{layout}|raft|bad_leader|none")
+        dec = stats.get(f"{layout}|decentralized|bad_leader|none")
+        reip_clean = stats.get(f"{layout}|reip|none|none")
 
         if reip and raft:
             delta = reip['coverage_mean'] - raft['coverage_mean']
@@ -1004,7 +1231,7 @@ def print_statistics(results: List[ExperimentResult]):
         # ---- Speed comparison (time to milestones) ----
         all_conds = {}
         for tag in ['reip', 'raft', 'decentralized']:
-            for fault_tag in ['none', 'bad_leader']:
+            for fault_tag in ['none', 'bad_leader', 'freeze_leader']:
                 k = f"{layout}|{tag}|{fault_tag}"
                 if k in stats:
                     label = f"{tag}{'(fault)' if fault_tag != 'none' else ''}"
@@ -1020,20 +1247,37 @@ def print_statistics(results: List[ExperimentResult]):
 
 
 # ==================== Experiment Conditions ====================
-# (condition_tag, controller, fault_type, fault_robot)
+# (condition_tag, controller, fault_type, fault_robot, ablation)
 EXPERIMENT_CONDITIONS = [
     # --- Clean performance ---
-    ("NoFault",    "reip",          None,          1),
-    ("NoFault",    "raft",          None,          1),
-    ("NoFault",    "decentralized", None,          1),
+    ("NoFault",    "reip",          None,          1, None),
+    ("NoFault",    "raft",          None,          1, None),
+    ("NoFault",    "decentralized", None,          1, None),
     # --- Bad leader (REIP's key differentiator) ---
-    ("BadLeader",  "reip",          "bad_leader",  1),
-    ("BadLeader",  "raft",          "bad_leader",  1),
-    ("BadLeader",  "decentralized", "bad_leader",  1),
-    # --- Oscillating leader fault (tests Tier 3 direction consistency) ---
-    ("Oscillate",  "reip",          "oscillate_leader",  1),
-    ("Oscillate",  "raft",          "oscillate_leader",  1),
-    ("Oscillate",  "decentralized", "oscillate_leader",  1),
+    ("BadLeader",  "reip",          "bad_leader",  1, None),
+    ("BadLeader",  "raft",          "bad_leader",  1, None),
+    ("BadLeader",  "decentralized", "bad_leader",  1, None),
+    # --- Freeze leader: leader stops updating assignments ---
+    ("FreezeLeader", "reip",          "freeze_leader",  1, None),
+    ("FreezeLeader", "raft",          "freeze_leader",  1, None),
+    ("FreezeLeader", "decentralized", "freeze_leader",  1, None),
+]
+
+# Ablation conditions: each removes ONE REIP component under bad_leader
+# to prove necessity. Also test no_causality under clean to show
+# false positive prevention.
+ABLATION_CONDITIONS = [
+    # No trust assessment: REIP with elections but no detection/impeachment
+    # Expected: plateaus like RAFT under bad_leader (proves trust IS the contribution)
+    ("Ablation_NoTrust_BL",    "reip", "bad_leader", 1, "no_trust"),
+    # No causality grace: CAUSALITY_GRACE_PERIOD=0
+    # Under clean: expect false positives (unnecessary impeachments)
+    ("Ablation_NoCausality_Clean", "reip", None,         1, "no_causality"),
+    # No causality grace under bad_leader: faster detection but more false positives
+    ("Ablation_NoCausality_BL",    "reip", "bad_leader", 1, "no_causality"),
+    # No direction consistency check: only three-tier cell check
+    # Expected: still detects bad_leader via Tier 1/3, but possibly slower
+    ("Ablation_NoDirection_BL",    "reip", "bad_leader", 1, "no_direction"),
 ]
 
 
@@ -1042,20 +1286,20 @@ def _run_worker(args_tuple):
     """Run a sequence of experiments on one worker with one port offset.
 
     args_tuple: (worker_id, job_list, output_dir)
-      job_list: [(name, layout, controller, fault_type, fault_robot, trial, seed), ...]
+      job_list: [(name, layout, controller, fault_type, fault_robot, trial, seed, ablation), ...]
     """
     worker_id, job_list, output_dir = args_tuple
     port_offset = worker_id * 1000
     results = []
     runner = ExperimentRunner(output_dir, port_offset=port_offset)
 
-    for name, layout, controller, fault_type, fault_robot, trial, seed in job_list:
+    for name, layout, controller, fault_type, fault_robot, trial, seed, ablation in job_list:
         runner.set_layout(layout)
         try:
             r = runner.run_experiment(
                 name=name, controller=controller,
                 fault_type=fault_type, fault_robot=fault_robot,
-                trial_num=trial, seed=seed)
+                trial_num=trial, seed=seed, ablation=ablation)
             results.append(asdict(r))
         except Exception as e:
             print(f"  [W{worker_id}][ERROR] {name}: {e}")
@@ -1088,6 +1332,8 @@ def main():
                         help="Parallel workers (0=auto based on CPU cores, 1=sequential)")
     parser.add_argument("--snapshots", action="store_true",
                         help="Save per-timestep position snapshots for gridworld viz")
+    parser.add_argument("--ablation", action="store_true",
+                        help="Run ablation study conditions instead of standard conditions")
     args = parser.parse_args()
 
     if args.quick:
@@ -1098,20 +1344,24 @@ def main():
         layouts = list(ARENA_LAYOUTS.keys()) if args.layout == "all" else [args.layout]
 
     # Filter conditions if requested
-    conditions = EXPERIMENT_CONDITIONS
+    if args.ablation:
+        conditions = ABLATION_CONDITIONS
+    else:
+        conditions = EXPERIMENT_CONDITIONS
     if args.condition:
         conditions = [c for c in conditions if args.condition.lower() in c[0].lower()
                       or args.condition.lower() in c[1].lower()]
 
     # Build the full job list
+    # Each job: (name, layout, controller, fault_type, fault_robot, trial, seed, ablation)
     jobs = []
     for layout in layouts:
         for trial in range(1, n_trials + 1):
             seed = trial * 1000
-            for cond_tag, controller, fault_type, fault_robot in conditions:
+            for cond_tag, controller, fault_type, fault_robot, ablation in conditions:
                 name = f"{layout}_{controller}_{cond_tag}_t{trial}"
                 jobs.append((name, layout, controller, fault_type,
-                             fault_robot, trial, seed))
+                             fault_robot, trial, seed, ablation))
 
     total = len(jobs)
     if total == 0:
@@ -1158,7 +1408,7 @@ def main():
         # ---- Sequential mode (simple, for debugging) ----
         runner = ExperimentRunner(output_dir)
         all_results: List[ExperimentResult] = []
-        for i, (name, layout, controller, fault_type, fault_robot, trial, seed) in enumerate(jobs):
+        for i, (name, layout, controller, fault_type, fault_robot, trial, seed, ablation) in enumerate(jobs):
             print(f"\n>>> Experiment {i+1}/{total}: {name}")
             runner.set_layout(layout)
             result = runner.run_experiment(
@@ -1166,6 +1416,7 @@ def main():
                 fault_type=fault_type, fault_robot=fault_robot,
                 trial_num=trial, seed=seed,
                 save_snapshots=args.snapshots,
+                ablation=ablation,
             )
             all_results.append(result)
             time.sleep(2)

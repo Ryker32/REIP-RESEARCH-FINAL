@@ -354,6 +354,8 @@ class REIPNode:
         self.bad_leader_mode = False  # Leadership fault: send bad assignments
         self.oscillate_leader_mode = False  # Oscillation fault: flip-flop targets
         self._oscillate_phase = 0  # Alternates 0/1 each broadcast cycle
+        self.freeze_leader_mode = False  # Freeze fault: leader stops assigning new targets
+        self._frozen_assignments: Dict[str, Tuple[float, float]] = {}  # Cached at freeze time
         
         # ===== Fault Classification: Command Stability Metric (Ω) =====
         # Tracks the angular velocity of the commanded direction to distinguish:
@@ -728,6 +730,10 @@ class REIPNode:
            optimal direction (nearest unexplored cell, per Yamauchi 1997).
            Only fires when three-tier ALSO found evidence (reinforcing).
         """
+        # ===== ABLATION: no_trust — skip all trust assessment =====
+        if getattr(self, '_ablation_no_trust', False):
+            return
+        
         if self.leader_assigned_target is None:
             return
         
@@ -785,16 +791,18 @@ class REIPNode:
         # Two modes:
         # 1. SEVERE mismatch (>135°): Can trigger independently (obvious wrong direction)
         # 2. MODERATE mismatch (90-135°): Only reinforces three-tier evidence
-        mpc_suspicion, mpc_severe = self._compute_mpc_direction_error()
-        
-        if mpc_severe:
-            # Severe direction mismatch - can trigger on its own
-            suspicion_added += mpc_suspicion
-            reasons.append(f"mpc_severe({mpc_suspicion:.2f})")
-        elif suspicion_added > 0 and mpc_suspicion > 0:
-            # Moderate mismatch - only reinforces existing evidence
-            suspicion_added += mpc_suspicion
-            reasons.append(f"mpc_direction({mpc_suspicion:.2f})")
+        # (Ablation: no_direction skips this entire check)
+        if not getattr(self, '_ablation_no_direction', False):
+            mpc_suspicion, mpc_severe = self._compute_mpc_direction_error()
+            
+            if mpc_severe:
+                # Severe direction mismatch - can trigger on its own
+                suspicion_added += mpc_suspicion
+                reasons.append(f"mpc_severe({mpc_suspicion:.2f})")
+            elif suspicion_added > 0 and mpc_suspicion > 0:
+                # Moderate mismatch - only reinforces existing evidence
+                suspicion_added += mpc_suspicion
+                reasons.append(f"mpc_direction({mpc_suspicion:.2f})")
         
         # ===== COMMAND STABILITY METRIC (Ω) — Fault Classification =====
         # Track angular velocity of commanded direction over a sliding window.
@@ -1003,6 +1011,11 @@ class REIPNode:
         if self.oscillate_leader_mode:
             return self._compute_oscillate_assignments()
         
+        # FREEZE LEADER MODE: stop updating assignments entirely
+        # Followers keep stale targets → as those cells get explored, coverage stalls
+        if self.freeze_leader_mode:
+            return self._compute_freeze_assignments()
+        
         # Find all unexplored cells (frontiers)
         frontiers = []
         frontier_set = set()
@@ -1170,6 +1183,47 @@ class REIPNode:
               f"({target[0]:.0f}, {target[1]:.0f})")
         return assignments
     
+    def _compute_freeze_assignments(self) -> Dict[str, Tuple[float, float]]:
+        """
+        FREEZE LEADER: stop updating assignments entirely.
+        
+        On first call, snapshots whatever the current assignments are (or assigns
+        the leader's own position if none exist).  From then on, the leader
+        returns the exact same stale targets forever.
+        
+        Detection signature:
+          - Tier 1 (personal_visited): once a frozen target is explored, followers
+            are commanded to already-visited cells -> trust decay
+          - Tier 3 (direction consistency): stale target = stable direction,
+            but predicted (local optimal) keeps changing -> moderate mismatch
+          - The fault is PASSIVE: the leader just stopped doing its job.
+            REIP should detect it via coverage stagnation + Tier 1 checks.
+            Raft has NO detection mechanism and will stall indefinitely.
+        """
+        if not self._frozen_assignments:
+            # First call: snapshot current assignments (or generate fallback)
+            if self._prev_assignments:
+                self._frozen_assignments = dict(self._prev_assignments)
+            else:
+                # No previous assignments — assign everyone to the leader's position
+                robots = {self.robot_id: (self.x, self.y)}
+                for pid, peer in self.peers.items():
+                    if time.time() - peer.last_seen < PEER_TIMEOUT:
+                        robots[pid] = (peer.x, peer.y)
+                for rid in robots:
+                    self._frozen_assignments[str(rid)] = (self.x, self.y)
+            
+            print(f"[FREEZE_LEADER] Frozen {len(self._frozen_assignments)} assignments "
+                  f"(will never update)")
+        
+        # Always return the same stale assignments
+        # Set own target from frozen cache
+        my_key = str(self.robot_id)
+        if my_key in self._frozen_assignments:
+            self.my_assigned_target = self._frozen_assignments[my_key]
+        
+        return dict(self._frozen_assignments)
+    
     def get_my_frontier(self) -> Optional[Tuple[float, float]]:
         """Compute nearest unexplored cell (Yamauchi 1997 frontier-based)."""
         my_cell = self.get_cell(self.x, self.y)
@@ -1280,7 +1334,9 @@ class REIPNode:
                 if old_leader == self.robot_id:
                     self.bad_leader_mode = False
                     self.oscillate_leader_mode = False
+                    self.freeze_leader_mode = False
                     self._oscillate_phase = 0
+                    self._frozen_assignments.clear()
                     if hasattr(self, '_bad_assignments_cache'):
                         self._bad_assignments_cache.clear()
             
@@ -1413,6 +1469,8 @@ class REIPNode:
                         self.injected_fault = None
                         self.bad_leader_mode = False
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
+                        self._frozen_assignments.clear()
                         if hasattr(self, '_bad_assignments_cache'):
                             self._bad_assignments_cache.clear()
                         print(f"[FAULT] All faults cleared")
@@ -1420,20 +1478,31 @@ class REIPNode:
                         # Leadership fault - triggers three-tier trust
                         self.bad_leader_mode = True
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
                         self.injected_fault = None  # Don't also do motor fault
                         print(f"[FAULT] BAD_LEADER mode activated - will send bad assignments")
                     elif fault == 'oscillate_leader':
                         # Oscillation fault - triggers Tier 3 direction consistency
                         self.oscillate_leader_mode = True
                         self.bad_leader_mode = False
+                        self.freeze_leader_mode = False
                         self.injected_fault = None
                         self._oscillate_phase = 0
                         print(f"[FAULT] OSCILLATE_LEADER mode activated - will flip-flop targets")
+                    elif fault == 'freeze_leader':
+                        # Freeze fault - leader stops updating assignments
+                        self.freeze_leader_mode = True
+                        self.bad_leader_mode = False
+                        self.oscillate_leader_mode = False
+                        self.injected_fault = None
+                        self._frozen_assignments.clear()  # Will be populated on first call
+                        print(f"[FAULT] FREEZE_LEADER mode activated - will stop updating assignments")
                     else:
                         # Motor fault - triggers anomaly detection
                         self.injected_fault = fault
                         self.bad_leader_mode = False
                         self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
                         print(f"[FAULT] Motor fault injected: {fault}")
         except (BlockingIOError, ConnectionResetError):
             pass
@@ -1551,10 +1620,14 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) < 2:
-        print("Usage: python3 reip_node.py <robot_id> [--sim] [--decentralized] [--port-base N]")
+        print("Usage: python3 reip_node.py <robot_id> [--sim] [--decentralized] [--port-base N] [--ablation MODE]")
         print("  --sim           Use unique ports for localhost testing")
         print("  --decentralized Disable leader coordination")
         print("  --port-base N   Offset all port numbers by N (for parallel experiments)")
+        print("  --ablation MODE Ablation study mode:")
+        print("       no_trust      - Disable all trust assessment (no detection/impeachment)")
+        print("       no_causality  - Set causality grace period to 0 (expect false positives)")
+        print("       no_direction  - Disable MPC direction consistency check")
         sys.exit(1)
     
     robot_id = int(sys.argv[1])
@@ -1569,7 +1642,45 @@ if __name__ == "__main__":
         UDP_PEER_PORT += port_offset
         UDP_FAULT_PORT += port_offset
     
+    # Parse --ablation for ablation study
+    ablation_mode = None
+    if "--ablation" in sys.argv:
+        idx = sys.argv.index("--ablation")
+        ablation_mode = sys.argv[idx + 1]
+        valid_modes = ("no_trust", "no_causality", "no_direction")
+        if ablation_mode not in valid_modes:
+            print(f"ERROR: Unknown ablation mode '{ablation_mode}'. Valid: {valid_modes}")
+            sys.exit(1)
+    
+    # Apply ablation overrides BEFORE constructing the node
+    if ablation_mode == "no_causality":
+        CAUSALITY_GRACE_PERIOD = 0.0
+        print(f"=== ABLATION: no_causality -- CAUSALITY_GRACE_PERIOD = 0 ===")
+    
+    # Parse --arena-width / --arena-height for scaled layouts
+    if "--arena-width" in sys.argv:
+        idx = sys.argv.index("--arena-width")
+        ARENA_WIDTH = int(sys.argv[idx + 1])
+        print(f"=== Arena width override: {ARENA_WIDTH} ===")
+    if "--arena-height" in sys.argv:
+        idx = sys.argv.index("--arena-height")
+        ARENA_HEIGHT = int(sys.argv[idx + 1])
+        print(f"=== Arena height override: {ARENA_HEIGHT} ===")
+    
     node = REIPNode(robot_id, sim_mode=sim_mode)
+    
+    # Apply ablation flags to the node instance
+    if ablation_mode == "no_trust":
+        node._ablation_no_trust = True
+        print(f"=== ABLATION: no_trust -- assess_leader_command() DISABLED ===")
+    else:
+        node._ablation_no_trust = False
+    
+    if ablation_mode == "no_direction":
+        node._ablation_no_direction = True
+        print(f"=== ABLATION: no_direction -- MPC direction check DISABLED ===")
+    else:
+        node._ablation_no_direction = False
     
     if "--decentralized" in sys.argv:
         node.decentralized_mode = True
@@ -1581,5 +1692,7 @@ if __name__ == "__main__":
           f"T3={WORST_CASE_DETECT_T3} cmds | "
           f"Impeachment: T1={WORST_CASE_IMPEACH_T1} cmds, "
           f"T3={WORST_CASE_IMPEACH_T3} cmds ===")
+    if ablation_mode:
+        print(f"=== ABLATION MODE: {ablation_mode} ===")
     
     node.run()

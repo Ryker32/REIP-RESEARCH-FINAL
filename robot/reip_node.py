@@ -236,7 +236,7 @@ class Hardware:
             return
         try:
             self.bus.write_byte(self.MUX_ADDR, 1 << ch)
-            time.sleep(0.005)
+            time.sleep(0.001)  # 1ms — TCA9548A switches in <1μs
         except:
             pass
     
@@ -1534,9 +1534,11 @@ class REIPNode:
     def _peer_avoidance_heading(self, desired_angle) -> float:
         """Steer away from nearby peers using their broadcast positions.
         At very close range, overrides heading to flee. Adds a per-robot
-        random offset to break symmetry when surrounded."""
-        PEER_AVOID_DIST = 350
-        PEER_REPEL_GAIN = 3.0
+        random offset to break symmetry when surrounded.
+        NOTE: peer positions are updated at BROADCAST_RATE (5 Hz), so they
+        can be up to 200ms stale. Use a generous avoidance distance."""
+        PEER_AVOID_DIST = 400   # was 350 — wider to compensate for stale positions
+        PEER_REPEL_GAIN = 4.0   # was 3.0 — stronger push when close
 
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
@@ -1625,20 +1627,21 @@ class REIPNode:
                 right = BASE_SPEED * (1 + turn * 0.5)
                 return (left, right)
 
-        # ToF front emergency: reverse + spin when about to physically collide.
-        # Tight range (30-100mm) so it only fires for imminent crashes, not
-        # when peers are merely nearby (peer_avoidance_heading handles that).
+        # ToF emergency: reverse + spin when about to physically collide.
+        # Uses front, front_left, and front_right sensors for wider coverage.
         front_dist = self.tof.get('front', 999)
-        if 30 < front_dist < 100:
-            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
-            diff = math.atan2(cy - self.y, cx - self.x) - self.theta
-            while diff > math.pi: diff -= 2 * math.pi
-            while diff < -math.pi: diff += 2 * math.pi
+        fl_dist = self.tof.get('front_left', 999)
+        fr_dist = self.tof.get('front_right', 999)
+        min_front_dist = min(front_dist, fl_dist, fr_dist)
+        if 30 < min_front_dist < 150:
+            # Reverse, steering away from the closest obstacle side
             rev = BASE_SPEED * 0.5
-            if diff > 0:
-                return (-rev * 0.4, -rev)
+            if fl_dist < fr_dist:
+                # Obstacle on front-left → reverse and turn right
+                return (-rev * 0.3, -rev)
             else:
-                return (-rev, -rev * 0.4)
+                # Obstacle on front-right → reverse and turn left
+                return (-rev, -rev * 0.3)
 
         # --- Target selection (identical to sim) ---
         target = None
@@ -1712,14 +1715,45 @@ class REIPNode:
 
         turn = max(-1, min(1, diff / (math.pi / 3)))
 
-        # Slow down near walls — replicates the sim's component-wise collision
-        # which naturally reduces effective speed when sliding along walls.
+        # ToF-based reactive turn bias: if front-left or front-right sensors
+        # see an obstacle within 200mm, bias turn away from it. This is a
+        # reflex layer that uses real sensor data, not camera/peer estimates.
+        TOF_BIAS_DIST = 200
+        fl = self.tof.get('front_left', 999)
+        fr = self.tof.get('front_right', 999)
+        left_tof = self.tof.get('left', 999)
+        right_tof = self.tof.get('right', 999)
+        # Positive bias = turn right (away from left obstacle)
+        tof_bias = 0.0
+        if fl < TOF_BIAS_DIST and fl > 20:
+            tof_bias += 0.3 * (TOF_BIAS_DIST - fl) / TOF_BIAS_DIST
+        if left_tof < TOF_BIAS_DIST and left_tof > 20:
+            tof_bias += 0.15 * (TOF_BIAS_DIST - left_tof) / TOF_BIAS_DIST
+        if fr < TOF_BIAS_DIST and fr > 20:
+            tof_bias -= 0.3 * (TOF_BIAS_DIST - fr) / TOF_BIAS_DIST
+        if right_tof < TOF_BIAS_DIST and right_tof > 20:
+            tof_bias -= 0.15 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
+        turn = max(-1, min(1, turn + tof_bias))
+
+        # --- Motor command: full speed, strong turns ---
+        # NO passive speed brake near walls/peers. The active steering layers
+        # (wall_slide_heading, peer_avoidance_heading, ToF bias, ToF emergency)
+        # redirect the heading. Braking just kills turn authority on a 217g
+        # differential-drive robot — the slow wheel stalls, the robot parks
+        # itself next to the wall instead of sliding along it.
+        #
+        # Instead: keep full speed but BOOST turn differential near obstacles
+        # so the robot can actually execute the heading correction.
+        effective_speed = BASE_SPEED
+
+        # Near obstacles: widen the turn differential so the robot turns
+        # harder without losing forward motion.  Normal: turn * 0.5 per wheel.
+        # Near obstacle: turn * 0.7 per wheel → stronger rotation.
         min_wall_dist = min(
             self.x, ARENA_WIDTH - self.x,
             self.y, ARENA_HEIGHT - self.y)
         if self.y < INTERIOR_WALL_Y_END:
             min_wall_dist = min(min_wall_dist, abs(self.x - INTERIOR_WALL_X))
-
         min_peer_dist = 9999.0
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > PEER_TIMEOUT:
@@ -1727,21 +1761,19 @@ class REIPNode:
             d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
             min_peer_dist = min(min_peer_dist, d)
 
-        speed_factor = 1.0
-        if min_wall_dist < REPULSION_ZONE:
-            speed_factor = min(speed_factor, max(0.3, min_wall_dist / REPULSION_ZONE))
-        if min_peer_dist < 2 * ROBOT_RADIUS:
-            speed_factor = min(speed_factor, max(0.35, min_peer_dist / (2 * ROBOT_RADIUS)))
-        effective_speed = BASE_SPEED * speed_factor
+        min_obstacle_dist = min(min_wall_dist, min_peer_dist)
+        TURN_BOOST_DIST = 250  # mm — boost turn authority when this close
+        if min_obstacle_dist < TURN_BOOST_DIST:
+            # Ramp turn_mix from 0.5 (normal) to 0.8 (near obstacle)
+            proximity = 1.0 - (min_obstacle_dist / TURN_BOOST_DIST)
+            turn_mix = 0.5 + 0.3 * proximity
+        else:
+            turn_mix = 0.5
 
-        # Decouple turn authority from speed: forward speed is reduced near
-        # walls, but the DIFFERENTIAL for turning stays strong enough to
-        # actually rotate the 217g robot.  Without this, 40% speed * 0.5 turn
-        # = 16 PWM on the slow motor, which stalls the N20 completely.
         MIN_MOTOR_PWM = 25  # Below this, N20 100:1 can't move 217g
-        left_speed = effective_speed * (1 - turn * 0.5)
-        right_speed = effective_speed * (1 + turn * 0.5)
-        # Ensure neither motor is in the dead zone when trying to move
+        left_speed = effective_speed * (1 - turn * turn_mix)
+        right_speed = effective_speed * (1 + turn * turn_mix)
+        # Ensure neither motor is in the dead zone when trying to turn
         if abs(turn) > 0.1:
             if abs(left_speed) > 0 and abs(left_speed) < MIN_MOTOR_PWM:
                 left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
@@ -1819,12 +1851,17 @@ class REIPNode:
     
     # ==================== MAIN LOOPS ====================
     def sensor_loop(self):
-        """Read sensors. Encoder reads disabled — positions come from camera,
-        and UART contention with motor commands trips the Pico's 500ms watchdog."""
+        """Read ToF sensors continuously. Encoder reads disabled — positions
+        come from camera, and UART contention with motor commands trips the
+        Pico's 500ms watchdog.
+        
+        Target: ~8-10 Hz ToF updates (5 sensors × ~20ms each ≈ 100ms cycle).
+        Old 500ms sleep made ToF data too stale for real-time avoidance."""
         while self.running:
             self.tof = self.hw.read_tof_all()
             self.update_tof_obstacles()
-            time.sleep(0.5)
+            time.sleep(0.02)  # ~50 Hz poll, but read_tof_all takes ~100ms
+                              # so effective rate is ~8-10 Hz
     
     def network_loop(self):
         """Handle network communication"""

@@ -139,7 +139,7 @@ class Hardware:
         if not HARDWARE_AVAILABLE: return
         try:
             self.bus.write_byte(self.MUX_ADDR, 1 << ch)
-            time.sleep(0.005)
+            time.sleep(0.001)  # 1ms — TCA9548A switches in <1μs
         except: pass
     
     def read_tof_all(self) -> Dict[str, int]:
@@ -866,9 +866,10 @@ class RAFTNode:
         return math.atan2(hy, hx)
 
     def _peer_avoidance_heading(self, desired_angle) -> float:
-        """Steer away from nearby peers using their broadcast positions."""
-        PEER_AVOID_DIST = 300
-        PEER_REPEL_GAIN = 2.5
+        """Steer away from nearby peers using their broadcast positions.
+        Peer positions can be up to 200ms stale — use generous distance."""
+        PEER_AVOID_DIST = 400   # was 300
+        PEER_REPEL_GAIN = 4.0   # was 2.5
 
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
@@ -932,6 +933,18 @@ class RAFTNode:
                 right = BASE_SPEED * (1 + turn * 0.5)
                 return (left, right)
 
+        # ToF emergency: reverse + spin when about to physically collide.
+        front_dist = self.tof.get('front', 999)
+        fl_dist = self.tof.get('front_left', 999)
+        fr_dist = self.tof.get('front_right', 999)
+        min_front_dist = min(front_dist, fl_dist, fr_dist)
+        if 30 < min_front_dist < 150:
+            rev = BASE_SPEED * 0.5
+            if fl_dist < fr_dist:
+                return (-rev * 0.3, -rev)
+            else:
+                return (-rev, -rev * 0.3)
+
         # NO TRUST CHECK - just follow leader assignment blindly
         target = None
         if self.state == RaftState.LEADER:
@@ -992,13 +1005,32 @@ class RAFTNode:
 
         turn = max(-1, min(1, diff / (math.pi / 3)))
 
-        # Slow down near walls and peers
+        # ToF-based reactive turn bias
+        TOF_BIAS_DIST = 200
+        fl = self.tof.get('front_left', 999)
+        fr = self.tof.get('front_right', 999)
+        left_tof = self.tof.get('left', 999)
+        right_tof = self.tof.get('right', 999)
+        tof_bias = 0.0
+        if fl < TOF_BIAS_DIST and fl > 20:
+            tof_bias += 0.3 * (TOF_BIAS_DIST - fl) / TOF_BIAS_DIST
+        if left_tof < TOF_BIAS_DIST and left_tof > 20:
+            tof_bias += 0.15 * (TOF_BIAS_DIST - left_tof) / TOF_BIAS_DIST
+        if fr < TOF_BIAS_DIST and fr > 20:
+            tof_bias -= 0.3 * (TOF_BIAS_DIST - fr) / TOF_BIAS_DIST
+        if right_tof < TOF_BIAS_DIST and right_tof > 20:
+            tof_bias -= 0.15 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
+        turn = max(-1, min(1, turn + tof_bias))
+
+        # No passive speed brake — active steering handles avoidance.
+        # Boost turn differential near obstacles instead.
+        effective_speed = BASE_SPEED
+
         min_wall_dist = min(
             self.x, ARENA_WIDTH - self.x,
             self.y, ARENA_HEIGHT - self.y)
         if self.y < INTERIOR_WALL_Y_END:
             min_wall_dist = min(min_wall_dist, abs(self.x - INTERIOR_WALL_X))
-
         min_peer_dist = 9999.0
         for pid, peer in self.peers.items():
             if time.time() - peer.get('last_seen', 0) > self.peer_timeout:
@@ -1006,16 +1038,17 @@ class RAFTNode:
             d = math.sqrt((self.x - peer['x'])**2 + (self.y - peer['y'])**2)
             min_peer_dist = min(min_peer_dist, d)
 
-        speed_factor = 1.0
-        if min_wall_dist < REPULSION_ZONE:
-            speed_factor = min(speed_factor, max(0.5, min_wall_dist / REPULSION_ZONE))
-        if min_peer_dist < 2 * ROBOT_RADIUS:
-            speed_factor = min(speed_factor, max(0.3, min_peer_dist / (2 * ROBOT_RADIUS)))
-        effective_speed = BASE_SPEED * speed_factor
+        min_obstacle_dist = min(min_wall_dist, min_peer_dist)
+        TURN_BOOST_DIST = 250
+        if min_obstacle_dist < TURN_BOOST_DIST:
+            proximity = 1.0 - (min_obstacle_dist / TURN_BOOST_DIST)
+            turn_mix = 0.5 + 0.3 * proximity
+        else:
+            turn_mix = 0.5
 
         MIN_MOTOR_PWM = 25
-        left_speed = effective_speed * (1 - turn * 0.5)
-        right_speed = effective_speed * (1 + turn * 0.5)
+        left_speed = effective_speed * (1 - turn * turn_mix)
+        right_speed = effective_speed * (1 + turn * turn_mix)
         if abs(turn) > 0.1:
             if abs(left_speed) > 0 and abs(left_speed) < MIN_MOTOR_PWM:
                 left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
@@ -1081,8 +1114,9 @@ class RAFTNode:
     def sensor_loop(self):
         while self.running:
             self.tof = self.hw.read_tof_all()
-            self.encoders = self.hw.read_encoders()
-            time.sleep(0.05)
+            # Encoder reads removed — positions come from camera,
+            # and UART contention with motor commands trips Pico watchdog.
+            time.sleep(0.02)
     
     def network_loop(self):
         last_broadcast = 0

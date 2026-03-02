@@ -1,5 +1,4 @@
 \documentclass[conference]{IEEEtran}
-\IEEEoverridecommandlockouts
 
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
@@ -39,8 +38,8 @@ centralized oversight.  Each robot maintains a trust ledger and verifies
 leader commands \emph{before execution} using a three-tier
 confidence-weighted model: personal visit history (ground truth), sensor
 readings (physically verifiable), and peer-reported coverage (lower
-confidence).  This proactive approach yields a closed-form worst-case
-detection bound of $\lceil \sigma / (w_{\min} - r) \rceil$
+confidence).  This proactive approach yields a closed-form detection
+bound of $\lceil \sigma / (w_{\text{tier}} - r) \rceil$
 commands---2~under ground-truth evidence, 8~under peer reports.  In
 multiroom simulation with dual sequential Byzantine fault injection
 ($N{=}100$ trials per condition), REIP achieves 100\% median
@@ -52,8 +51,8 @@ Byzantine Assignment and $+32.2\,$pp under Freeze Leader, which
 cannot detect a leader that misbehaves while maintaining heartbeats.
 An ablation study confirms that removing the trust model collapses
 coverage to $39.7\%$, demonstrating that trust is the core mechanism.
-Hardware validation on a five-robot embedded platform confirms
-sub-second fault detection.
+A five-robot embedded hardware platform is presented for
+physical validation.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -162,11 +161,9 @@ by source reliability---personal experience outweighs sensor readings,
 which outweigh peer reports---enabling fast detection from strong evidence
 while preventing false positives from stale data.
 
-Returning to the orchestra analogy: REIP gives each musician the ability
-to independently judge whether the conductor's directions make musical
-sense.  If enough musicians independently conclude the conductor is
-calling wrong notes, they vote to replace the conductor mid-performance
----without stopping the music.
+In effect, REIP gives each follower the ability to independently judge
+commands and, if enough followers concur, vote to replace the leader
+without halting the mission.
 
 An earlier reactive model using CUSUM--Bayesian fault
 detection~\cite{page1954cusum, gelman2013bayesian} was validated across
@@ -268,8 +265,7 @@ coordinating assignments to maximize coverage
 rate~\cite{burgard2000collaborative}.  Leader--follower architectures
 exploit a global view for coordinated
 assignment~\cite{simmons2000coordination}, but treat the leader as
-implicitly trustworthy---analogous to an orchestra that follows the
-conductor's baton without question.  There is no mechanism for detecting
+implicitly trustworthy.  There is no mechanism for detecting
 when the leader's directions become counterproductive, nor for replacing
 the leader without external supervision.  REIP augments a standard
 frontier-based leader--follower stack with a governance layer that
@@ -592,9 +588,11 @@ where $\delta_b = 0.5\,$s (approximately $2.5\times$ the broadcast
 period at $5\,$Hz).  This grace period reflects the inherent information
 delay in the distributed system: if a cell was explored less than
 $\delta_b$ seconds before the assignment, the leader's merged map may
-not yet contain the update.  The check applies to all three tiers,
-eliminating false positives from network latency and asynchronous map
-updates without weakening detection of genuinely bad commands---a
+not yet contain the update.  The check applies to Tiers~1 and~3
+(stored map evidence); Tier~2 uses instantaneous ToF sensor data
+and does not require stale-data gating.  This eliminates false positives
+from network latency and asynchronous map updates without weakening
+detection of genuinely bad commands---a
 compromised leader sends robots to cells explored \emph{long} before the
 assignment, well outside the grace window.
 
@@ -784,7 +782,7 @@ zigzag movement.
 \subsection{Communication}
 Agents communicate via UDP broadcast at 5\,Hz.  Each broadcast includes
 robot state (position, heading, trust scores), vote, visited cells
-(last 100), and leader assignments.  Stale assignments older than 2\,s
+(last 100), and leader assignments.  Stale assignments older than 1\,s
 are automatically discarded.  The broadcast rate determines the
 temporal resolution of fault detection: at 5\,Hz, the 2-command Tier~1
 bound corresponds to 0.4\,s worst-case detection.
@@ -922,13 +920,12 @@ Table~\ref{tab:mr_coverage} presents final coverage across all nine
 conditions.  Under clean conditions, all three controllers achieve
 comparable median coverage of $100\%$; however, Raft's \emph{mean}
 coverage ($86.4\%$) is notably lower than both REIP ($91.2\%$) and
-Decentralized ($90.6\%$).  This ${\approx}5$\,pp deficit exists even
-without faults, reflecting the inherent overhead of heartbeat-based
-consensus: periodic election rounds, leader-timeout intervals, and
-the absence of any performance-aware assignment reasoning.  Raft
-answers ``is the leader alive?'' but never ``is the leader making
-good decisions?''---a distinction that costs coverage even in the
-best case.  Under the bad-leader fault, this baseline gap compounds
+Decentralized ($90.6\%$).  This ${\approx}5$\,pp deficit exists even without faults.
+We attribute it to election-timeout and heartbeat overhead in our
+Raft implementation, though a full breakdown (e.g., idle time during
+elections, message counts) is left for future profiling.
+Raft answers ``is the leader alive?'' but never ``is the leader
+making good decisions?''  Under the bad-leader fault, this baseline gap compounds
 with Raft's inability to detect misbehaviour, producing the critical
 separation visible in Fig.~\ref{fig:reip_vs_raft}.
 
@@ -1033,8 +1030,10 @@ Detection rate     & Freeze Ldr & \multicolumn{2}{c}{99/100 (99\%)} \\
 \midrule
 False positives (clean)\textsuperscript{*} & --- & \multicolumn{2}{c}{0.7 per trial} \\
 \bottomrule
-\multicolumn{4}{@{}l}{\footnotesize\textsuperscript{*}Leader changes
-during the pre-fault settling period ($t < 10\,$s).}
+\multicolumn{4}{@{}l}{\footnotesize\textsuperscript{*}Trust-triggered
+impeachments of a healthy leader in clean trials (no injected faults),}\\
+\multicolumn{4}{@{}l}{\footnotesize excluding the initial election
+at $t{=}0$.}
 \end{tabular}
 \end{table}
 
@@ -1135,8 +1134,8 @@ Byzantine Assignment ($t{=}10\,$s and $t{=}30\,$s).
 \textbf{(a)}~Pre-fault: normal coordinated exploration.
 \textbf{(b)}~Fault detected: compromised leader R1 (red glow)
 identified within $1\,$s.
-\textbf{(c)}~Post-impeachment: new leader R1 still active;
-coverage at $50\%$.
+\textbf{(c)}~Post-impeachment: R1 removed from leadership; a new
+leader directs followers toward remaining frontiers; coverage at $50\%$.
 \textbf{(d)}~Recovery complete: R2 elected after second fault;
 $96\%$ coverage.  White~=~explored, light blue~=~unexplored,
 yellow squares~=~frontier cells.}
@@ -1464,8 +1463,8 @@ sequence).
 \subsection{Results}
 
 Table~\ref{tab:hw_results} summarizes hardware results.  Hardware trials
-use the same 100 seeds as Section~\ref{sec:hw_sim} for paired
-comparison.
+use a subset of the simulation seeds (Section~\ref{sec:hw_sim}) for
+paired comparison.
 
 \begin{table}[t]
 \centering
@@ -1486,15 +1485,13 @@ Raft          & bad\_leader & ---\% & --- & ---   \\
 \end{tabular}
 \end{table}
 
-% Hardware results will be populated from N=30 physical trials using
-% the same seeds as the multiroom simulation experiments.
+% TODO: populate table with hardware trial results.
 
 \subsubsection{Clean Performance}
-Under clean conditions (no faults), REIP-Full and Raft-style baselines
-are expected to achieve comparable coverage rates, as the governance
-layer acts as a passive monitor.  The decentralized baseline is expected
-to show lower coverage efficiency due to redundant exploration without
-coordinated assignment.
+Under clean conditions (no faults), the governance layer acts as a
+passive monitor; REIP and Raft-style baselines should therefore produce
+comparable coverage.  The decentralized baseline lacks coordinated
+assignment and is prone to redundant exploration.
 
 \subsubsection{Fault Resilience}
 Under the \texttt{bad\_leader} fault, the key differentiator is
@@ -1509,12 +1506,38 @@ but sacrifices coordination efficiency.
 The theoretical bound (Eq.~\ref{eq:detection_bound}) predicts
 $n_{\text{detect}} = 2$ commands under Tier~1 evidence.  Simulation
 results (median $0.21\,$s first suspicion) validate this bound.
-Hardware detection times are expected to show modest additional latency
-from real sensor noise and WiFi broadcast jitter.
+Hardware detection times may exhibit modest additional latency
+from real sensor noise and WiFi broadcast jitter; quantitative
+comparison is deferred to the hardware results in
+Table~\ref{tab:hw_results}.
 
 %=========================================================================
 \section{Discussion}
 %=========================================================================
+
+\subsection{Engineering Requirements Verification}
+Table~\ref{tab:eng_req} summarises the key engineering requirements and
+their verification status from the 100-seed simulation campaign.
+
+\begin{table}[t]
+\centering
+\caption{Engineering requirements and verification.}
+\label{tab:eng_req}
+\small
+\begin{tabular}{@{}p{4.5cm}cc@{}}
+\toprule
+\textbf{Requirement} & \textbf{Target} & \textbf{Result} \\
+\midrule
+Detect compromised leader             & $< 2\,$s        & 0.21\,s med.\ \checkmark \\
+Impeach compromised leader            & $< 5\,$s        & 2.14\,s med.\ \checkmark \\
+Coverage under fault $\geq$ clean $-5$\,pp & $\leq 5$\,pp gap & 0.3\,pp gap \checkmark \\
+False positives (clean trials)        & $< 1$ per trial  & 0.7 per trial \checkmark \\
+Detection rate (bad leader)           & $\geq 95\%$     & 97\% \checkmark \\
+No centralised oracle required        & ---             & \checkmark \\
+Run on Pi Zero 2W at $\geq 5\,$Hz    & 5\,Hz           & Pending HW \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Why Proactive Detection Matters}
 \label{sec:discussion_evolution}
@@ -1523,9 +1546,10 @@ The proactive model provides a provable worst-case detection bound
 Reactive detectors require $O(1/\epsilon^2)$ observations to distinguish
 a faulty leader from noise at confidence level $\epsilon$, because they
 operate on statistical residuals accumulated \emph{after} commands are
-executed.  The proactive model's bound is $\lceil \sigma / (w_{\min} -
-r) \rceil = 8$ commands under worst-case Tier~3 evidence, tightening to
-2~commands under Tier~1 ground-truth evidence.  This is a structural
+executed.  The proactive model's bound is $\lceil \sigma / (w_{\text{tier}} -
+r) \rceil$: 8~commands under worst-case Tier~3 evidence
+($w_3{=}0.3$), tightening to 2~commands under Tier~1 ground-truth
+evidence ($w_1{=}1.0$).  This is a structural
 advantage: detection speed scales with evidence quality, not sample size.
 
 The three-tier confidence weighting reflects an epistemological hierarchy
@@ -1666,10 +1690,11 @@ leaders without centralized oversight or ground-truth oracle access.
 
 The core mechanism is a proactive three-tier trust model that verifies
 leader commands \emph{before execution} against local knowledge ranked
-by source reliability.  This yields a closed-form worst-case detection
-bound of $\lceil \sigma / (w_{\min} - r) \rceil$ commands---2~under
-ground-truth evidence, 8~under peer reports---enabling sub-second fault
-detection without wasting physical movement on bad commands.
+by source reliability.  This yields a closed-form detection
+bound of $\lceil \sigma / (w_{\text{tier}} - r) \rceil$ commands---2~under
+ground-truth evidence ($w_1{=}1.0$), 8~under peer reports
+($w_3{=}0.3$)---enabling sub-second fault detection without wasting
+physical movement on bad commands.
 
 In multiroom experiments ($N{=}100$ per condition), REIP achieves:
 \begin{itemize}
@@ -1706,82 +1731,17 @@ the hardware platform.
 
 \FloatBarrier  % flush all pending figures before bibliography
 %=========================================================================
+% References ordered by first citation in the paper.
 \begin{thebibliography}{00}
 %=========================================================================
 
-\bibitem{yamauchi1997frontier}
-B.~Yamauchi, ``A frontier-based approach for autonomous exploration,''
-in \emph{Proc.\ IEEE Int.\ Symp.\ Comput.\ Intell.\ Robot.\ Autom.\
-(CIRA)}, 1997, pp.~146--151.
+% [1] — first cited line 73 (Introduction)
+\bibitem{whittaker2012lunar}
+W.~Whittaker, ``Technologies enabling exploration of skylights, lava
+tubes, and caves,'' NASA Innovative Advanced Concepts (NIAC),
+Tech.\ Rep., Carnegie Mellon Univ., 2012.
 
-\bibitem{burgard2000collaborative}
-W.~Burgard, M.~Moors, D.~Fox, R.~Simmons, and S.~Thrun,
-``Collaborative multi-robot exploration,''
-in \emph{Proc.\ IEEE Int.\ Conf.\ Robot.\ Autom.\ (ICRA)}, 2000,
-pp.~476--481.
-
-\bibitem{simmons2000coordination}
-R.~Simmons, D.~Apfelbaum, W.~Burgard, D.~Fox, M.~Moors, S.~Thrun,
-and H.~Younes,
-``Coordination for multi-robot exploration and mapping,''
-in \emph{Proc.\ Natl.\ Conf.\ Artif.\ Intell.\ (AAAI)}, 2000,
-pp.~852--858.
-
-\bibitem{douceur2002sybil}
-J.~R. Douceur, ``The Sybil attack,''
-in \emph{Proc.\ 1st Int.\ Workshop Peer-to-Peer Syst.\ (IPTPS)}, 2002,
-pp.~251--260.
-
-\bibitem{ji2023hallucination}
-Z.~Ji, N.~Lee, V.~Prabhakaran, \emph{et al.},
-``Survey of hallucination in natural language generation,''
-\emph{ACM Comput.\ Surv.}, vol.~55, no.~12, art.~248, 2023.
-
-\bibitem{lamport1982byzantine}
-L.~Lamport, R.~Shostak, and M.~Pease,
-``The Byzantine generals problem,''
-\emph{ACM Trans.\ Program.\ Lang.\ Syst.}, vol.~4, no.~3,
-pp.~382--401, 1982.
-
-\bibitem{castro1999practical}
-M.~Castro and B.~Liskov,
-``Practical Byzantine fault tolerance,''
-in \emph{Proc.\ 3rd Symp.\ Oper.\ Syst.\ Des.\ Implement.\ (OSDI)},
-1999, pp.~173--186.
-
-\bibitem{ongaro2014raft}
-D.~Ongaro and J.~Ousterhout,
-``In search of an understandable consensus algorithm,''
-in \emph{Proc.\ USENIX Annu.\ Tech.\ Conf.\ (ATC)}, 2014,
-pp.~305--319.
-
-\bibitem{marsh1994formalising}
-S.~Marsh, ``Formalising trust as a computational concept,''
-Ph.D. dissertation, Univ.\ of Stirling, UK, 1994.
-
-
-\bibitem{page1954cusum}
-E.~S. Page, ``Continuous inspection schemes,''
-\emph{Biometrika}, vol.~41, no.~1/2, pp.~100--115, 1954.
-
-\bibitem{gelman2013bayesian}
-A.~Gelman, J.~B. Carlin, H.~S. Stern, D.~B. Dunson, A.~Vehtari,
-and D.~B. Rubin, \emph{Bayesian Data Analysis}, 3rd~ed.\
-Boca Raton, FL, USA: Chapman and Hall/CRC, 2013.
-
-\bibitem{chandola2009anomaly}
-V.~Chandola, A.~Banerjee, and V.~Kumar,
-``Anomaly detection: A survey,''
-\emph{ACM Comput.\ Surv.}, vol.~41, no.~3, art.~15, 2009.
-
-
-\bibitem{garrido2014aruco}
-S.~Garrido-Jurado, R.~Mu\~{n}oz-Salinas, F.~J. Madrid-Cuevas, and
-M.~J. Mar\'{i}n-Jim\'{e}nez,
-``Automatic generation and detection of highly reliable fiducial markers
-under occlusion,''
-\emph{Pattern Recognit.}, vol.~47, no.~6, pp.~2280--2292, 2014.
-
+% [2] — first cited line 73
 \bibitem{chung2023darpa}
 T.~H. Chung, V.~Orekhov, and A.~Maio,
 ``Into the robotic depths: Analysis and insights from the DARPA
@@ -1789,11 +1749,7 @@ Subterranean Challenge,''
 \emph{Annu.\ Rev.\ Control Robot.\ Auton.\ Syst.}, vol.~6,
 pp.~477--501, 2023.
 
-\bibitem{whittaker2012lunar}
-W.~Whittaker, ``Technologies enabling exploration of skylights, lava
-tubes, and caves,'' NASA Innovative Advanced Concepts (NIAC),
-Tech.\ Rep., Carnegie Mellon Univ., 2012.
-
+% [3] — first cited line 76
 \bibitem{marshall2016robotics}
 J.~A. Marshall, A.~Bonchis, E.~Nebot, and S.~Scheding,
 ``Robotics in mining,''
@@ -1801,12 +1757,98 @@ in \emph{Springer Handbook of Robotics}, 2nd~ed.\
 B.~Siciliano and O.~Khatib, Eds.\
 Berlin, Germany: Springer, 2016, ch.~59, pp.~1549--1576.
 
+% [4] — first cited line 81
 \bibitem{murphy2004rescue}
 R.~R. Murphy,
 ``Human--robot interaction in rescue robotics,''
 \emph{IEEE Trans.\ Syst., Man, Cybern.\ C}, vol.~34, no.~2,
 pp.~138--153, 2004.
 
+% [5] — first cited line 97
+\bibitem{burgard2000collaborative}
+W.~Burgard, M.~Moors, D.~Fox, R.~Simmons, and S.~Thrun,
+``Collaborative multi-robot exploration,''
+in \emph{Proc.\ IEEE Int.\ Conf.\ Robot.\ Autom.\ (ICRA)}, 2000,
+pp.~476--481.
+
+% [6] — first cited line 111
+\bibitem{yamauchi1997frontier}
+B.~Yamauchi, ``A frontier-based approach for autonomous exploration,''
+in \emph{Proc.\ IEEE Int.\ Symp.\ Comput.\ Intell.\ Robot.\ Autom.\
+(CIRA)}, 1997, pp.~146--151.
+
+% [7] — first cited line 121
+\bibitem{douceur2002sybil}
+J.~R. Douceur, ``The Sybil attack,''
+in \emph{Proc.\ 1st Int.\ Workshop Peer-to-Peer Syst.\ (IPTPS)}, 2002,
+pp.~251--260.
+
+% [8] — first cited line 121
+\bibitem{ji2023hallucination}
+Z.~Ji, N.~Lee, V.~Prabhakaran, \emph{et al.},
+``Survey of hallucination in natural language generation,''
+\emph{ACM Comput.\ Surv.}, vol.~55, no.~12, art.~248, 2023.
+
+% [9] — first cited line 135
+\bibitem{lamport1982byzantine}
+L.~Lamport, R.~Shostak, and M.~Pease,
+``The Byzantine generals problem,''
+\emph{ACM Trans.\ Program.\ Lang.\ Syst.}, vol.~4, no.~3,
+pp.~382--401, 1982.
+
+% [10] — first cited line 135
+\bibitem{castro1999practical}
+M.~Castro and B.~Liskov,
+``Practical Byzantine fault tolerance,''
+in \emph{Proc.\ 3rd Symp.\ Oper.\ Syst.\ Des.\ Implement.\ (OSDI)},
+1999, pp.~173--186.
+
+% [11] — first cited line 137
+\bibitem{ongaro2014raft}
+D.~Ongaro and J.~Ousterhout,
+``In search of an understandable consensus algorithm,''
+in \emph{Proc.\ USENIX Annu.\ Tech.\ Conf.\ (ATC)}, 2014,
+pp.~305--319.
+
+% [12] — first cited line 141
+\bibitem{marsh1994formalising}
+S.~Marsh, ``Formalising trust as a computational concept,''
+Ph.D. dissertation, Univ.\ of Stirling, UK, 1994.
+
+% [13] — first cited line 147
+\bibitem{chandola2009anomaly}
+V.~Chandola, A.~Banerjee, and V.~Kumar,
+``Anomaly detection: A survey,''
+\emph{ACM Comput.\ Surv.}, vol.~41, no.~3, art.~15, 2009.
+
+% [14] — first cited line 172
+\bibitem{page1954cusum}
+E.~S. Page, ``Continuous inspection schemes,''
+\emph{Biometrika}, vol.~41, no.~1/2, pp.~100--115, 1954.
+
+% [15] — first cited line 172
+\bibitem{gelman2013bayesian}
+A.~Gelman, J.~B. Carlin, H.~S. Stern, D.~B. Dunson, A.~Vehtari,
+and D.~B. Rubin, \emph{Bayesian Data Analysis}, 3rd~ed.\
+Boca Raton, FL, USA: Chapman and Hall/CRC, 2013.
+
+% [16] — first cited line 199
+\bibitem{garrido2014aruco}
+S.~Garrido-Jurado, R.~Mu\~{n}oz-Salinas, F.~J. Madrid-Cuevas, and
+M.~J. Mar\'{i}n-Jim\'{e}nez,
+``Automatic generation and detection of highly reliable fiducial markers
+under occlusion,''
+\emph{Pattern Recognit.}, vol.~47, no.~6, pp.~2280--2292, 2014.
+
+% [17] — first cited line 268 (Background)
+\bibitem{simmons2000coordination}
+R.~Simmons, D.~Apfelbaum, W.~Burgard, D.~Fox, M.~Moors, S.~Thrun,
+and H.~Younes,
+``Coordination for multi-robot exploration and mapping,''
+in \emph{Proc.\ Natl.\ Conf.\ Artif.\ Intell.\ (AAAI)}, 2000,
+pp.~852--858.
+
+% [18] — first cited line 284 (Background)
 \bibitem{ramchurn2004trust}
 S.~D. Ramchurn, D.~Huynh, and N.~R. Jennings,
 ``Trust in multi-agent systems,''

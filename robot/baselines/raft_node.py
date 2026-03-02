@@ -60,9 +60,21 @@ ARENA_WIDTH = 2000
 ARENA_HEIGHT = 1500
 CELL_SIZE = 125
 
-ROBOT_RADIUS = 75
+ROBOT_RADIUS = 110   # mm — avoidance radius (actual body diagonal ~106mm)
+BODY_RADIUS = 80     # mm — actual body extent from ArUco center for cell marking
 AVOID_DISTANCE = 200
 CRITICAL_DISTANCE = 100
+
+# Interior wall: x=1000mm, runs from y=0 to y=1200, passage at y=1200-1500
+INTERIOR_WALL_X = 1000
+INTERIOR_WALL_Y_END = 1200  # wall runs y=0 to this value
+
+# Wall margins — outer walls get minimal padding;
+# interior divider gets extra to prevent tag occlusion near the wall edge.
+OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm — just enough body clearance
+DIVIDER_MARGIN = 125                  # 1 full cell around the divider
+WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
+REPULSION_ZONE = WALL_MARGIN + 60     # 145mm — soft repulsion starts before hard margin
 
 # RAFT parameters - NO TRUST, only heartbeats
 HEARTBEAT_INTERVAL = 0.5   # Leader sends heartbeat this often
@@ -306,18 +318,39 @@ class RAFTNode:
     def receive_position(self):
         try:
             while True:
-                data, _ = self.pos_socket.recvfrom(1024)
+                data, _ = self.pos_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
                 if msg.get('type') == 'position' and msg.get('robot_id') == self.robot_id:
                     self.x = msg['x']
                     self.y = msg['y']
                     self.theta = msg['theta']
                     self.position_timestamp = msg.get('timestamp', time.time())
-                    cell = self.get_cell(self.x, self.y)
-                    if cell:
-                        self.my_visited.add(cell)
-                        self.known_visited.add(cell)
+
+                    # Mark cells the robot body overlaps as visited
+                    min_cx = max(0, int((self.x - BODY_RADIUS) / CELL_SIZE))
+                    max_cx = min(self.coverage_width - 1,
+                                 int((self.x + BODY_RADIUS) / CELL_SIZE))
+                    min_cy = max(0, int((self.y - BODY_RADIUS) / CELL_SIZE))
+                    max_cy = min(self.coverage_height - 1,
+                                 int((self.y + BODY_RADIUS) / CELL_SIZE))
+                    robot_left = self.x < INTERIOR_WALL_X
+                    for _cx in range(min_cx, max_cx + 1):
+                        for _cy in range(min_cy, max_cy + 1):
+                            if self.y < INTERIOR_WALL_Y_END:
+                                cell_center_x = (_cx + 0.5) * CELL_SIZE
+                                if robot_left != (cell_center_x < INTERIOR_WALL_X):
+                                    continue
+                            _cell = (_cx, _cy)
+                            if _cell not in self.my_visited:
+                                self.my_visited.add(_cell)
+                                self.known_visited.add(_cell)
+                elif msg.get('type') == 'peer_state':
+                    peer_id = msg.get('robot_id')
+                    if peer_id and peer_id != self.robot_id:
+                        self.handle_peer_state(msg)
         except (BlockingIOError, ConnectionResetError):
+            pass
+        except OSError:
             pass
     
     def get_cell(self, x: float, y: float) -> Optional[tuple]:
@@ -332,6 +365,23 @@ class RAFTNode:
     
     def pos_to_cell(self, pos: Tuple[float, float]) -> tuple:
         return (int(pos[0] / CELL_SIZE), int(pos[1] / CELL_SIZE))
+    
+    def _is_wall_cell(self, cx: int, cy: int) -> bool:
+        """True if the cell center is too close to a wall to be a good target.
+
+        Outer walls use OUTER_WALL_MARGIN; interior divider uses DIVIDER_MARGIN.
+        """
+        x, y = self.cell_to_pos((cx, cy))
+        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH - OUTER_WALL_MARGIN:
+            return True
+        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT - OUTER_WALL_MARGIN:
+            return True
+        if y < INTERIOR_WALL_Y_END and abs(x - INTERIOR_WALL_X) < DIVIDER_MARGIN:
+            return True
+        return False
+
+    def distance(self, p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+        return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
     
     # ==================== RAFT PROTOCOL ====================
     def broadcast_message(self, msg: dict):
@@ -547,7 +597,7 @@ class RAFTNode:
         frontier_set = set()
         for cx in range(self.coverage_width):
             for cy in range(self.coverage_height):
-                if (cx, cy) not in self.known_visited:
+                if (cx, cy) not in self.known_visited and not self._is_wall_cell(cx, cy):
                     frontiers.append((cx, cy))
                     frontier_set.add((cx, cy))
         
@@ -699,7 +749,7 @@ class RAFTNode:
                         continue
                     cx, cy = my_cell[0] + dx, my_cell[1] + dy
                     if 0 <= cx < self.coverage_width and 0 <= cy < self.coverage_height:
-                        if (cx, cy) not in self.known_visited:
+                        if (cx, cy) not in self.known_visited and not self._is_wall_cell(cx, cy):
                             d = abs(dx) + abs(dy)
                             if d < best_dist:
                                 best_dist = d
@@ -708,8 +758,147 @@ class RAFTNode:
                 return self.cell_to_pos(best_cell)
         return None
     
+    # ==================== NAVIGATION ====================
+    def _init_stuck_detection(self):
+        self._nav_history = []
+        self._escape_until = 0
+        self._escape_start = 0
+
+    def _check_stuck(self):
+        """Detect if robot is physically stuck."""
+        now = time.time()
+
+        if now - self.position_timestamp > 1.0:
+            self._nav_history.clear()
+            return False
+
+        self._nav_history.append((now, self.x, self.y))
+        self._nav_history = [(t, x, y) for t, x, y in self._nav_history
+                             if now - t < 3.0]
+        if len(self._nav_history) < 2:
+            return False
+        oldest_t, oldest_x, oldest_y = self._nav_history[0]
+        elapsed = now - oldest_t
+        moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
+        return elapsed > 1.5 and moved < 20
+
+    def _route_around_wall(self, target):
+        """If target is across the interior wall, route through the passage."""
+        tx, ty = target
+        on_left = self.x < INTERIOR_WALL_X
+        target_on_left = tx < INTERIOR_WALL_X
+        if on_left != target_on_left and self.y < INTERIOR_WALL_Y_END + 150:
+            passage_y = INTERIOR_WALL_Y_END + 250
+            if on_left:
+                passage_x = INTERIOR_WALL_X - DIVIDER_MARGIN - 50
+            else:
+                passage_x = INTERIOR_WALL_X + DIVIDER_MARGIN + 50
+            dist_to_passage = math.sqrt((self.x - passage_x)**2
+                                        + (self.y - passage_y)**2)
+            if dist_to_passage > 150:
+                return [passage_x, passage_y]
+        return target
+
+    def _wall_slide_heading(self, desired_angle):
+        """Modify heading to avoid walls using separate outer/divider margins.
+
+        Three layers:
+          1. Soft quadratic repulsion starting at REPULSION_ZONE
+          2. Hard clamp at WALL_MARGIN / DIVIDER_MARGIN
+          3. Deadlock escape toward center if both components zeroed
+        """
+        hx = math.cos(desired_angle)
+        hy = math.sin(desired_angle)
+
+        def _repel(dist_to_wall, zone):
+            if dist_to_wall < zone:
+                n = (zone - dist_to_wall) / zone
+                return n * n
+            return 0.0
+
+        repel_x, repel_y = 0.0, 0.0
+        repel_x += _repel(self.x, REPULSION_ZONE)
+        repel_x -= _repel(ARENA_WIDTH - self.x, REPULSION_ZONE)
+        repel_y += _repel(self.y, REPULSION_ZONE)
+        repel_y -= _repel(ARENA_HEIGHT - self.y, REPULSION_ZONE)
+
+        if self.y < INTERIOR_WALL_Y_END:
+            d = self.x - INTERIOR_WALL_X
+            div_zone = DIVIDER_MARGIN + 60
+            if 0 < d < div_zone:
+                repel_x += _repel(d, div_zone)
+            elif -div_zone < d < 0:
+                repel_x -= _repel(-d, div_zone)
+
+        # Circular repulsion around the wall tip (1000, 1200)
+        tip_dx = self.x - INTERIOR_WALL_X
+        tip_dy = self.y - INTERIOR_WALL_Y_END
+        tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
+        TIP_ZONE = DIVIDER_MARGIN + 80
+        if tip_dist < TIP_ZONE and tip_dist > 5:
+            tip_strength = _repel(tip_dist, TIP_ZONE)
+            repel_x += (tip_dx / tip_dist) * tip_strength
+            repel_y += (tip_dy / tip_dist) * tip_strength
+
+        REPEL_GAIN = 4.0
+        hx += repel_x * REPEL_GAIN
+        hy += repel_y * REPEL_GAIN
+
+        if self.x < WALL_MARGIN and hx < 0:
+            hx = 0
+        if self.x > ARENA_WIDTH - WALL_MARGIN and hx > 0:
+            hx = 0
+        if self.y < WALL_MARGIN and hy < 0:
+            hy = 0
+        if self.y > ARENA_HEIGHT - WALL_MARGIN and hy > 0:
+            hy = 0
+        if self.y < INTERIOR_WALL_Y_END:
+            d = self.x - INTERIOR_WALL_X
+            if 0 < d < DIVIDER_MARGIN and hx < 0:
+                hx = 0
+            elif -DIVIDER_MARGIN < d < 0 and hx > 0:
+                hx = 0
+
+        if abs(hx) < 0.01 and abs(hy) < 0.01:
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            return math.atan2(cy - self.y, cx - self.x)
+
+        return math.atan2(hy, hx)
+
+    def _peer_avoidance_heading(self, desired_angle) -> float:
+        """Steer away from nearby peers using their broadcast positions."""
+        PEER_AVOID_DIST = 300
+        PEER_REPEL_GAIN = 2.5
+
+        hx = math.cos(desired_angle)
+        hy = math.sin(desired_angle)
+
+        repel_x, repel_y = 0.0, 0.0
+        for pid, peer in self.peers.items():
+            if time.time() - peer.get('last_seen', 0) > self.peer_timeout:
+                continue
+            dx = self.x - peer['x']
+            dy = self.y - peer['y']
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist < PEER_AVOID_DIST and dist > 5:
+                strength = (PEER_AVOID_DIST - dist) / PEER_AVOID_DIST
+                if dist < 2 * ROBOT_RADIUS:
+                    strength *= 3.0
+                repel_x += (dx / dist) * strength
+                repel_y += (dy / dist) * strength
+
+        if abs(repel_x) < 0.01 and abs(repel_y) < 0.01:
+            return desired_angle
+
+        hx += repel_x * PEER_REPEL_GAIN
+        hy += repel_y * PEER_REPEL_GAIN
+        return math.atan2(hy, hx)
+
     # ==================== MOTOR CONTROL ====================
     def compute_motor_command(self) -> Tuple[float, float]:
+        if not hasattr(self, '_nav_history'):
+            self._init_stuck_detection()
+
         # Fault injection
         if self.injected_fault == 'spin':
             return (BASE_SPEED, -BASE_SPEED)
@@ -718,29 +907,35 @@ class RAFTNode:
         elif self.injected_fault == 'erratic':
             return (random.uniform(-BASE_SPEED, BASE_SPEED),
                    random.uniform(-BASE_SPEED, BASE_SPEED))
-        
-        front = self.tof.get('front', 9999)
-        front_left = self.tof.get('front_left', 9999)
-        front_right = self.tof.get('front_right', 9999)
-        
-        if front < 0: front = 9999
-        if front_left < 0: front_left = 9999
-        if front_right < 0: front_right = 9999
-        
-        if front < CRITICAL_DISTANCE:
-            return (-BASE_SPEED * 0.5, -BASE_SPEED * 0.3)
-        
-        if front < AVOID_DISTANCE or front_left < AVOID_DISTANCE or front_right < AVOID_DISTANCE:
-            if front_left < front_right:
-                return (BASE_SPEED * 0.6, BASE_SPEED * 0.2)
+
+        # Escape mode: turn toward center, then drive WITH wall avoidance
+        if time.time() < self._escape_until:
+            phase_elapsed = time.time() - self._escape_start
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            angle_to_center = math.atan2(cy - self.y, cx - self.x)
+
+            if phase_elapsed < 1.0:
+                diff = angle_to_center - self.theta
+                while diff > math.pi: diff -= 2 * math.pi
+                while diff < -math.pi: diff += 2 * math.pi
+                if diff > 0:
+                    return (BASE_SPEED, -BASE_SPEED)
+                else:
+                    return (-BASE_SPEED, BASE_SPEED)
             else:
-                return (BASE_SPEED * 0.2, BASE_SPEED * 0.6)
-        
+                safe_angle = self._wall_slide_heading(angle_to_center)
+                diff = safe_angle - self.theta
+                while diff > math.pi: diff -= 2 * math.pi
+                while diff < -math.pi: diff += 2 * math.pi
+                turn = max(-1, min(1, diff / (math.pi / 4)))
+                left = BASE_SPEED * (1 - turn * 0.5)
+                right = BASE_SPEED * (1 + turn * 0.5)
+                return (left, right)
+
         # NO TRUST CHECK - just follow leader assignment blindly
         target = None
         if self.state == RaftState.LEADER:
             if self.bad_leader_mode or self.oscillate_leader_mode or self.freeze_leader_mode:
-                # Compromised leader follows its own bad/oscillating/frozen assignment
                 target = self.assigned_target if self.assigned_target else self.get_my_frontier()
             else:
                 target = self.get_my_frontier()
@@ -748,24 +943,85 @@ class RAFTNode:
             target = self.assigned_target  # Follow blindly!
         else:
             target = self.get_my_frontier()
-        
-        self.current_navigation_target = target
-        
+
         if not target:
+            self.current_navigation_target = None
             return (0, 0)
-        
+
+        # Clamp target outside repulsion zones (outer walls + divider)
+        tx = max(OUTER_WALL_MARGIN, min(ARENA_WIDTH - OUTER_WALL_MARGIN, target[0]))
+        ty = max(OUTER_WALL_MARGIN, min(ARENA_HEIGHT - OUTER_WALL_MARGIN, target[1]))
+        if ty < INTERIOR_WALL_Y_END and abs(tx - INTERIOR_WALL_X) < DIVIDER_MARGIN:
+            if tx < INTERIOR_WALL_X:
+                tx = INTERIOR_WALL_X - DIVIDER_MARGIN
+            else:
+                tx = INTERIOR_WALL_X + DIVIDER_MARGIN
+        target = (tx, ty)
+        self.current_navigation_target = target
+
+        # Route around interior wall
+        target = self._route_around_wall(target)
+
+        # Stuck detection → triggers escape sequence
+        if self._check_stuck():
+            self._escape_until = time.time() + 2.5
+            self._escape_start = time.time()
+            self._nav_history.clear()
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            angle_to_center = math.atan2(cy - self.y, cx - self.x)
+            diff = angle_to_center - self.theta
+            while diff > math.pi: diff -= 2 * math.pi
+            while diff < -math.pi: diff += 2 * math.pi
+            if diff > 0:
+                return (BASE_SPEED, -BASE_SPEED)
+            else:
+                return (-BASE_SPEED, BASE_SPEED)
+
+        # Navigate to target
         dx = target[0] - self.x
         dy = target[1] - self.y
         target_angle = math.atan2(dy, dx)
-        
+
+        # Wall-sliding and peer avoidance
+        target_angle = self._wall_slide_heading(target_angle)
+        target_angle = self._peer_avoidance_heading(target_angle)
+
         diff = target_angle - self.theta
         while diff > math.pi: diff -= 2 * math.pi
         while diff < -math.pi: diff += 2 * math.pi
-        
+
         turn = max(-1, min(1, diff / (math.pi / 3)))
-        left_speed = BASE_SPEED * (1 - turn * 0.5)
-        right_speed = BASE_SPEED * (1 + turn * 0.5)
-        
+
+        # Slow down near walls and peers
+        min_wall_dist = min(
+            self.x, ARENA_WIDTH - self.x,
+            self.y, ARENA_HEIGHT - self.y)
+        if self.y < INTERIOR_WALL_Y_END:
+            min_wall_dist = min(min_wall_dist, abs(self.x - INTERIOR_WALL_X))
+
+        min_peer_dist = 9999.0
+        for pid, peer in self.peers.items():
+            if time.time() - peer.get('last_seen', 0) > self.peer_timeout:
+                continue
+            d = math.sqrt((self.x - peer['x'])**2 + (self.y - peer['y'])**2)
+            min_peer_dist = min(min_peer_dist, d)
+
+        speed_factor = 1.0
+        if min_wall_dist < REPULSION_ZONE:
+            speed_factor = min(speed_factor, max(0.5, min_wall_dist / REPULSION_ZONE))
+        if min_peer_dist < 2 * ROBOT_RADIUS:
+            speed_factor = min(speed_factor, max(0.3, min_peer_dist / (2 * ROBOT_RADIUS)))
+        effective_speed = BASE_SPEED * speed_factor
+
+        MIN_MOTOR_PWM = 25
+        left_speed = effective_speed * (1 - turn * 0.5)
+        right_speed = effective_speed * (1 + turn * 0.5)
+        if abs(turn) > 0.1:
+            if abs(left_speed) > 0 and abs(left_speed) < MIN_MOTOR_PWM:
+                left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
+            if abs(right_speed) > 0 and abs(right_speed) < MIN_MOTOR_PWM:
+                right_speed = math.copysign(MIN_MOTOR_PWM, right_speed)
+
         return (left_speed, right_speed)
     
     # ==================== FAULT INJECTION ====================
@@ -870,7 +1126,9 @@ class RAFTNode:
         while self.running:
             start = time.time()
             
-            if self.position_timestamp > 0:
+            left, right = 0.0, 0.0
+            pos_age = time.time() - self.position_timestamp
+            if self.position_timestamp > 0 and pos_age < 1.5:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:

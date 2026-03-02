@@ -69,7 +69,8 @@ ARENA_HEIGHT = 1500  # mm
 CELL_SIZE = 125      # mm - gives 16×12 = 192 cells, ~38 per robot with 5 bots
 
 # Robot physical
-ROBOT_RADIUS = 75    # mm
+ROBOT_RADIUS = 110   # mm — avoidance radius (actual body diagonal ~106mm)
+BODY_RADIUS = 80     # mm — actual body extent from ArUco center for cell marking
 TOF_RANGE = 200      # mm - high-res verification zone
 AVOID_DISTANCE = 200 # mm
 CRITICAL_DISTANCE = 100  # mm
@@ -77,7 +78,13 @@ CRITICAL_DISTANCE = 100  # mm
 # Interior wall: x=1000mm, runs from y=0 to y=1200, passage at y=1200-1500
 INTERIOR_WALL_X = 1000
 INTERIOR_WALL_Y_END = 1200  # wall runs y=0 to this value
-WALL_MARGIN = ROBOT_RADIUS + 30  # mm — mirrors sim's collision radius + buffer
+
+# Wall margins — outer walls get minimal padding (sim uses 75mm);
+# interior divider gets extra to prevent tag occlusion near the wall edge.
+OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm — just enough body clearance
+DIVIDER_MARGIN = 125                  # 1 full cell around the divider (prevents tag occlusion)
+WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
+REPULSION_ZONE = WALL_MARGIN + 115    # 200mm — soft repulsion starts early (critical at low FPS)
 
 # ============== REIP Trust Parameters ==============
 # Three-tier confidence weights
@@ -496,14 +503,27 @@ class REIPNode:
                         self.theta = msg['theta']
                         self.position_timestamp = msg.get('timestamp', time.time())
                         
-                        # Update my visited cells
-                        cell = self.get_cell(self.x, self.y)
-                        if cell and cell not in self.my_visited:
-                            now = time.time()
-                            self.my_visited[cell] = now  # Track WHEN visited
-                            if cell not in self.known_visited:
-                                self.known_visited.add(cell)
-                                self.known_visited_time[cell] = now
+                        # Mark cells the robot body overlaps as visited.
+                        now = time.time()
+                        min_cx = max(0, int((self.x - BODY_RADIUS) / CELL_SIZE))
+                        max_cx = min(self.coverage_width - 1,
+                                     int((self.x + BODY_RADIUS) / CELL_SIZE))
+                        min_cy = max(0, int((self.y - BODY_RADIUS) / CELL_SIZE))
+                        max_cy = min(self.coverage_height - 1,
+                                     int((self.y + BODY_RADIUS) / CELL_SIZE))
+                        robot_left = self.x < INTERIOR_WALL_X
+                        for _cx in range(min_cx, max_cx + 1):
+                            for _cy in range(min_cy, max_cy + 1):
+                                if self.y < INTERIOR_WALL_Y_END:
+                                    cell_center_x = (_cx + 0.5) * CELL_SIZE
+                                    if robot_left != (cell_center_x < INTERIOR_WALL_X):
+                                        continue
+                                _cell = (_cx, _cy)
+                                if _cell not in self.my_visited:
+                                    self.my_visited[_cell] = now
+                                    if _cell not in self.known_visited:
+                                        self.known_visited.add(_cell)
+                                        self.known_visited_time[_cell] = now
                 
                 # Handle relayed peer states (from visual_sim acting as relay)
                 elif msg.get('type') == 'peer_state':
@@ -534,20 +554,17 @@ class REIPNode:
         return (int(pos[0] / CELL_SIZE), int(pos[1] / CELL_SIZE))
     
     def _is_wall_cell(self, cx: int, cy: int) -> bool:
-        """True if the cell center is within ROBOT_RADIUS of any wall.
+        """True if the cell center is too close to a wall to be a good target.
 
-        These cells are physically unreachable as direct targets because the
-        robot body would overlap the wall.  They still get *visited* naturally
-        when the robot is near walls (position listener marks any entered cell),
-        matching the sim's behaviour where the physics engine clamps position
-        to ROBOT_RADIUS from walls.
+        Outer walls use OUTER_WALL_MARGIN; interior divider uses DIVIDER_MARGIN.
+        These cells get visited naturally via body-overlap when nearby.
         """
         x, y = self.cell_to_pos((cx, cy))
-        if x < ROBOT_RADIUS or x > ARENA_WIDTH - ROBOT_RADIUS:
+        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH - OUTER_WALL_MARGIN:
             return True
-        if y < ROBOT_RADIUS or y > ARENA_HEIGHT - ROBOT_RADIUS:
+        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT - OUTER_WALL_MARGIN:
             return True
-        if y < INTERIOR_WALL_Y_END and abs(x - INTERIOR_WALL_X) < ROBOT_RADIUS:
+        if y < INTERIOR_WALL_Y_END and abs(x - INTERIOR_WALL_X) < DIVIDER_MARGIN:
             return True
         return False
 
@@ -1428,61 +1445,71 @@ class REIPNode:
         """If target is across the interior wall, route through the passage.
         Hardware equivalent of visual_sim's A* pathfinding.
 
-        The waypoint is offset to the ROBOT'S side of the wall so the
-        approach path never enters the wall-repulsion zone.  Once the robot
-        reaches the waypoint (above the wall at y > INTERIOR_WALL_Y_END),
-        there is no wall to repel it and it crosses freely.
+        Two waypoints: first go to your side of the passage opening,
+        then cross through above the wall.
         """
         tx, ty = target
         on_left = self.x < INTERIOR_WALL_X
         target_on_left = tx < INTERIOR_WALL_X
-        if on_left != target_on_left and self.y < INTERIOR_WALL_Y_END + 100:
-            passage_y = INTERIOR_WALL_Y_END + 200  # Well above the wall end
-            # Offset to robot's side so we never fight wall repulsion
+        if on_left != target_on_left and self.y < INTERIOR_WALL_Y_END + 200:
+            # Waypoint above the wall tip, well outside the divider repulsion zone
+            passage_y = INTERIOR_WALL_Y_END + 200
             if on_left:
-                passage_x = INTERIOR_WALL_X - WALL_MARGIN - 20
+                passage_x = INTERIOR_WALL_X - DIVIDER_MARGIN - 100
             else:
-                passage_x = INTERIOR_WALL_X + WALL_MARGIN + 20
+                passage_x = INTERIOR_WALL_X + DIVIDER_MARGIN + 100
             dist_to_passage = math.sqrt((self.x - passage_x)**2
                                         + (self.y - passage_y)**2)
-            if dist_to_passage > 150:
+            if dist_to_passage > 100:
                 return [passage_x, passage_y]
         return target
 
     def _wall_slide_heading(self, desired_angle):
-        """Modify heading to avoid walls: repel away + zero into-wall component.
+        """Modify heading to avoid walls using separate outer/divider margins.
 
-        The sim's physics engine prevents overlap and applies sliding.
-        On hardware we replicate this with two layers:
-          1. Repulsion: proportional push away from any wall within WALL_MARGIN
-          2. Hard clamp: zero the heading component that faces into the wall
+        Three layers:
+          1. Soft quadratic repulsion starting at REPULSION_ZONE
+          2. Hard clamp at WALL_MARGIN / DIVIDER_MARGIN
+          3. Deadlock escape toward center if both components zeroed
         """
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
 
-        # Layer 1: Repulsive force — stronger the closer to the wall
+        def _repel(dist_to_wall, zone):
+            if dist_to_wall < zone:
+                n = (zone - dist_to_wall) / zone
+                return n * n
+            return 0.0
+
         repel_x, repel_y = 0.0, 0.0
-        if self.x < WALL_MARGIN:
-            repel_x += (WALL_MARGIN - self.x) / WALL_MARGIN
-        if self.x > ARENA_WIDTH - WALL_MARGIN:
-            repel_x -= (self.x - (ARENA_WIDTH - WALL_MARGIN)) / WALL_MARGIN
-        if self.y < WALL_MARGIN:
-            repel_y += (WALL_MARGIN - self.y) / WALL_MARGIN
-        if self.y > ARENA_HEIGHT - WALL_MARGIN:
-            repel_y -= (self.y - (ARENA_HEIGHT - WALL_MARGIN)) / WALL_MARGIN
+        repel_x += _repel(self.x, REPULSION_ZONE)
+        repel_x -= _repel(ARENA_WIDTH - self.x, REPULSION_ZONE)
+        repel_y += _repel(self.y, REPULSION_ZONE)
+        repel_y -= _repel(ARENA_HEIGHT - self.y, REPULSION_ZONE)
 
         if self.y < INTERIOR_WALL_Y_END:
             d = self.x - INTERIOR_WALL_X
-            if 0 < d < WALL_MARGIN:
-                repel_x += (WALL_MARGIN - d) / WALL_MARGIN
-            elif -WALL_MARGIN < d < 0:
-                repel_x -= (WALL_MARGIN + d) / WALL_MARGIN
+            div_zone = DIVIDER_MARGIN + 60
+            if 0 < d < div_zone:
+                repel_x += _repel(d, div_zone)
+            elif -div_zone < d < 0:
+                repel_x -= _repel(-d, div_zone)
 
-        REPEL_GAIN = 2.5
+        # Circular repulsion around the wall tip (1000, 1200).
+        # Only apply BELOW the tip — above it is the open passage.
+        tip_dx = self.x - INTERIOR_WALL_X
+        tip_dy = self.y - INTERIOR_WALL_Y_END
+        tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
+        TIP_ZONE = DIVIDER_MARGIN + 30  # 155mm — tight, allows passage
+        if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + 50:
+            tip_strength = _repel(tip_dist, TIP_ZONE)
+            repel_x += (tip_dx / tip_dist) * tip_strength
+            repel_y += (tip_dy / tip_dist) * tip_strength
+
+        REPEL_GAIN = 6.0
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
-        # Layer 2: Hard clamp — never head into the wall
         if self.x < WALL_MARGIN and hx < 0:
             hx = 0
         if self.x > ARENA_WIDTH - WALL_MARGIN and hx > 0:
@@ -1493,15 +1520,64 @@ class REIPNode:
             hy = 0
         if self.y < INTERIOR_WALL_Y_END:
             d = self.x - INTERIOR_WALL_X
-            if 0 < d < WALL_MARGIN and hx < 0:
+            if 0 < d < DIVIDER_MARGIN and hx < 0:
                 hx = 0
-            elif -WALL_MARGIN < d < 0 and hx > 0:
+            elif -DIVIDER_MARGIN < d < 0 and hx > 0:
                 hx = 0
 
         if abs(hx) < 0.01 and abs(hy) < 0.01:
             cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
             return math.atan2(cy - self.y, cx - self.x)
 
+        return math.atan2(hy, hx)
+
+    def _peer_avoidance_heading(self, desired_angle) -> float:
+        """Steer away from nearby peers using their broadcast positions.
+        At very close range, overrides heading to flee. Adds a per-robot
+        random offset to break symmetry when surrounded."""
+        PEER_AVOID_DIST = 350
+        PEER_REPEL_GAIN = 3.0
+
+        hx = math.cos(desired_angle)
+        hy = math.sin(desired_angle)
+
+        repel_x, repel_y = 0.0, 0.0
+        closest_dist = 9999.0
+        n_close = 0
+        for pid, peer in self.peers.items():
+            if time.time() - peer.last_seen > PEER_TIMEOUT:
+                continue
+            dx = self.x - peer.x
+            dy = self.y - peer.y
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist < closest_dist:
+                closest_dist = dist
+            if dist < PEER_AVOID_DIST and dist > 5:
+                n_close += 1
+                strength = (PEER_AVOID_DIST - dist) / PEER_AVOID_DIST
+                if dist < ROBOT_RADIUS:
+                    strength *= 6.0
+                elif dist < 2 * ROBOT_RADIUS:
+                    strength *= 3.0
+                repel_x += (dx / dist) * strength
+                repel_y += (dy / dist) * strength
+
+        # Symmetry breaker: when surrounded by multiple peers, repulsion
+        # vectors can cancel out. Add a per-robot deterministic offset
+        # so each robot picks a different escape direction.
+        if n_close >= 2 and (abs(repel_x) + abs(repel_y)) < 0.5:
+            offset_angle = (self.robot_id * 1.2566)  # 72 degrees apart for 5 robots
+            repel_x += math.cos(offset_angle) * 0.8
+            repel_y += math.sin(offset_angle) * 0.8
+
+        if abs(repel_x) < 0.01 and abs(repel_y) < 0.01:
+            return desired_angle
+
+        if closest_dist < ROBOT_RADIUS:
+            return math.atan2(repel_y, repel_x)
+
+        hx += repel_x * PEER_REPEL_GAIN
+        hy += repel_y * PEER_REPEL_GAIN
         return math.atan2(hy, hx)
 
     def compute_motor_command(self) -> Tuple[float, float]:
@@ -1525,15 +1601,13 @@ class REIPNode:
             return (random.uniform(-BASE_SPEED, BASE_SPEED),
                    random.uniform(-BASE_SPEED, BASE_SPEED))
 
-        # Escape mode: FULL-POWER reverse → turn toward center → drive.
-        # N20 motors with 100:1 ratio need high duty to unstick 217g from walls.
+        # Escape mode: turn toward center, then drive WITH wall avoidance.
         if time.time() < self._escape_until:
             phase_elapsed = time.time() - self._escape_start
-            if phase_elapsed < 0.8:
-                return (-BASE_SPEED, -BASE_SPEED * 0.85)
-            elif phase_elapsed < 1.8:
-                cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
-                angle_to_center = math.atan2(cy - self.y, cx - self.x)
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            angle_to_center = math.atan2(cy - self.y, cx - self.x)
+
+            if phase_elapsed < 1.0:
                 diff = angle_to_center - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
                 while diff < -math.pi: diff += 2 * math.pi
@@ -1542,12 +1616,29 @@ class REIPNode:
                 else:
                     return (-BASE_SPEED, BASE_SPEED)
             else:
-                return (BASE_SPEED, BASE_SPEED)
+                safe_angle = self._wall_slide_heading(angle_to_center)
+                diff = safe_angle - self.theta
+                while diff > math.pi: diff -= 2 * math.pi
+                while diff < -math.pi: diff += 2 * math.pi
+                turn = max(-1, min(1, diff / (math.pi / 4)))
+                left = BASE_SPEED * (1 - turn * 0.5)
+                right = BASE_SPEED * (1 + turn * 0.5)
+                return (left, right)
 
-        # ToF motor avoidance DISABLED — sensors are unreliable (return 0,
-        # 15000+, etc.) and cause reverse loops. Position-based wall sliding
-        # in _wall_slide_heading handles avoidance instead. ToF readings still
-        # feed update_tof_obstacles for the trust model's obstacle detection.
+        # ToF front emergency: reverse + spin when about to physically collide.
+        # Tight range (30-100mm) so it only fires for imminent crashes, not
+        # when peers are merely nearby (peer_avoidance_heading handles that).
+        front_dist = self.tof.get('front', 999)
+        if 30 < front_dist < 100:
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            diff = math.atan2(cy - self.y, cx - self.x) - self.theta
+            while diff > math.pi: diff -= 2 * math.pi
+            while diff < -math.pi: diff += 2 * math.pi
+            rev = BASE_SPEED * 0.5
+            if diff > 0:
+                return (-rev * 0.4, -rev)
+            else:
+                return (-rev, -rev * 0.4)
 
         # --- Target selection (identical to sim) ---
         target = None
@@ -1576,30 +1667,34 @@ class REIPNode:
             self.current_navigation_target = None
             return (0, 0)
 
-        self.current_navigation_target = target
-
-        # Clamp target to positions outside the wall repulsion zone.
-        # Using WALL_MARGIN (not ROBOT_RADIUS) so the target never fights
-        # the repulsion field — the robot approaches smoothly and visits
-        # wall-adjacent cells naturally on the way.
-        tx = max(WALL_MARGIN, min(ARENA_WIDTH - WALL_MARGIN, target[0]))
-        ty = max(WALL_MARGIN, min(ARENA_HEIGHT - WALL_MARGIN, target[1]))
-        if ty < INTERIOR_WALL_Y_END and abs(tx - INTERIOR_WALL_X) < WALL_MARGIN:
+        # Clamp target outside repulsion zones (outer walls + divider).
+        tx = max(OUTER_WALL_MARGIN, min(ARENA_WIDTH - OUTER_WALL_MARGIN, target[0]))
+        ty = max(OUTER_WALL_MARGIN, min(ARENA_HEIGHT - OUTER_WALL_MARGIN, target[1]))
+        if ty < INTERIOR_WALL_Y_END and abs(tx - INTERIOR_WALL_X) < DIVIDER_MARGIN:
             if tx < INTERIOR_WALL_X:
-                tx = INTERIOR_WALL_X - WALL_MARGIN
+                tx = INTERIOR_WALL_X - DIVIDER_MARGIN
             else:
-                tx = INTERIOR_WALL_X + WALL_MARGIN
+                tx = INTERIOR_WALL_X + DIVIDER_MARGIN
         target = (tx, ty)
+        self.current_navigation_target = target
 
         # Route around interior wall (equivalent to sim's A* pathfinding)
         target = self._route_around_wall(target)
 
         # Stuck detection → triggers escape sequence (3.0s total)
         if self._check_stuck():
-            self._escape_until = time.time() + 3.0
+            self._escape_until = time.time() + 2.5
             self._escape_start = time.time()
             self._nav_history.clear()
-            return (-BASE_SPEED, -BASE_SPEED * 0.85)
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            angle_to_center = math.atan2(cy - self.y, cx - self.x)
+            diff = angle_to_center - self.theta
+            while diff > math.pi: diff -= 2 * math.pi
+            while diff < -math.pi: diff += 2 * math.pi
+            if diff > 0:
+                return (BASE_SPEED, -BASE_SPEED)
+            else:
+                return (-BASE_SPEED, BASE_SPEED)
 
         # --- Navigate to target ---
         dx = target[0] - self.x
@@ -1609,6 +1704,7 @@ class REIPNode:
         # Wall-sliding: modify heading to avoid driving into walls
         # (equivalent to sim's wall collision + component-wise motion)
         target_angle = self._wall_slide_heading(target_angle)
+        target_angle = self._peer_avoidance_heading(target_angle)
 
         diff = target_angle - self.theta
         while diff > math.pi: diff -= 2 * math.pi
@@ -1623,10 +1719,20 @@ class REIPNode:
             self.y, ARENA_HEIGHT - self.y)
         if self.y < INTERIOR_WALL_Y_END:
             min_wall_dist = min(min_wall_dist, abs(self.x - INTERIOR_WALL_X))
-        wall_speed_factor = 1.0
-        if min_wall_dist < WALL_MARGIN:
-            wall_speed_factor = max(0.55, min_wall_dist / WALL_MARGIN)
-        effective_speed = BASE_SPEED * wall_speed_factor
+
+        min_peer_dist = 9999.0
+        for pid, peer in self.peers.items():
+            if time.time() - peer.last_seen > PEER_TIMEOUT:
+                continue
+            d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
+            min_peer_dist = min(min_peer_dist, d)
+
+        speed_factor = 1.0
+        if min_wall_dist < REPULSION_ZONE:
+            speed_factor = min(speed_factor, max(0.3, min_wall_dist / REPULSION_ZONE))
+        if min_peer_dist < 2 * ROBOT_RADIUS:
+            speed_factor = min(speed_factor, max(0.35, min_peer_dist / (2 * ROBOT_RADIUS)))
+        effective_speed = BASE_SPEED * speed_factor
 
         # Decouple turn authority from speed: forward speed is reduced near
         # walls, but the DIFFERENTIAL for turning stays strong enough to
@@ -1765,9 +1871,10 @@ class REIPNode:
                 last_election = time.time()
                 election_count += 1
             
-            # Motor control
+            # Motor control — stop if position data is stale (tag occluded)
             left, right = 0.0, 0.0
-            if self.position_timestamp > 0:
+            pos_age = time.time() - self.position_timestamp
+            if self.position_timestamp > 0 and pos_age < 1.5:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:

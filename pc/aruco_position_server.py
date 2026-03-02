@@ -12,13 +12,16 @@ import numpy as np
 import time
 import json
 import socket
-from dataclasses import dataclass
-from typing import Dict, Tuple
+import threading
+import os
+import math
+from datetime import datetime
+from typing import Dict, Tuple, Optional
 
 # ============== Configuration ==============
 CAMERA_ID = 0
-CAMERA_WIDTH = 1920   # 1080p for better marker detection
-CAMERA_HEIGHT = 1080
+CAMERA_WIDTH = 1280   # 720p — faster ArUco detection, higher FPS for position updates
+CAMERA_HEIGHT = 720
 
 # ArUco
 ARUCO_DICT = cv2.aruco.DICT_4X4_50  # IDs 0-49 available
@@ -36,6 +39,7 @@ ARENA_HEIGHT_MM = 1500  # mm (16:12 aspect, ~matches 16:9 camera)
 # Hardware mode: all robots listen on UDP_PORT (5100).
 # Messages include robot_id; each robot filters for its own.
 UDP_PORT = 5100  # Position updates to robots
+UDP_PEER_PORT = 5200  # Robot peer-to-peer broadcasts (we eavesdrop)
 BROADCAST_IP = "192.168.20.255"
 POSITION_RATE = 30  # Hz
 
@@ -89,7 +93,8 @@ class PositionServer:
         # Calibration - two modes:
         # 1. Homography from 4 corner markers (preferred, auto-detects each frame)
         # 2. Simple linear scaling (fallback)
-        self.homography = None  # 3x3 transform matrix
+        self.homography = None      # 3x3 pixel→arena transform
+        self.inv_homography = None  # 3x3 arena→pixel (for overlay drawing)
         self.use_homography = True  # Try to use corner markers
         
         # Fallback linear calibration
@@ -109,18 +114,150 @@ class PositionServer:
         self.frame_count = 0
         self.fps = 0
         self.last_fps_time = time.time()
-        
+
+        # Robot state listener (eavesdrop on peer broadcasts)
+        self.robot_states: Dict[int, dict] = {}
+        self._state_lock = threading.Lock()
+        self._start_state_listener()
+
+        # Video recording
+        self.video_writer: Optional[cv2.VideoWriter] = None
+        self.recording = False
+        self.record_path = ""
+
+        # JSON state log (parallel to video)
+        self.state_log_file = None
+        self.trial_dir = ""
+
         print("Ready!\n")
+        print("  'r' = start/stop recording   'q' = quit")
+        print("  'c' = calibrate              'v' = toggle video\n")
     
+    # ==================== State listener ====================
+    def _start_state_listener(self):
+        """Listen on UDP_PEER_PORT for robot peer_state broadcasts."""
+        self._state_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._state_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._state_sock.bind(("0.0.0.0", UDP_PEER_PORT))
+        self._state_sock.settimeout(0.05)
+        t = threading.Thread(target=self._state_listener_loop, daemon=True)
+        t.start()
+
+    def _state_listener_loop(self):
+        while True:
+            try:
+                data, _ = self._state_sock.recvfrom(65536)
+                msg = json.loads(data.decode())
+                if msg.get('type') == 'peer_state':
+                    rid = msg.get('robot_id')
+                    if rid:
+                        with self._state_lock:
+                            self.robot_states[rid] = msg
+            except socket.timeout:
+                pass
+            except Exception:
+                pass
+
+    # ==================== Recording (background thread) ====================
+    def start_recording(self, frame_shape):
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.trial_dir = os.path.join("trials", ts)
+        os.makedirs(self.trial_dir, exist_ok=True)
+
+        self.record_path = os.path.join(self.trial_dir, "overhead.mp4")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        h, w = frame_shape[:2]
+        self.video_writer = cv2.VideoWriter(self.record_path, fourcc, 30.0, (w, h))
+        self.recording = True
+        self._rec_queue: list = []
+        self._rec_lock = threading.Lock()
+        self._rec_stop = threading.Event()
+        self._rec_thread = threading.Thread(target=self._rec_writer_loop, daemon=True)
+        self._rec_thread.start()
+
+        log_path = os.path.join(self.trial_dir, "robot_states.jsonl")
+        self.state_log_file = open(log_path, 'w')
+
+        print(f"[REC] Recording to {self.trial_dir}")
+
+    def _rec_writer_loop(self):
+        """Background thread that writes frames + state lines without blocking the main loop."""
+        while not self._rec_stop.is_set():
+            with self._rec_lock:
+                batch = self._rec_queue[:]
+                self._rec_queue.clear()
+            for frame_copy, state_line in batch:
+                if self.video_writer:
+                    self.video_writer.write(frame_copy)
+                if self.state_log_file and state_line:
+                    self.state_log_file.write(state_line)
+            if not batch:
+                time.sleep(0.005)
+
+    def _enqueue_frame(self, frame, poses):
+        """Queue a frame + state for background writing."""
+        with self._state_lock:
+            states_snapshot = dict(self.robot_states)
+        record = {
+            't': time.time(),
+            'poses': {str(k): {'x': float(v['x']), 'y': float(v['y']), 'theta': float(v['theta'])}
+                      for k, v in poses.items()},
+            'robot_states': {}
+        }
+        for rid, st in states_snapshot.items():
+            record['robot_states'][str(rid)] = {
+                'x': st.get('x'), 'y': st.get('y'), 'theta': st.get('theta'),
+                'state': st.get('state'),
+                'leader_id': st.get('leader_id'),
+                'trust_in_leader': st.get('trust_in_leader'),
+                'suspicion': st.get('suspicion'),
+                'navigation_target': st.get('navigation_target'),
+                'predicted_target': st.get('predicted_target'),
+                'commanded_target': st.get('commanded_target'),
+                'coverage_count': st.get('coverage_count'),
+            }
+        state_line = json.dumps(record) + '\n'
+        with self._rec_lock:
+            self._rec_queue.append((frame.copy(), state_line))
+
+    def stop_recording(self):
+        if hasattr(self, '_rec_stop'):
+            self._rec_stop.set()
+            if hasattr(self, '_rec_thread'):
+                self._rec_thread.join(timeout=3)
+        if self.video_writer:
+            self.video_writer.release()
+            self.video_writer = None
+        if self.state_log_file:
+            self.state_log_file.close()
+            self.state_log_file = None
+        self.recording = False
+        print(f"[REC] Stopped — saved to {self.trial_dir}")
+
+    # Two height corrections — homography maps the wall-top plane (152mm).
+    # 1. Arena contour: wall-top → floor (0mm), scale outward ~7.5%
+    # 2. Robot positions: wall-top → robot tag height (80mm), scale outward ~3.5%
+    CAM_H = 2190             # mm — camera above arena floor
+    CORNER_H = 152           # mm — corner tags on 6-inch walls
+    ROBOT_TAG_H = 80         # mm — robot ArUco tags are 8 cm up
+    CAMERA_CENTER_X = 1000   # arena X directly below camera
+    CAMERA_CENTER_Y = -40    # arena Y directly below camera (750 - 790)
+    FLOOR_SCALE = CAM_H / (CAM_H - CORNER_H)                    # ~1.075 for arena overlay
+    ROBOT_SCALE = (CAM_H - ROBOT_TAG_H) / (CAM_H - CORNER_H)   # ~1.035 for robot positions
+
     def pixel_to_arena(self, px: float, py: float) -> Tuple[float, float]:
-        """Convert pixel coords to arena coords (mm)"""
+        """Convert pixel coords to arena coords (mm), corrected for floor plane."""
         if self.homography is not None:
-            # Use homography for proper perspective correction
             pt = np.array([[[px, py]]], dtype=np.float32)
             transformed = cv2.perspectiveTransform(pt, self.homography)
-            return float(transformed[0][0][0]), float(transformed[0][0][1])
+            x_mm = float(transformed[0][0][0])
+            y_mm = float(transformed[0][0][1])
+
+            # Correct from wall-top plane to robot tag plane
+            x_mm = self.CAMERA_CENTER_X + (x_mm - self.CAMERA_CENTER_X) * self.ROBOT_SCALE
+            y_mm = self.CAMERA_CENTER_Y + (y_mm - self.CAMERA_CENTER_Y) * self.ROBOT_SCALE
+            return x_mm, y_mm
         else:
-            # Fallback to linear scaling
             x_mm = (px - self.origin_x) / self.pixels_per_mm_x
             y_mm = (self.origin_y - py) / self.pixels_per_mm_y
             return x_mm, y_mm
@@ -174,10 +311,11 @@ class PositionServer:
             [-113, ARENA_HEIGHT_MM],   # TL — 11.3 cm left of origin
         ], dtype=np.float32)
         
-        # Compute homography
+        # Compute homography (pixel→arena) and its inverse (arena→pixel)
         self.homography, _ = cv2.findHomography(src_pts, dst_pts)
+        self.inv_homography = np.linalg.inv(self.homography)
         
-        if self.frame_count % 100 == 0:  # Log occasionally
+        if self.frame_count % 100 == 0:
             print(f"[HOMOGRAPHY] Updated from corner markers")
     
     def detect_and_send(self, frame: np.ndarray) -> Dict[int, dict]:
@@ -250,32 +388,172 @@ class PositionServer:
         else:
             self.socket.sendto(data, (BROADCAST_IP, UDP_PORT))
     
+    def arena_to_pixel(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
+        """Convert floor-level arena coords to pixel coords for overlay drawing.
+        Undoes the floor correction (FLOOR_SCALE) to get wall-top coords,
+        then uses the inverse homography to get pixel coords."""
+        if self.inv_homography is not None:
+            wx = self.CAMERA_CENTER_X + (x_mm - self.CAMERA_CENTER_X) / self.FLOOR_SCALE
+            wy = self.CAMERA_CENTER_Y + (y_mm - self.CAMERA_CENTER_Y) / self.FLOOR_SCALE
+            pt = np.array([[[wx, wy]]], dtype=np.float32)
+            px_pt = cv2.perspectiveTransform(pt, self.inv_homography)
+            return int(px_pt[0][0][0]), int(px_pt[0][0][1])
+        return int(x_mm * self.pixels_per_mm_x), int(self.origin_y - y_mm * self.pixels_per_mm_y)
+
+    def draw_arena_contour(self, frame: np.ndarray):
+        """Draw the arena model as the robots see it: walls, margin, grid."""
+        if self.inv_homography is None:
+            return
+
+        WALL_MARGIN = 85   # OUTER_WALL_MARGIN
+        DIVIDER_MARGIN = 125  # full cell
+        CELL_SIZE = 125
+        INTERIOR_WALL_X = 1000
+        INTERIOR_WALL_Y_END = 1200
+        cells_x = int(ARENA_WIDTH_MM / CELL_SIZE)
+        cells_y = int(ARENA_HEIGHT_MM / CELL_SIZE)
+
+        overlay = frame.copy()
+
+        # Arena boundary (green)
+        arena_pts = [(0, 0), (ARENA_WIDTH_MM, 0),
+                     (ARENA_WIDTH_MM, ARENA_HEIGHT_MM), (0, ARENA_HEIGHT_MM)]
+        pts = [self.arena_to_pixel(x, y) for x, y in arena_pts]
+        for i in range(4):
+            cv2.line(overlay, pts[i], pts[(i + 1) % 4], (0, 255, 0), 2)
+
+        # Interior wall (green)
+        cv2.line(overlay,
+                 self.arena_to_pixel(INTERIOR_WALL_X, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X, INTERIOR_WALL_Y_END),
+                 (0, 255, 0), 2)
+
+        # WALL_MARGIN zone (yellow)
+        margin_pts = [(WALL_MARGIN, WALL_MARGIN),
+                      (ARENA_WIDTH_MM - WALL_MARGIN, WALL_MARGIN),
+                      (ARENA_WIDTH_MM - WALL_MARGIN, ARENA_HEIGHT_MM - WALL_MARGIN),
+                      (WALL_MARGIN, ARENA_HEIGHT_MM - WALL_MARGIN)]
+        mpts = [self.arena_to_pixel(x, y) for x, y in margin_pts]
+        for i in range(4):
+            cv2.line(overlay, mpts[i], mpts[(i + 1) % 4], (0, 200, 255), 1)
+
+        # Interior wall margins (yellow — uses DIVIDER_MARGIN)
+        cv2.line(overlay,
+                 self.arena_to_pixel(INTERIOR_WALL_X - DIVIDER_MARGIN, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X - DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
+                 (0, 200, 255), 1)
+        cv2.line(overlay,
+                 self.arena_to_pixel(INTERIOR_WALL_X + DIVIDER_MARGIN, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X + DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
+                 (0, 200, 255), 1)
+
+        # Grid cells (gray)
+        for cx in range(1, cells_x):
+            cv2.line(overlay,
+                     self.arena_to_pixel(cx * CELL_SIZE, 0),
+                     self.arena_to_pixel(cx * CELL_SIZE, ARENA_HEIGHT_MM),
+                     (100, 100, 100), 1)
+        for cy in range(1, cells_y):
+            cv2.line(overlay,
+                     self.arena_to_pixel(0, cy * CELL_SIZE),
+                     self.arena_to_pixel(ARENA_WIDTH_MM, cy * CELL_SIZE),
+                     (100, 100, 100), 1)
+
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
     def draw_overlay(self, frame: np.ndarray, poses: Dict[int, dict]):
-        """Draw detection overlay"""
+        """Draw detection overlay with navigation vectors and trust indicators."""
+        with self._state_lock:
+            states = dict(self.robot_states)
+
         for robot_id, pose in poses.items():
             px = pose['px']
             py = pose['py']
-            
-            # Circle
-            cv2.circle(frame, (px, py), 20, (0, 255, 0), 2)
-            
-            # Arrow for heading
+            st = states.get(robot_id, {})
+
+            is_leader = (st.get('state') == 'leader')
+            trust = st.get('trust_in_leader')
+            suspicion = st.get('suspicion', 0)
+
+            # --- Ring color: green=healthy, yellow=suspicious, red=distrusting ---
+            if trust is not None and trust < 0.5:
+                ring_color = (0, 0, 255)       # red — lost trust
+            elif suspicion and suspicion > 0.4:
+                ring_color = (0, 180, 255)     # orange — suspicious
+            else:
+                ring_color = (0, 255, 0)       # green — normal
+
+            ring_thick = 3 if is_leader else 2
+            cv2.circle(frame, (px, py), 22, ring_color, ring_thick)
+            if is_leader:
+                cv2.circle(frame, (px, py), 28, (0, 255, 255), 1)
+
+            # --- Heading arrow (green, short) ---
             arrow_len = 40
             ax = int(px + arrow_len * np.cos(-pose['theta']))
             ay = int(py + arrow_len * np.sin(-pose['theta']))
             cv2.arrowedLine(frame, (px, py), (ax, ay), (0, 255, 0), 2)
-            
-            # Label
-            cv2.putText(frame, f"R{robot_id}", (px - 15, py - 25),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            cv2.putText(frame, f"({pose['x']:.0f},{pose['y']:.0f})", (px - 30, py + 40),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        
-        # FPS
-        cv2.putText(frame, f"FPS: {self.fps:.1f} | Robots: {len(poses)}", (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        
-        # Mode indicator
+
+            # --- Navigation target arrow (cyan, longer) ---
+            nav_tgt = st.get('navigation_target')
+            if nav_tgt and self.inv_homography is not None:
+                tpx, tpy = self.arena_to_pixel(nav_tgt[0], nav_tgt[1])
+                dx, dy = tpx - px, tpy - py
+                dist = math.sqrt(dx * dx + dy * dy)
+                if dist > 5:
+                    max_arrow = 80
+                    scale = min(max_arrow / dist, 1.0)
+                    epx = int(px + dx * scale)
+                    epy = int(py + dy * scale)
+                    cv2.arrowedLine(frame, (px, py), (epx, epy), (255, 200, 0), 2, tipLength=0.25)
+
+            # --- Bad command indicator (red arrow for commanded, green for predicted) ---
+            cmd_tgt = st.get('commanded_target')
+            pred_tgt = st.get('predicted_target')
+            if cmd_tgt and pred_tgt and self.inv_homography is not None:
+                cdx = cmd_tgt[0] - pose['x']
+                cdy = cmd_tgt[1] - pose['y']
+                pdx = pred_tgt[0] - pose['x']
+                pdy = pred_tgt[1] - pose['y']
+                cmd_len = math.sqrt(cdx * cdx + cdy * cdy)
+                pred_len = math.sqrt(pdx * pdx + pdy * pdy)
+                if cmd_len > 1 and pred_len > 1:
+                    dot = (cdx * pdx + cdy * pdy) / (cmd_len * pred_len)
+                    dot = max(-1.0, min(1.0, dot))
+                    angle_diff = math.degrees(math.acos(dot))
+                    if angle_diff > 30:
+                        # Significant divergence — show red (commanded) vs green (predicted)
+                        cpx, cpy = self.arena_to_pixel(cmd_tgt[0], cmd_tgt[1])
+                        ddx, ddy = cpx - px, cpy - py
+                        cd = math.sqrt(ddx * ddx + ddy * ddy)
+                        if cd > 5:
+                            sc = min(90 / cd, 1.0)
+                            cv2.arrowedLine(frame, (px, py),
+                                            (int(px + ddx * sc), int(py + ddy * sc)),
+                                            (0, 0, 255), 3, tipLength=0.3)
+                        ppx, ppy = self.arena_to_pixel(pred_tgt[0], pred_tgt[1])
+                        ddx2, ddy2 = ppx - px, ppy - py
+                        pd = math.sqrt(ddx2 * ddx2 + ddy2 * ddy2)
+                        if pd > 5:
+                            sc2 = min(90 / pd, 1.0)
+                            cv2.arrowedLine(frame, (px, py),
+                                            (int(px + ddx2 * sc2), int(py + ddy2 * sc2)),
+                                            (0, 255, 100), 3, tipLength=0.3)
+
+            # --- Label ---
+            label = f"{'L' if is_leader else 'R'}{robot_id}"
+            cv2.putText(frame, label, (px - 15, py - 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, ring_color, 2)
+            trust_str = f"T:{trust:.2f}" if trust is not None else ""
+            cv2.putText(frame, f"({pose['x']:.0f},{pose['y']:.0f}) {trust_str}",
+                       (px - 40, py + 40),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+        # FPS + recording indicator
+        rec_tag = " [REC]" if self.recording else ""
+        cv2.putText(frame, f"FPS: {self.fps:.1f} | Robots: {len(poses)}{rec_tag}", (10, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255) if not self.recording else (0, 0, 255), 2)
+
         mode_text = "HOMOGRAPHY" if self.homography is not None else "LINEAR (no corners)"
         cv2.putText(frame, f"Mode: {mode_text}", (10, 60),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if self.homography is not None else (0, 165, 255), 2)
@@ -348,46 +626,55 @@ class PositionServer:
         """Main loop"""
         self.running = True
         interval = 1.0 / POSITION_RATE
-        
-        print("Running... Press 'q' to quit, 'c' to calibrate, 'v' to toggle video\n")
-        
+
+        print("Running... Press 'q' to quit, 'r' to record, 'c' to calibrate, 'v' to toggle video\n")
+
         while self.running:
             start = time.time()
-            
+
             ret, frame = self.cap.read()
             if not ret:
                 break
-            
-            # Detect and send
+
             poses = self.detect_and_send(frame)
-            
+
             # FPS calc
             self.frame_count += 1
             if time.time() - self.last_fps_time >= 1.0:
                 self.fps = self.frame_count / (time.time() - self.last_fps_time)
                 self.frame_count = 0
                 self.last_fps_time = time.time()
-            
-            # Display
+
             if self.show_video:
+                self.draw_arena_contour(frame)
                 self.draw_overlay(frame, poses)
                 cv2.imshow('Position Server', frame)
-            
+
+            # Record frame + state (non-blocking, queued to background thread)
+            if self.recording:
+                self._enqueue_frame(frame, poses)
+
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 self.running = False
+            elif key == ord('r'):
+                if not self.recording:
+                    self.start_recording(frame.shape)
+                else:
+                    self.stop_recording()
             elif key == ord('c'):
                 self.calibrate()
             elif key == ord('v'):
                 self.show_video = not self.show_video
                 if not self.show_video:
                     cv2.destroyAllWindows()
-            
-            # Rate limit
+
             elapsed = time.time() - start
             if elapsed < interval:
                 time.sleep(interval - elapsed)
-        
+
+        if self.recording:
+            self.stop_recording()
         self.cap.release()
         cv2.destroyAllWindows()
         print("Stopped.")

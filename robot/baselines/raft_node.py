@@ -60,8 +60,8 @@ ARENA_WIDTH = 2000
 ARENA_HEIGHT = 1500
 CELL_SIZE = 125
 
-ROBOT_RADIUS = 110   # mm — avoidance radius (actual body diagonal ~106mm)
-BODY_RADIUS = 80     # mm — actual body extent from ArUco center for cell marking
+ROBOT_RADIUS = 110   # mm, avoidance radius (actual body diagonal ~106mm)
+BODY_RADIUS = 80     # mm, actual body extent from ArUco center for cell marking
 AVOID_DISTANCE = 200
 CRITICAL_DISTANCE = 100
 
@@ -69,12 +69,12 @@ CRITICAL_DISTANCE = 100
 INTERIOR_WALL_X = 1000
 INTERIOR_WALL_Y_END = 1200  # wall runs y=0 to this value
 
-# Wall margins — outer walls get minimal padding;
+# wall margins - outer walls get minimal padding;
 # interior divider gets extra to prevent tag occlusion near the wall edge.
-OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm — just enough body clearance
+OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm, just enough body clearance
 DIVIDER_MARGIN = 125                  # 1 full cell around the divider
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = WALL_MARGIN + 60     # 145mm — soft repulsion starts before hard margin
+REPULSION_ZONE = WALL_MARGIN + 60     # 145mm, soft repulsion starts before hard margin
 
 # RAFT parameters - NO TRUST, only heartbeats
 HEARTBEAT_INTERVAL = 0.5   # Leader sends heartbeat this often
@@ -139,7 +139,7 @@ class Hardware:
         if not HARDWARE_AVAILABLE: return
         try:
             self.bus.write_byte(self.MUX_ADDR, 1 << ch)
-            time.sleep(0.001)  # 1ms — TCA9548A switches in <1μs
+            time.sleep(0.001)  # 1ms, tca9548a switches in <1us
         except: pass
     
     def read_tof_all(self) -> Dict[str, int]:
@@ -577,7 +577,7 @@ class RAFTNode:
         """Leader assigns frontiers to robots.
         If bad_leader_mode is active, deliberately sends robots to
         already-explored cells.  Raft has NO trust model so followers
-        obey blindly — this is the whole point of the baseline."""
+        obey blindly - this is the whole point of the baseline."""
         if self.state != RaftState.LEADER:
             return {}
         
@@ -648,9 +648,9 @@ class RAFTNode:
     def _compute_bad_assignments(self) -> Dict[str, Tuple[float, float]]:
         """BAD LEADER: deliberately assign already-explored cells.
         Simulates a compromised/hallucinating leader that fixates on
-        territory it believes needs coverage.  Assignments are persisted —
+        territory it believes needs coverage.  assignments are persisted -
         each robot gets the SAME bad target every broadcast until cleared.
-        Raft followers have no way to detect this — they just obey."""
+        raft followers have no way to detect this - they just obey."""
         explored = list(self.known_visited)
         if not explored:
             return {}
@@ -683,7 +683,7 @@ class RAFTNode:
     def _compute_oscillate_assignments(self) -> Dict[str, Tuple[float, float]]:
         """OSCILLATE LEADER: flip-flop all followers between two far corners.
         Every broadcast cycle, targets alternate between corner A and B.
-        Raft has NO trust model — followers flip-flop forever, coverage stalls."""
+        raft has no trust model - followers flip-flop forever, coverage stalls."""
         margin = ROBOT_RADIUS + CELL_SIZE
         corner_a = (margin, margin)
         corner_b = (ARENA_WIDTH - margin, ARENA_HEIGHT - margin)
@@ -709,14 +709,14 @@ class RAFTNode:
     def _compute_freeze_assignments(self) -> Dict[str, Tuple[float, float]]:
         """FREEZE LEADER: stop updating assignments entirely.
         Snapshots current assignments on first call, then returns the same stale
-        targets forever.  Raft has NO trust model — followers obey the stale
+        targets forever.  raft has no trust model - followers obey the stale
         assignments indefinitely, coverage stalls once targets are explored."""
         if not self._frozen_assignments:
             # First call: snapshot current assignments or use leader position
             if self._prev_assignments:
                 self._frozen_assignments = dict(self._prev_assignments)
             else:
-                # No previous assignments — assign everyone to leader position
+                # no previous assignments - assign everyone to leader position
                 robots = {self.robot_id: (self.x, self.y)}
                 for pid, peer in self.peers.items():
                     if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
@@ -867,7 +867,7 @@ class RAFTNode:
 
     def _peer_avoidance_heading(self, desired_angle) -> float:
         """Steer away from nearby peers using their broadcast positions.
-        Peer positions can be up to 200ms stale — use generous distance."""
+        peer positions can be up to 200ms stale - use generous distance."""
         PEER_AVOID_DIST = 400   # was 300
         PEER_REPEL_GAIN = 4.0   # was 2.5
 
@@ -1022,7 +1022,7 @@ class RAFTNode:
             tof_bias -= 0.15 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
         turn = max(-1, min(1, turn + tof_bias))
 
-        # No passive speed brake — active steering handles avoidance.
+        # no passive speed brake - active steering handles avoidance.
         # Boost turn differential near obstacles instead.
         effective_speed = BASE_SPEED
 
@@ -1114,7 +1114,7 @@ class RAFTNode:
     def sensor_loop(self):
         while self.running:
             self.tof = self.hw.read_tof_all()
-            # Encoder reads removed — positions come from camera,
+            # encoder reads removed - positions come from camera,
             # and UART contention with motor commands trips Pico watchdog.
             time.sleep(0.02)
     

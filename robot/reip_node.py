@@ -69,8 +69,8 @@ ARENA_HEIGHT = 1500  # mm
 CELL_SIZE = 125      # mm - gives 16×12 = 192 cells, ~38 per robot with 5 bots
 
 # Robot physical
-ROBOT_RADIUS = 110   # mm — avoidance radius (actual body diagonal ~106mm)
-BODY_RADIUS = 80     # mm — actual body extent from ArUco center for cell marking
+ROBOT_RADIUS = 110   # mm, avoidance radius (actual body diagonal ~106mm)
+BODY_RADIUS = 80     # mm, actual body extent from ArUco center for cell marking
 TOF_RANGE = 200      # mm - high-res verification zone
 AVOID_DISTANCE = 200 # mm
 CRITICAL_DISTANCE = 100  # mm
@@ -79,14 +79,14 @@ CRITICAL_DISTANCE = 100  # mm
 INTERIOR_WALL_X = 1000
 INTERIOR_WALL_Y_END = 1200  # wall runs y=0 to this value
 
-# Wall margins — outer walls get minimal padding (sim uses 75mm);
+# wall margins - outer walls get minimal padding (sim uses 75mm)ush
 # interior divider gets extra to prevent tag occlusion near the wall edge.
-OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm — just enough body clearance
+OUTER_WALL_MARGIN = BODY_RADIUS + 5   # 85mm, just enough body clearance
 DIVIDER_MARGIN = 125                  # 1 full cell around the divider (prevents tag occlusion)
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = WALL_MARGIN + 115    # 200mm — soft repulsion starts early (critical at low FPS)
+REPULSION_ZONE = WALL_MARGIN + 115    # 200mm, soft repulsion starts early (critical at low fps)
 
-# ============== REIP Trust Parameters ==============
+# ============== REIP Trust Parameters ==============-`
 # Three-tier confidence weights
 # Inspired by Marsh 1994's trust formalization: evidence reliability
 # varies by source.  Personal experience is ground truth (weight 1.0),
@@ -142,7 +142,7 @@ ELECTION_FAST_COUNT = 3      # number of fast elections before switching to norm
 PEER_TIMEOUT = 3.0           # seconds before peer considered dead
 CONTROL_RATE = 10            # Hz
 BROADCAST_RATE = 5           # Hz
-BASE_SPEED = 80              # PWM % — N20 100:1 motors need high duty for 217g robot
+BASE_SPEED = 80              # pwm %, n20 100:1 motors need high duty for 217g robot
 
 # ToF channels (hardware wiring)
 TOF_CHANNELS = {
@@ -236,7 +236,7 @@ class Hardware:
             return
         try:
             self.bus.write_byte(self.MUX_ADDR, 1 << ch)
-            time.sleep(0.001)  # 1ms — TCA9548A switches in <1μs
+            time.sleep(0.001)  # 1ms, tca9548a switches in <1us
         except:
             pass
     
@@ -668,7 +668,7 @@ class REIPNode:
                 
                 # Always update assignment and timestamp from each broadcast.
                 # Each broadcast is a fresh leadership decision that must be
-                # independently verified — even if the target hasn't changed.
+                # independently verified, even if the target hasn't changed.
                 # Without this, a bad leader that persists with the same bad
                 # assignment only triggers ONE assessment, which may not be
                 # enough to cross the suspicion threshold.
@@ -691,7 +691,7 @@ class REIPNode:
         
         IMPORTANT: When we already suspect the leader (trust_in_leader < TRUST_THRESHOLD),
         we SKIP coverage-stall checks for non-leader peers.  A bad leader's commands cause
-        all followers to stall — blaming fellow followers for the leader's commands would
+        all followers to stall - blaming fellow followers for the leader's commands would
         prevent the swarm from electing a replacement (everyone excludes everyone).
         Only motor anomalies (stuck/spinning) are checked when leader trust is low.
         """
@@ -728,11 +728,11 @@ class REIPNode:
         
         anomaly_detected = False
         
-        # Stuck: moved less than 50mm in 2+ seconds (MOTOR anomaly — always check)
+        # stuck: moved less than 50mm in 2+ seconds (motor anomaly, always check)
         if time_elapsed > 2.0 and distance_moved < 50:
             anomaly_detected = True
         
-        # Spinning: high rotation, low translation (MOTOR anomaly — always check)
+        # spinning: high rotation, low translation (motor anomaly, always check)
         if time_elapsed > 1.0 and theta_changes > math.pi and distance_moved < 100:
             anomaly_detected = True
         
@@ -762,9 +762,9 @@ class REIPNode:
         
         1. Three-tier confidence check (catches "send to explored cell"):
            Evidence weighted by source reliability (Marsh 1994):
-           - Tier 1: Cells I personally visited (weight 1.0) — ground truth
-           - Tier 2: Obstacles within ToF range (weight 1.0) — direct sensor
-           - Tier 3: Cells in known_visited from peers (weight 0.3) — may be stale
+           - tier 1: cells i personally visited (weight 1.0) - ground truth
+           - tier 2: obstacles within tof range (weight 1.0) - direct sensor
+           - tier 3: cells in known_visited from peers (weight 0.3) - may be stale
            All checks are causality-aware: evidence is only used if it
            predates the leader's assignment timestamp, preventing false
            positives from network delay.
@@ -774,7 +774,7 @@ class REIPNode:
            optimal direction (nearest unexplored cell, per Yamauchi 1997).
            Only fires when three-tier ALSO found evidence (reinforcing).
         """
-        # ===== ABLATION: no_trust — skip all trust assessment =====
+        # ===== ABLATION: no_trust - skip all trust assessment =====
         if getattr(self, '_ablation_no_trust', False):
             return
         
@@ -848,7 +848,7 @@ class REIPNode:
                 suspicion_added += mpc_suspicion
                 reasons.append(f"mpc_direction({mpc_suspicion:.2f})")
         
-        # ===== COMMAND STABILITY METRIC (Ω) — Fault Classification =====
+        # ===== command stability metric (omega) - fault classification =====
         # Track angular velocity of commanded direction over a sliding window.
         # This is the discrete derivative of θ_cmd(t): Ω = mean(|Δθ|)
         #   Low Ω + high S → Byzantine Assignment (bad_leader)
@@ -1144,7 +1144,7 @@ class REIPNode:
         """
         BAD LEADER: deliberately assign already-explored cells.
         This simulates a compromised/hallucinating leader that fixates on
-        territory it believes needs coverage.  Assignments are persisted —
+        territory it believes needs coverage.  assignments are persisted -
         each robot gets the SAME bad target every broadcast until a new
         election occurs.  This prevents followers from accidentally covering
         the arena via a high-speed random walk.
@@ -1168,7 +1168,7 @@ class REIPNode:
         assignments = {}
         for rid in robots:
             if str(rid) not in self._bad_assignments_cache:
-                # First time seeing this robot — pick a fixed bad target
+                # first time seeing this robot - pick a fixed bad target
                 bad_cell = random.choice(explored)
                 self._bad_assignments_cache[str(rid)] = self.cell_to_pos(bad_cell)
             
@@ -1249,7 +1249,7 @@ class REIPNode:
             if self._prev_assignments:
                 self._frozen_assignments = dict(self._prev_assignments)
             else:
-                # No previous assignments — assign everyone to the leader's position
+                # no previous assignments - assign everyone to the leader's position
                 robots = {self.robot_id: (self.x, self.y)}
                 for pid, peer in self.peers.items():
                     if time.time() - peer.last_seen < PEER_TIMEOUT:
@@ -1327,7 +1327,7 @@ class REIPNode:
         if candidates:
             self.my_vote = candidates[0][0]
             
-            # Count votes from peers — but ONLY for eligible candidates.
+            # count votes from peers, but only for eligible candidates.
             # A robot excluded from OUR candidate list (e.g. a bad leader with
             # trust below threshold) should not win just because it votes for
             # itself.  Each node enforces its own trust assessment.
@@ -1348,14 +1348,14 @@ class REIPNode:
             
             if self.current_leader != old_leader:
                 # Track failure for old leader (they got impeached)
-                # Don't count the initial startup convergence — when robots first
+                # don't count the initial startup convergence - when robots first
                 # discover peers, their self-election gets overridden.  This is normal
                 # convergence, not a real impeachment, and should not bias tie-breaking.
                 if old_leader is not None and self._election_settled:
                     self.leader_failures[old_leader] = self.leader_failures.get(old_leader, 0) + 1
                     print(f"[ELECTION] Leader {old_leader} impeached (failures={self.leader_failures[old_leader]})")
                 if not self._election_settled and len(self.peers) >= 2:
-                    # First election with peers present — startup is done
+                    # first election with peers present - startup is done
                     self._election_settled = True
                 
                 print(f"[ELECTION] New leader: {self.current_leader}")
@@ -1408,7 +1408,7 @@ class REIPNode:
     # Hardware-specific additions below replicate what visual_sim.py provides
     # via its physics engine:  wall collision + sliding, A* routing, stuck
     # override.  The REIP algorithm (target selection, trust, elections) is
-    # untouched — only the motor-command layer differs.
+    # untouched - only the motor-command layer differs.
 
     def _init_stuck_detection(self):
         self._nav_history = []
@@ -1416,7 +1416,7 @@ class REIPNode:
         self._escape_start = 0
 
     def _check_stuck(self):
-        """Detect if robot is physically stuck — equivalent to visual_sim's
+        """detect if robot is physically stuck - equivalent to visual_sim's
         stuck_counter (STUCK_THRESHOLD=20 frames, STUCK_MOVE_EPS=15mm).
 
         Tuned for hardware N20 motors: 1.5s / 20mm catches wall-hugging
@@ -1425,7 +1425,7 @@ class REIPNode:
         """
         now = time.time()
 
-        # Don't trigger if position data is stale — the camera might
+        # don't trigger if position data is stale - the camera might
         # just not see the marker.  Escaping on bad data makes it worse.
         if now - self.position_timestamp > 1.0:
             self._nav_history.clear()
@@ -1496,11 +1496,11 @@ class REIPNode:
                 repel_x -= _repel(-d, div_zone)
 
         # Circular repulsion around the wall tip (1000, 1200).
-        # Only apply BELOW the tip — above it is the open passage.
+        # only apply below the tip - above it is the open passage.
         tip_dx = self.x - INTERIOR_WALL_X
         tip_dy = self.y - INTERIOR_WALL_Y_END
         tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
-        TIP_ZONE = DIVIDER_MARGIN + 30  # 155mm — tight, allows passage
+        TIP_ZONE = DIVIDER_MARGIN + 30  # 155mm, tight, allows passage
         if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + 50:
             tip_strength = _repel(tip_dist, TIP_ZONE)
             repel_x += (tip_dx / tip_dist) * tip_strength
@@ -1537,8 +1537,8 @@ class REIPNode:
         random offset to break symmetry when surrounded.
         NOTE: peer positions are updated at BROADCAST_RATE (5 Hz), so they
         can be up to 200ms stale. Use a generous avoidance distance."""
-        PEER_AVOID_DIST = 400   # was 350 — wider to compensate for stale positions
-        PEER_REPEL_GAIN = 4.0   # was 3.0 — stronger push when close
+        PEER_AVOID_DIST = 400   # was 350, wider to compensate for stale positions
+        PEER_REPEL_GAIN = 4.0   # was 3.0, stronger push when close
 
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
@@ -1739,7 +1739,7 @@ class REIPNode:
         # NO passive speed brake near walls/peers. The active steering layers
         # (wall_slide_heading, peer_avoidance_heading, ToF bias, ToF emergency)
         # redirect the heading. Braking just kills turn authority on a 217g
-        # differential-drive robot — the slow wheel stalls, the robot parks
+        # differential-drive robot - the slow wheel stalls, the robot parks
         # itself next to the wall instead of sliding along it.
         #
         # Instead: keep full speed but BOOST turn differential near obstacles
@@ -1762,7 +1762,7 @@ class REIPNode:
             min_peer_dist = min(min_peer_dist, d)
 
         min_obstacle_dist = min(min_wall_dist, min_peer_dist)
-        TURN_BOOST_DIST = 250  # mm — boost turn authority when this close
+        TURN_BOOST_DIST = 250  # mm, boost turn authority when this close
         if min_obstacle_dist < TURN_BOOST_DIST:
             # Ramp turn_mix from 0.5 (normal) to 0.8 (near obstacle)
             proximity = 1.0 - (min_obstacle_dist / TURN_BOOST_DIST)
@@ -1851,9 +1851,9 @@ class REIPNode:
     
     # ==================== MAIN LOOPS ====================
     def sensor_loop(self):
-        """Read ToF sensors continuously. Encoder reads disabled — positions
-        come from camera, and UART contention with motor commands trips the
-        Pico's 500ms watchdog.
+        """read tof sensors continuously. encoder reads disabled - positions
+        come from camera, and uart contention with motor commands trips the
+        pico's 500ms watchdog.
         
         Target: ~8-10 Hz ToF updates (5 sensors × ~20ms each ≈ 100ms cycle).
         Old 500ms sleep made ToF data too stale for real-time avoidance."""
@@ -1908,7 +1908,7 @@ class REIPNode:
                 last_election = time.time()
                 election_count += 1
             
-            # Motor control — stop if position data is stale (tag occluded)
+            # motor control - stop if position data is stale (tag occluded)
             left, right = 0.0, 0.0
             pos_age = time.time() - self.position_timestamp
             if self.position_timestamp > 0 and pos_age < 1.5:

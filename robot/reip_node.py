@@ -1400,7 +1400,12 @@ class REIPNode:
 
     def _check_stuck(self):
         """Detect if robot is physically stuck — equivalent to visual_sim's
-        stuck_counter (STUCK_THRESHOLD=20 frames, STUCK_MOVE_EPS=15mm)."""
+        stuck_counter (STUCK_THRESHOLD=20 frames, STUCK_MOVE_EPS=15mm).
+
+        Tuned for hardware N20 motors: 1.5s / 20mm catches wall-hugging
+        faster than the original 2.0s / 30mm, before the robot wastes
+        time oscillating in the repulsion zone.
+        """
         now = time.time()
 
         # Don't trigger if position data is stale — the camera might
@@ -1417,17 +1422,27 @@ class REIPNode:
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 2.0 and moved < 30
+        return elapsed > 1.5 and moved < 20
 
     def _route_around_wall(self, target):
         """If target is across the interior wall, route through the passage.
-        Hardware equivalent of visual_sim's A* pathfinding."""
+        Hardware equivalent of visual_sim's A* pathfinding.
+
+        The waypoint is offset to the ROBOT'S side of the wall so the
+        approach path never enters the wall-repulsion zone.  Once the robot
+        reaches the waypoint (above the wall at y > INTERIOR_WALL_Y_END),
+        there is no wall to repel it and it crosses freely.
+        """
         tx, ty = target
         on_left = self.x < INTERIOR_WALL_X
         target_on_left = tx < INTERIOR_WALL_X
         if on_left != target_on_left and self.y < INTERIOR_WALL_Y_END + 100:
-            passage_y = INTERIOR_WALL_Y_END + 150
-            passage_x = INTERIOR_WALL_X
+            passage_y = INTERIOR_WALL_Y_END + 200  # Well above the wall end
+            # Offset to robot's side so we never fight wall repulsion
+            if on_left:
+                passage_x = INTERIOR_WALL_X - WALL_MARGIN - 20
+            else:
+                passage_x = INTERIOR_WALL_X + WALL_MARGIN + 20
             dist_to_passage = math.sqrt((self.x - passage_x)**2
                                         + (self.y - passage_y)**2)
             if dist_to_passage > 150:
@@ -1610,11 +1625,22 @@ class REIPNode:
             min_wall_dist = min(min_wall_dist, abs(self.x - INTERIOR_WALL_X))
         wall_speed_factor = 1.0
         if min_wall_dist < WALL_MARGIN:
-            wall_speed_factor = max(0.4, min_wall_dist / WALL_MARGIN)
+            wall_speed_factor = max(0.55, min_wall_dist / WALL_MARGIN)
         effective_speed = BASE_SPEED * wall_speed_factor
 
+        # Decouple turn authority from speed: forward speed is reduced near
+        # walls, but the DIFFERENTIAL for turning stays strong enough to
+        # actually rotate the 217g robot.  Without this, 40% speed * 0.5 turn
+        # = 16 PWM on the slow motor, which stalls the N20 completely.
+        MIN_MOTOR_PWM = 25  # Below this, N20 100:1 can't move 217g
         left_speed = effective_speed * (1 - turn * 0.5)
         right_speed = effective_speed * (1 + turn * 0.5)
+        # Ensure neither motor is in the dead zone when trying to move
+        if abs(turn) > 0.1:
+            if abs(left_speed) > 0 and abs(left_speed) < MIN_MOTOR_PWM:
+                left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
+            if abs(right_speed) > 0 and abs(right_speed) < MIN_MOTOR_PWM:
+                right_speed = math.copysign(MIN_MOTOR_PWM, right_speed)
 
         return (left_speed, right_speed)
     

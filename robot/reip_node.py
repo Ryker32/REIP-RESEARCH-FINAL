@@ -74,6 +74,11 @@ TOF_RANGE = 200      # mm - high-res verification zone
 AVOID_DISTANCE = 200 # mm
 CRITICAL_DISTANCE = 100  # mm
 
+# Interior wall: x=1000mm, runs from y=0 to y=1200, passage at y=1200-1500
+INTERIOR_WALL_X = 1000
+INTERIOR_WALL_Y_END = 1200  # wall runs y=0 to this value
+WALL_MARGIN = ROBOT_RADIUS + 30  # mm — mirrors sim's collision radius + buffer
+
 # ============== REIP Trust Parameters ==============
 # Three-tier confidence weights
 # Inspired by Marsh 1994's trust formalization: evidence reliability
@@ -130,7 +135,7 @@ ELECTION_FAST_COUNT = 3      # number of fast elections before switching to norm
 PEER_TIMEOUT = 3.0           # seconds before peer considered dead
 CONTROL_RATE = 10            # Hz
 BROADCAST_RATE = 5           # Hz
-BASE_SPEED = 50              # PWM %
+BASE_SPEED = 65              # PWM % — above motor stall threshold
 
 # ToF channels (hardware wiring)
 TOF_CHANNELS = {
@@ -169,6 +174,7 @@ class PeerInfo:
 # ============== Hardware Interface ==============
 class Hardware:
     def __init__(self):
+        self._uart_lock = threading.Lock()
         if not HARDWARE_AVAILABLE:
             print("  Hardware: SIMULATED")
             return
@@ -245,35 +251,38 @@ class Hardware:
     def read_encoders(self) -> tuple:
         if not HARDWARE_AVAILABLE:
             return (0, 0)
-        try:
-            self.uart.reset_input_buffer()
-            self.uart.write(b'ENC\n')
-            time.sleep(0.02)
-            resp = self.uart.readline().decode().strip()
-            if ',' in resp:
-                l, r = resp.split(',')
-                return (int(l), int(r))
-        except:
-            pass
+        with self._uart_lock:
+            try:
+                self.uart.reset_input_buffer()
+                self.uart.write(b'ENC\n')
+                time.sleep(0.02)
+                resp = self.uart.readline().decode().strip()
+                if ',' in resp:
+                    l, r = resp.split(',')
+                    return (int(l), int(r))
+            except:
+                pass
         return (0, 0)
     
     def set_motors(self, left: float, right: float):
         if not HARDWARE_AVAILABLE:
             return
-        try:
-            self.uart.write(f"MOT,{left:.1f},{right:.1f}\n".encode())
-            self.uart.readline()
-        except:
-            pass
+        with self._uart_lock:
+            try:
+                self.uart.reset_input_buffer()
+                self.uart.write(f"MOT,{left:.1f},{right:.1f}\n".encode())
+            except:
+                pass
     
     def stop(self):
         if not HARDWARE_AVAILABLE:
             return
-        try:
-            self.uart.write(b'STOP\n')
-            self.uart.readline()
-        except:
-            pass
+        with self._uart_lock:
+            try:
+                self.uart.reset_input_buffer()
+                self.uart.write(b'STOP\n')
+            except:
+                pass
 
 # ============== REIP Node ==============
 class REIPNode:
@@ -1361,9 +1370,100 @@ class REIPNode:
             print(f"[IMPEACH] Trust too low ({self.trust_in_leader:.2f}), excluding leader {self.current_leader} from candidates")
     
     # ==================== NAVIGATION ====================
+    # Hardware-specific additions below replicate what visual_sim.py provides
+    # via its physics engine:  wall collision + sliding, A* routing, stuck
+    # override.  The REIP algorithm (target selection, trust, elections) is
+    # untouched — only the motor-command layer differs.
+
+    def _init_stuck_detection(self):
+        self._nav_history = []
+        self._escape_until = 0
+        self._escape_start = 0
+
+    def _check_stuck(self):
+        """Detect if robot is physically stuck — equivalent to visual_sim's
+        stuck_counter (STUCK_THRESHOLD=20 frames, STUCK_MOVE_EPS=15mm)."""
+        now = time.time()
+        self._nav_history.append((now, self.x, self.y))
+        self._nav_history = [(t, x, y) for t, x, y in self._nav_history
+                             if now - t < 3.0]
+        if len(self._nav_history) < 2:
+            return False
+        oldest_t, oldest_x, oldest_y = self._nav_history[0]
+        elapsed = now - oldest_t
+        moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
+        return elapsed > 2.0 and moved < 30
+
+    def _route_around_wall(self, target):
+        """If target is across the interior wall, route through the passage.
+        Hardware equivalent of visual_sim's A* pathfinding."""
+        tx, ty = target
+        on_left = self.x < INTERIOR_WALL_X
+        target_on_left = tx < INTERIOR_WALL_X
+        if on_left != target_on_left and self.y < INTERIOR_WALL_Y_END + 100:
+            passage_y = INTERIOR_WALL_Y_END + 150
+            passage_x = INTERIOR_WALL_X
+            dist_to_passage = math.sqrt((self.x - passage_x)**2
+                                        + (self.y - passage_y)**2)
+            if dist_to_passage > 150:
+                return [passage_x, passage_y]
+        return target
+
+    def _wall_slide_heading(self, desired_angle):
+        """Modify heading to slide along walls instead of driving into them.
+
+        Direct equivalent of visual_sim's wall collision handling (lines
+        518-543): when the desired move would collide with a wall, the sim
+        tries X-only motion, then Y-only, then perpendicular sliding.
+
+        Here we achieve the same effect by zeroing the heading component
+        that points into any nearby wall, leaving only the parallel
+        (sliding) component.
+        """
+        hx = math.cos(desired_angle)
+        hy = math.sin(desired_angle)
+        modified = False
+
+        # Arena boundaries
+        if self.x < WALL_MARGIN and hx < 0:
+            hx = 0; modified = True
+        if self.x > ARENA_WIDTH - WALL_MARGIN and hx > 0:
+            hx = 0; modified = True
+        if self.y < WALL_MARGIN and hy < 0:
+            hy = 0; modified = True
+        if self.y > ARENA_HEIGHT - WALL_MARGIN and hy > 0:
+            hy = 0; modified = True
+
+        # Interior wall (x=INTERIOR_WALL_X, y=0 to INTERIOR_WALL_Y_END)
+        if self.y < INTERIOR_WALL_Y_END:
+            dist_to_interior = self.x - INTERIOR_WALL_X
+            if 0 < dist_to_interior < WALL_MARGIN and hx < 0:
+                hx = 0; modified = True
+            elif -WALL_MARGIN < dist_to_interior < 0 and hx > 0:
+                hx = 0; modified = True
+
+        if not modified:
+            return desired_angle
+
+        if abs(hx) < 0.01 and abs(hy) < 0.01:
+            cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+            return math.atan2(cy - self.y, cx - self.x)
+
+        return math.atan2(hy, hx)
+
     def compute_motor_command(self) -> Tuple[float, float]:
-        """Compute motor speeds"""
-        # Handle injected faults
+        """Compute motor speeds.
+
+        REIP logic (faults, target selection) is identical to the sim.
+        Hardware additions mirror what the sim's physics engine provides:
+          - _wall_slide_heading  →  sim's wall collision + component motion
+          - _route_around_wall   →  sim's A* pathfinding
+          - _check_stuck + escape →  sim's stuck_counter + override
+        """
+        if not hasattr(self, '_nav_history'):
+            self._init_stuck_detection()
+
+        # Handle injected faults (identical to sim)
         if self.injected_fault == 'spin':
             return (BASE_SPEED, -BASE_SPEED)
         elif self.injected_fault == 'stop':
@@ -1371,77 +1471,100 @@ class REIPNode:
         elif self.injected_fault == 'erratic':
             return (random.uniform(-BASE_SPEED, BASE_SPEED),
                    random.uniform(-BASE_SPEED, BASE_SPEED))
-        
-        # Get sensor readings
+
+        # Escape mode: reverse then turn toward center (stuck recovery)
+        if time.time() < self._escape_until:
+            phase_elapsed = time.time() - self._escape_start
+            if phase_elapsed < 0.6:
+                return (-BASE_SPEED * 0.5, -BASE_SPEED * 0.45)
+            elif phase_elapsed < 1.6:
+                cx, cy = ARENA_WIDTH / 2, ARENA_HEIGHT / 2
+                angle_to_center = math.atan2(cy - self.y, cx - self.x)
+                diff = angle_to_center - self.theta
+                while diff > math.pi: diff -= 2 * math.pi
+                while diff < -math.pi: diff += 2 * math.pi
+                if diff > 0:
+                    return (BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
+                else:
+                    return (-BASE_SPEED * 0.6, BASE_SPEED * 0.6)
+            else:
+                return (BASE_SPEED * 0.7, BASE_SPEED * 0.7)
+
+        # ToF sensor readings (identical to sim code — no-op when sensors
+        # return -1, which is the case on current hardware)
         front = self.tof.get('front', 9999)
         front_left = self.tof.get('front_left', 9999)
         front_right = self.tof.get('front_right', 9999)
-        
+
         if front < 0: front = 9999
         if front_left < 0: front_left = 9999
         if front_right < 0: front_right = 9999
-        
-        # Critical stop
+
         if front < CRITICAL_DISTANCE:
             return (-BASE_SPEED * 0.5, -BASE_SPEED * 0.3)
-        
-        # Obstacle avoidance
+
         if front < AVOID_DISTANCE or front_left < AVOID_DISTANCE or front_right < AVOID_DISTANCE:
             if front_left < front_right:
                 return (BASE_SPEED * 0.6, BASE_SPEED * 0.2)
             else:
                 return (BASE_SPEED * 0.2, BASE_SPEED * 0.6)
-        
-        # Determine target
+
+        # --- Target selection (identical to sim) ---
         target = None
-        
-        # Always compute local optimum for MPC comparison / logging
+
         self.my_predicted_target = self.get_my_frontier()
-        
+
         if self.decentralized_mode:
-            # DECENTRALIZED BASELINE: No leader, just local frontier exploration
-            # Each robot independently picks nearest unexplored cell
             target = self.my_predicted_target
         elif self.state == RobotState.LEADER:
-            # Leader uses its own assigned target from compute_task_assignments
-            # Falls back to local frontier if no assignment yet
             target = self.my_assigned_target if self.my_assigned_target else self.my_predicted_target
         else:
-            # Follower: check if assignment is stale
             assignment_age = time.time() - self.leader_assignment_time
             assignment_valid = (
                 self.leader_assigned_target is not None and
                 assignment_age < self.ASSIGNMENT_STALE_TIME
             )
-            
+
             if self.trust_in_leader > TRUST_THRESHOLD and assignment_valid:
                 target = self.leader_assigned_target
             else:
-                # Low trust OR stale assignment → use local fallback
                 target = self.my_predicted_target
                 if not assignment_valid and self.leader_assigned_target:
-                    # Clear stale assignment
                     self.leader_assigned_target = None
-        
+
         if not target:
             self.current_navigation_target = None
             return (0, 0)
-        
+
         self.current_navigation_target = target
-        
-        # Navigate to target
+
+        # Route around interior wall (equivalent to sim's A* pathfinding)
+        target = self._route_around_wall(target)
+
+        # Stuck detection → triggers escape sequence
+        if self._check_stuck():
+            self._escape_until = time.time() + 2.5
+            self._escape_start = time.time()
+            self._nav_history.clear()
+            return (-BASE_SPEED * 0.5, -BASE_SPEED * 0.45)
+
+        # --- Navigate to target ---
         dx = target[0] - self.x
         dy = target[1] - self.y
         target_angle = math.atan2(dy, dx)
-        
+
+        # Wall-sliding: modify heading to avoid driving into walls
+        # (equivalent to sim's wall collision + component-wise motion)
+        target_angle = self._wall_slide_heading(target_angle)
+
         diff = target_angle - self.theta
         while diff > math.pi: diff -= 2 * math.pi
         while diff < -math.pi: diff += 2 * math.pi
-        
+
         turn = max(-1, min(1, diff / (math.pi / 3)))
         left_speed = BASE_SPEED * (1 - turn * 0.5)
         right_speed = BASE_SPEED * (1 + turn * 0.5)
-        
+
         return (left_speed, right_speed)
     
     # ==================== FAULT INJECTION ====================
@@ -1513,12 +1636,12 @@ class REIPNode:
     
     # ==================== MAIN LOOPS ====================
     def sensor_loop(self):
-        """Read sensors continuously"""
+        """Read sensors. Encoder reads disabled — positions come from camera,
+        and UART contention with motor commands trips the Pico's 500ms watchdog."""
         while self.running:
             self.tof = self.hw.read_tof_all()
             self.update_tof_obstacles()
-            self.encoders = self.hw.read_encoders()
-            time.sleep(0.05)
+            time.sleep(0.5)
     
     def network_loop(self):
         """Handle network communication"""

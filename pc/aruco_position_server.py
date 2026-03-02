@@ -36,7 +36,7 @@ ARENA_HEIGHT_MM = 1500  # mm (16:12 aspect, ~matches 16:9 camera)
 # Hardware mode: all robots listen on UDP_PORT (5100).
 # Messages include robot_id; each robot filters for its own.
 UDP_PORT = 5100  # Position updates to robots
-BROADCAST_IP = "255.255.255.255"
+BROADCAST_IP = "192.168.20.255"
 POSITION_RATE = 30  # Hz
 
 # Robot IPs (None = broadcast to all, or set specific IPs for unicast)
@@ -55,18 +55,31 @@ class PositionServer:
         print("=== REIP Position Server ===")
         print("(GPS satellite mode - each robot gets only its own position)\n")
         
-        # Camera
+        # Camera (DirectShow backend avoids MSMF hang on Windows)
         print(f"Opening camera {camera_id}...")
-        self.cap = cv2.VideoCapture(camera_id)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-        
+        self.cap = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
+        if not self.cap.isOpened():
+            print("DirectShow failed, trying default backend...")
+            self.cap = cv2.VideoCapture(camera_id)
         if not self.cap.isOpened():
             raise RuntimeError(f"Cannot open camera {camera_id}")
         
-        actual_w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        actual_h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        print(f"Camera: {int(actual_w)}x{int(actual_h)}")
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        self.cap.set(cv2.CAP_PROP_FOCUS, 0)
+        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, -7)
+        
+        ret, test_frame = self.cap.read()
+        if ret:
+            actual_h, actual_w = test_frame.shape[:2]
+            print(f"Camera: {actual_w}x{actual_h}")
+        else:
+            actual_w = CAMERA_WIDTH
+            actual_h = CAMERA_HEIGHT
+            print("Warning: camera opened but no frames yet")
         
         # ArUco
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
@@ -85,9 +98,10 @@ class PositionServer:
         self.origin_x = 0
         self.origin_y = actual_h
         
-        # Network
+        # Network — bind to WiFi interface so broadcasts reach robots
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.socket.bind(("192.168.20.214", 0))
         
         # State
         self.running = False
@@ -188,9 +202,11 @@ class PositionServer:
                 cx = np.mean(corner[:, 0])
                 cy = np.mean(corner[:, 1])
                 
-                # Orientation
-                dx = corner[1][0] - corner[0][0]
-                dy = corner[1][1] - corner[0][1]
+                # Orientation: "forward" = top of marker (bottom-mid → top-mid)
+                top_mid = (corner[0] + corner[1]) / 2
+                bot_mid = (corner[2] + corner[3]) / 2
+                dx = top_mid[0] - bot_mid[0]
+                dy = top_mid[1] - bot_mid[1]
                 theta = np.arctan2(-dy, dx)
                 
                 # Convert to arena coords
@@ -201,7 +217,9 @@ class PositionServer:
                     'x': x_mm,
                     'y': y_mm,
                     'theta': theta,
-                    'timestamp': time.time()
+                    'timestamp': time.time(),
+                    'px': int(cx),
+                    'py': int(cy),
                 }
                 poses[int(marker_id)] = pose
                 
@@ -219,10 +237,10 @@ class PositionServer:
         msg = {
             'type': 'position',
             'robot_id': robot_id,
-            'x': pose['x'],
-            'y': pose['y'],
-            'theta': pose['theta'],
-            'timestamp': pose['timestamp']
+            'x': float(pose['x']),
+            'y': float(pose['y']),
+            'theta': float(pose['theta']),
+            'timestamp': float(pose['timestamp'])
         }
         data = json.dumps(msg).encode()
         
@@ -235,8 +253,8 @@ class PositionServer:
     def draw_overlay(self, frame: np.ndarray, poses: Dict[int, dict]):
         """Draw detection overlay"""
         for robot_id, pose in poses.items():
-            px = int(self.origin_x + pose['x'] * self.pixels_per_mm_x)
-            py = int(self.origin_y - pose['y'] * self.pixels_per_mm_y)
+            px = pose['px']
+            py = pose['py']
             
             # Circle
             cv2.circle(frame, (px, py), 20, (0, 255, 0), 2)
@@ -260,7 +278,7 @@ class PositionServer:
         # Mode indicator
         mode_text = "HOMOGRAPHY" if self.homography is not None else "LINEAR (no corners)"
         cv2.putText(frame, f"Mode: {mode_text}", (10, 60),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if self.homography else (0, 165, 255), 2)
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if self.homography is not None else (0, 165, 255), 2)
     
     def calibrate(self):
         """Interactive calibration"""

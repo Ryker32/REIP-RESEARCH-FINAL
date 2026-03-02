@@ -684,9 +684,9 @@ class RAFTNode:
         """OSCILLATE LEADER: flip-flop all followers between two far corners.
         Every broadcast cycle, targets alternate between corner A and B.
         Raft has NO trust model — followers flip-flop forever, coverage stalls."""
-        margin = 75 + 125  # ROBOT_RADIUS + CELL_SIZE
+        margin = ROBOT_RADIUS + CELL_SIZE
         corner_a = (margin, margin)
-        corner_b = (self.arena_width - margin, self.arena_height - margin)
+        corner_b = (ARENA_WIDTH - margin, ARENA_HEIGHT - margin)
         
         self._oscillate_phase = 1 - self._oscillate_phase
         target = corner_a if self._oscillate_phase == 0 else corner_b

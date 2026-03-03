@@ -1,13 +1,24 @@
-# Heavy experiment data (50k+ files)
-experiments/
-logs/
+# Trial data (videos + logs) — keep locally, don't push to GitHub
+trials/
+*.mp4
+*.avi
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
 
-# OS
+# Environment
+.env
+*.log
+venv/
+.venv/
+
+# OS junk
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -15,9 +26,5 @@ desktop.ini
 # IDE
 .vscode/
 .idea/
-*.code-workspace
-
-# Temporary/generated
-*.egg-info/
-dist/
-build/
+*.swp
+*.swo

@@ -59,12 +59,19 @@ class PositionServer:
         print("=== REIP Position Server ===")
         print("(GPS satellite mode - each robot gets only its own position)\n")
         
-        # Camera (DirectShow backend avoids MSMF hang on Windows)
         print(f"Opening camera {camera_id}...")
-        self.cap = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
-        if not self.cap.isOpened():
-            print("DirectShow failed, trying default backend...")
-            self.cap = cv2.VideoCapture(camera_id)
+        # Try each backend; DirectShow is fastest on Windows when it works
+        for backend_name, backend in [("DirectShow", cv2.CAP_DSHOW),
+                                       ("MSMF", cv2.CAP_MSMF),
+                                       ("Default", cv2.CAP_ANY)]:
+            print(f"  Trying {backend_name}...", end=" ", flush=True)
+            self.cap = cv2.VideoCapture(camera_id, backend)
+            if self.cap.isOpened():
+                print("OK")
+                break
+            else:
+                print("failed")
+                self.cap.release()
         if not self.cap.isOpened():
             raise RuntimeError(f"Cannot open camera {camera_id}")
         
@@ -129,9 +136,13 @@ class PositionServer:
         self.state_log_file = None
         self.trial_dir = ""
 
+        self.show_exploration = True
+        self._visited_cells: set = set()
+
         print("Ready!\n")
         print("  'r' = start/stop recording   'q' = quit")
-        print("  'c' = calibrate              'v' = toggle video\n")
+        print("  'c' = calibrate              'v' = toggle video")
+        print("  'e' = toggle exploration overlay\n")
     
     # ==================== State listener ====================
     def _start_state_listener(self):
@@ -314,6 +325,7 @@ class PositionServer:
         # Compute homography (pixel→arena) and its inverse (arena→pixel)
         self.homography, _ = cv2.findHomography(src_pts, dst_pts)
         self.inv_homography = np.linalg.inv(self.homography)
+        self._cell_polys = []  # invalidate cache so overlay rebuilds
         
         if self.frame_count % 100 == 0:
             print(f"[HOMOGRAPHY] Updated from corner markers")
@@ -400,15 +412,96 @@ class PositionServer:
             return int(px_pt[0][0][0]), int(px_pt[0][0][1])
         return int(x_mm * self.pixels_per_mm_x), int(self.origin_y - y_mm * self.pixels_per_mm_y)
 
+    def _is_wall_cell(self, cx: int, cy: int) -> bool:
+        """Mirror of robot's _is_wall_cell for overlay rendering."""
+        OUTER_WALL_MARGIN = 115  # swept radius (100) + 15mm gap
+        DIVIDER_MARGIN = 125
+        BODY_RADIUS = 77
+        CELL_SIZE = 125
+        INTERIOR_WALL_X_LEFT = 1000
+        INTERIOR_WALL_X_RIGHT = 1036
+        INTERIOR_WALL_Y_END = 1200
+
+        x = cx * CELL_SIZE + CELL_SIZE / 2
+        y = cy * CELL_SIZE + CELL_SIZE / 2
+        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH_MM - OUTER_WALL_MARGIN:
+            return True
+        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT_MM - OUTER_WALL_MARGIN:
+            return True
+        if y < INTERIOR_WALL_Y_END and (
+            INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
+            return True
+        if INTERIOR_WALL_X_LEFT - BODY_RADIUS < x < INTERIOR_WALL_X_RIGHT + BODY_RADIUS:
+            return True
+        return False
+
+    def _build_cell_cache(self):
+        """Pre-compute cell pixel corners and wall status (called once when
+        homography is established, avoids 768 perspective transforms per frame)."""
+        CELL_SIZE = 125
+        cells_x = int(ARENA_WIDTH_MM / CELL_SIZE)
+        cells_y = int(ARENA_HEIGHT_MM / CELL_SIZE)
+        self._cell_polys = []
+        self._cell_wall = []
+        self._num_explorable = 0
+        for cy in range(cells_y):
+            for cx in range(cells_x):
+                x0, y0 = cx * CELL_SIZE, cy * CELL_SIZE
+                corners = [(x0, y0), (x0 + CELL_SIZE, y0),
+                           (x0 + CELL_SIZE, y0 + CELL_SIZE), (x0, y0 + CELL_SIZE)]
+                pts = np.array([self.arena_to_pixel(ax, ay) for ax, ay in corners],
+                               dtype=np.int32)
+                is_wall = self._is_wall_cell(cx, cy)
+                self._cell_polys.append(((cx, cy), pts, is_wall))
+                self._cell_wall.append(is_wall)
+                if not is_wall:
+                    self._num_explorable += 1
+
+    def draw_exploration_overlay(self, frame: np.ndarray):
+        """Draw live exploration coverage: green=visited, dark=unexplored, gray=wall."""
+        if self.inv_homography is None:
+            return
+
+        if not hasattr(self, '_cell_polys') or not self._cell_polys:
+            self._build_cell_cache()
+
+        with self._state_lock:
+            states = dict(self.robot_states)
+
+        for st in states.values():
+            for cell in st.get('visited_cells', []):
+                if isinstance(cell, (list, tuple)) and len(cell) == 2:
+                    self._visited_cells.add((int(cell[0]), int(cell[1])))
+        visited = self._visited_cells
+
+        overlay = frame.copy()
+        for (cx, cy), pts, is_wall in self._cell_polys:
+            if is_wall:
+                cv2.fillConvexPoly(overlay, pts, (60, 60, 60))
+            elif (cx, cy) in visited:
+                cv2.fillConvexPoly(overlay, pts, (0, 140, 0))
+            else:
+                cv2.fillConvexPoly(overlay, pts, (40, 20, 20))
+
+        cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
+
+        pct = len(visited) / max(1, self._num_explorable) * 100
+        h, w = frame.shape[:2]
+        cov_text = f"Coverage: {len(visited)} cells ({pct:.0f}%)"
+        cov_size = cv2.getTextSize(cov_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        cv2.putText(frame, cov_text, ((w - cov_size[0]) // 2, 85),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
     def draw_arena_contour(self, frame: np.ndarray):
         """Draw the arena model as the robots see it: walls, margin, grid."""
         if self.inv_homography is None:
             return
 
-        WALL_MARGIN = 85   # OUTER_WALL_MARGIN
-        DIVIDER_MARGIN = 125  # full cell
+        WALL_MARGIN = 115  # OUTER_WALL_MARGIN (swept radius + gap)
+        DIVIDER_MARGIN = 125
         CELL_SIZE = 125
-        INTERIOR_WALL_X = 1000
+        INTERIOR_WALL_X_LEFT = 1000
+        INTERIOR_WALL_X_RIGHT = 1036
         INTERIOR_WALL_Y_END = 1200
         cells_x = int(ARENA_WIDTH_MM / CELL_SIZE)
         cells_y = int(ARENA_HEIGHT_MM / CELL_SIZE)
@@ -422,10 +515,14 @@ class PositionServer:
         for i in range(4):
             cv2.line(overlay, pts[i], pts[(i + 1) % 4], (0, 255, 0), 2)
 
-        # Interior wall (green)
+        # Interior wall (green) - draw both faces
         cv2.line(overlay,
-                 self.arena_to_pixel(INTERIOR_WALL_X, 0),
-                 self.arena_to_pixel(INTERIOR_WALL_X, INTERIOR_WALL_Y_END),
+                 self.arena_to_pixel(INTERIOR_WALL_X_LEFT, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X_LEFT, INTERIOR_WALL_Y_END),
+                 (0, 255, 0), 2)
+        cv2.line(overlay,
+                 self.arena_to_pixel(INTERIOR_WALL_X_RIGHT, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X_RIGHT, INTERIOR_WALL_Y_END),
                  (0, 255, 0), 2)
 
         # WALL_MARGIN zone (yellow)
@@ -437,14 +534,14 @@ class PositionServer:
         for i in range(4):
             cv2.line(overlay, mpts[i], mpts[(i + 1) % 4], (0, 200, 255), 1)
 
-        # Interior wall margins (yellow — uses DIVIDER_MARGIN)
+        # Interior wall margins (yellow — uses DIVIDER_MARGIN from each face)
         cv2.line(overlay,
-                 self.arena_to_pixel(INTERIOR_WALL_X - DIVIDER_MARGIN, 0),
-                 self.arena_to_pixel(INTERIOR_WALL_X - DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
+                 self.arena_to_pixel(INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
                  (0, 200, 255), 1)
         cv2.line(overlay,
-                 self.arena_to_pixel(INTERIOR_WALL_X + DIVIDER_MARGIN, 0),
-                 self.arena_to_pixel(INTERIOR_WALL_X + DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
+                 self.arena_to_pixel(INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN, 0),
+                 self.arena_to_pixel(INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
                  (0, 200, 255), 1)
 
         # Grid cells (gray)
@@ -549,14 +646,21 @@ class PositionServer:
                        (px - 40, py + 40),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
-        # FPS + recording indicator
+        # FPS + recording indicator (centered at top)
+        h, w = frame.shape[:2]
         rec_tag = " [REC]" if self.recording else ""
-        cv2.putText(frame, f"FPS: {self.fps:.1f} | Robots: {len(poses)}{rec_tag}", (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255) if not self.recording else (0, 0, 255), 2)
+        fps_text = f"FPS: {self.fps:.1f} | Robots: {len(poses)}{rec_tag}"
+        fps_color = (0, 0, 255) if self.recording else (0, 255, 255)
+        fps_size = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+        cv2.putText(frame, fps_text, ((w - fps_size[0]) // 2, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, fps_color, 2)
 
         mode_text = "HOMOGRAPHY" if self.homography is not None else "LINEAR (no corners)"
-        cv2.putText(frame, f"Mode: {mode_text}", (10, 60),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if self.homography is not None else (0, 165, 255), 2)
+        mode_display = f"Mode: {mode_text}"
+        mode_color = (0, 255, 0) if self.homography is not None else (0, 165, 255)
+        mode_size = cv2.getTextSize(mode_display, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        cv2.putText(frame, mode_display, ((w - mode_size[0]) // 2, 60),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, mode_color, 2)
     
     def calibrate(self):
         """Interactive calibration"""
@@ -627,7 +731,7 @@ class PositionServer:
         self.running = True
         interval = 1.0 / POSITION_RATE
 
-        print("Running... Press 'q' to quit, 'r' to record, 'c' to calibrate, 'v' to toggle video\n")
+        print("Running... 'q'=quit 'r'=record 'c'=calibrate 'v'=video 'e'=exploration\n")
 
         while self.running:
             start = time.time()
@@ -646,6 +750,8 @@ class PositionServer:
                 self.last_fps_time = time.time()
 
             if self.show_video:
+                if self.show_exploration:
+                    self.draw_exploration_overlay(frame)
                 self.draw_arena_contour(frame)
                 self.draw_overlay(frame, poses)
                 cv2.imshow('Position Server', frame)
@@ -668,6 +774,9 @@ class PositionServer:
                 self.show_video = not self.show_video
                 if not self.show_video:
                     cv2.destroyAllWindows()
+            elif key == ord('e'):
+                self.show_exploration = not self.show_exploration
+                print(f"Exploration overlay: {'ON' if self.show_exploration else 'OFF'}")
 
             elapsed = time.time() - start
             if elapsed < interval:

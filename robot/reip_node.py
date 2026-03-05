@@ -92,13 +92,12 @@ INTERIOR_WALL_X_RIGHT = 1036  # right face (1000 + 35.7 ≈ 1036)
 INTERIOR_WALL_X = 1018        # center of wall (for legacy/tip calculations)
 INTERIOR_WALL_Y_END = 1200    # wall runs y=0 to this value
 
-# Wall margins - must clear the largest body extent (77mm rear)
-# plus clearance so the robot doesn't physically contact the wall.
-OUTER_WALL_MARGIN = SWEPT_RADIUS + 15  # 115mm, clears worst-case rear corner sweep + 15mm gap
-DIVIDER_MARGIN = 125                  # 1 full cell around the divider (prevents tag occlusion)
+# Outer wall margin: at least ROBOT_RADIUS so frontier assignment never
+# sends robots to cells they can't physically reach without hitting the wall.
+OUTER_WALL_MARGIN = ROBOT_RADIUS      # ~110mm — excludes perimeter cells
+DIVIDER_MARGIN = BODY_HALF_WIDTH       # 64mm — robot body extends this far from center
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = 300                  # mm — wide soft repulsion, strong enough to stop
-                                      # a robot heading straight at a wall by ~215mm out
+REPULSION_ZONE = 220                  # mm — soft repulsion, wide enough to steer clear
 
 # ============== REIP Trust Parameters ==============
 # Three-tier confidence weights
@@ -196,25 +195,30 @@ class PeerInfo:
 class Hardware:
     def __init__(self):
         self._uart_lock = threading.Lock()
+        self.hw_ok = False
         if not HARDWARE_AVAILABLE:
             print("  Hardware: SIMULATED")
             return
-            
-        # UART to Pico
-        self.uart = serial.Serial('/dev/serial0', 115200, timeout=0.1)
-        time.sleep(0.5)
-        self.uart.reset_input_buffer()
-        
-        # I2C for ToF
-        self.bus = smbus.SMBus(1)
-        self.i2c = busio.I2C(board.SCL, board.SDA)
-        self.MUX_ADDR = 0x70
-        
-        # ToF sensor cache
-        self.tof_sensors = {}
-        self._init_tof_sensors()
-        
-        self._ping_pico()
+
+        for attempt in range(2):
+            try:
+                self.uart = serial.Serial('/dev/serial0', 115200, timeout=0.1)
+                time.sleep(0.5)
+                self.uart.reset_input_buffer()
+                self.bus = smbus.SMBus(1)
+                self.i2c = busio.I2C(board.SCL, board.SDA)
+                self.MUX_ADDR = 0x70
+                self.tof_sensors = {}
+                self._init_tof_sensors()
+                self._ping_pico()
+                self.hw_ok = True
+                break
+            except Exception as e:
+                print(f"  Hardware init attempt {attempt+1} failed: {e}")
+                if attempt == 0:
+                    time.sleep(1)
+        if not self.hw_ok:
+            print("  WARNING: Hardware init failed, running with degraded sensors")
     
     def _ping_pico(self):
         if not HARDWARE_AVAILABLE:
@@ -323,6 +327,7 @@ class REIPNode:
         self.theta = 0.0
         self.state = RobotState.IDLE
         self.position_timestamp = 0.0
+        self._pos_initialized = False
         
         # Sensor data
         self.tof = {}
@@ -359,7 +364,7 @@ class REIPNode:
         self.current_navigation_target: Optional[Tuple[float, float]] = None  # What I'm ACTUALLY navigating to
         
         # Assignment staleness
-        self.ASSIGNMENT_STALE_TIME = 1.0  # seconds (snappy recovery after impeachment)
+        self.ASSIGNMENT_STALE_TIME = 5.0  # seconds — must survive WiFi drops (leader broadcasts at 5Hz)
         
         # Coverage - with timestamps for causality-aware trust
         self.coverage_width = int(ARENA_WIDTH / CELL_SIZE)
@@ -379,6 +384,9 @@ class REIPNode:
         # Network sockets
         self._init_sockets()
         
+        # Trial gating — motors stay off until explicit "start" command
+        self.trial_started = False
+
         # Fault injection state
         self.injected_fault = None  # Motor faults: 'spin', 'stop', 'erratic'
         self.bad_leader_mode = False  # Leadership fault: send bad assignments
@@ -512,34 +520,36 @@ class REIPNode:
                 if msg.get('type') == 'position':
                     msg_rid = msg.get('robot_id')
                     if msg_rid == self.robot_id:
-                        self.x = msg['x']
-                        self.y = msg['y']
+                        POS_EMA = 0.5
+                        raw_x, raw_y = msg['x'], msg['y']
+                        if not self._pos_initialized:
+                            self.x = raw_x
+                            self.y = raw_y
+                            self._pos_initialized = True
+                        else:
+                            self.x += POS_EMA * (raw_x - self.x)
+                            self.y += POS_EMA * (raw_y - self.y)
                         self.theta = msg['theta']
                         self.position_timestamp = msg.get('timestamp', time.time())
                         
-                        # Mark cells the robot body overlaps as visited.
+                        # Mark cells the robot body covers as visited.
+                        # Robot body is 128mm wide, cell is 125mm — the robot
+                        # physically overlaps the center cell plus its direct
+                        # neighbors.  Only mark non-wall cells.
                         now = time.time()
-                        min_cx = max(0, int((self.x - BODY_RADIUS) / CELL_SIZE))
-                        max_cx = min(self.coverage_width - 1,
-                                     int((self.x + BODY_RADIUS) / CELL_SIZE))
-                        min_cy = max(0, int((self.y - BODY_RADIUS) / CELL_SIZE))
-                        max_cy = min(self.coverage_height - 1,
-                                     int((self.y + BODY_RADIUS) / CELL_SIZE))
-                        robot_left = self.x < INTERIOR_WALL_X_LEFT
-                        for _cx in range(min_cx, max_cx + 1):
-                            for _cy in range(min_cy, max_cy + 1):
-                                if self.y < INTERIOR_WALL_Y_END:
-                                    cell_center_x = (_cx + 0.5) * CELL_SIZE
-                                    if robot_left and cell_center_x > INTERIOR_WALL_X_LEFT:
-                                        continue
-                                    if not robot_left and cell_center_x < INTERIOR_WALL_X_RIGHT:
-                                        continue
-                                _cell = (_cx, _cy)
-                                if _cell not in self.my_visited:
-                                    self.my_visited[_cell] = now
-                                    if _cell not in self.known_visited:
-                                        self.known_visited.add(_cell)
-                                        self.known_visited_time[_cell] = now
+                        _cell = self.get_cell(self.x, self.y)
+                        if _cell is not None:
+                            cx, cy = _cell
+                            for dx, dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)):
+                                nc = (cx+dx, cy+dy)
+                                if (0 <= nc[0] < self.coverage_width and
+                                    0 <= nc[1] < self.coverage_height and
+                                    not self._is_wall_cell(nc[0], nc[1]) and
+                                    nc not in self.my_visited):
+                                    self.my_visited[nc] = now
+                                    if nc not in self.known_visited:
+                                        self.known_visited.add(nc)
+                                        self.known_visited_time[nc] = now
                 
                 # Handle relayed peer states (from visual_sim acting as relay)
                 elif msg.get('type') == 'peer_state':
@@ -580,8 +590,6 @@ class REIPNode:
             return True
         if y < INTERIOR_WALL_Y_END and (
             INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
-            return True
-        if INTERIOR_WALL_X_LEFT - BODY_RADIUS < x < INTERIOR_WALL_X_RIGHT + BODY_RADIUS:
             return True
         return False
 
@@ -1111,12 +1119,24 @@ class REIPNode:
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen < PEER_TIMEOUT:
                 robots[pid] = (peer.x, peer.y)
-        
+
+        # Passage yielding: the passage (y>1200, x near divider) is ~190mm
+        # after margins — one robot fits, two jam.  Count how many robots
+        # are currently in the passage zone so the assignment logic can
+        # avoid sending more than one through at a time.
+        PASSAGE_Y_START = INTERIOR_WALL_Y_END          # 1200mm
+        PASSAGE_X_MIN = INTERIOR_WALL_X_LEFT - ROBOT_RADIUS   # ~890mm
+        PASSAGE_X_MAX = INTERIOR_WALL_X_RIGHT + ROBOT_RADIUS  # ~1146mm
+        robots_in_passage = set()
+        for rid, pos in robots.items():
+            if pos[1] > PASSAGE_Y_START and PASSAGE_X_MIN < pos[0] < PASSAGE_X_MAX:
+                robots_in_passage.add(rid)
+
         # === ASSIGNMENT PERSISTENCE (Hysteresis) ===
-        # Keep previous assignments if their target frontier is still unexplored.
-        # This prevents assignment instability where the greedy algorithm oscillates
-        # between equidistant frontiers, producing high Ω in normal operation.
-        # Only reassign when a target has been explored or the robot disconnected.
+        # Keep previous assignments if their target frontier is still unexplored
+        # AND the robot hasn't already reached it.  The proximity check closes
+        # the loop when WiFi drops prevent visited_cells from arriving: the
+        # leader can see the robot is at its target and will reassign.
         still_valid = {}
         assigned_frontiers = set()
         for rid_str, prev_target in self._prev_assignments.items():
@@ -1124,7 +1144,14 @@ class REIPNode:
             if rid in robots:
                 cell = self.pos_to_cell(prev_target)
                 if cell in frontier_set:
-                    # Previous assignment still valid (target unexplored)
+                    pos = robots[rid]
+                    dist = math.sqrt((pos[0] - prev_target[0])**2 +
+                                     (pos[1] - prev_target[1])**2)
+                    if dist < CELL_SIZE:
+                        # Robot reached target — treat as explored, reassign
+                        self.known_visited.add(cell)
+                        self.known_visited_time[cell] = time.time()
+                        continue
                     still_valid[rid_str] = prev_target
                     assigned_frontiers.add(cell)
         
@@ -1142,25 +1169,120 @@ class REIPNode:
                            for f in available_frontiers)
             sorted_robots = sorted(need_assignment, key=nearest_frontier_dist)
             
+            MIN_TARGET_SPACING = CELL_SIZE * 3
+            wall_cx = int(INTERIOR_WALL_X_LEFT / CELL_SIZE)
+
             for rid in sorted_robots:
                 pos = robots[rid]
+                robot_on_left = pos[0] < INTERIOR_WALL_X_LEFT
                 best_frontier = None
                 best_dist = float('inf')
-                
+
+                # Passage yielding: if someone else is already in the
+                # passage, don't send this robot cross-room (it would
+                # jam the passage).  The robot already IN the passage
+                # keeps its assignment.
+                passage_blocked = (len(robots_in_passage) > 0 and
+                                   rid not in robots_in_passage)
+
                 for frontier in available_frontiers:
                     if frontier in assigned_frontiers:
                         continue
                     frontier_pos = self.cell_to_pos(frontier)
+
+                    # Skip cross-room frontiers if passage is blocked
+                    frontier_on_left = frontier[0] < wall_cx
+                    if passage_blocked and frontier_on_left != robot_on_left:
+                        continue
+
+                    too_close = False
+                    for _, existing_tgt in still_valid.items():
+                        if self.distance(frontier_pos, existing_tgt) < MIN_TARGET_SPACING:
+                            too_close = True
+                            break
+                    if too_close:
+                        continue
+
                     dist = self.path_distance(pos, frontier_pos)
                     if dist < best_dist:
                         best_dist = dist
                         best_frontier = frontier
-                
+
+                if not best_frontier:
+                    for frontier in available_frontiers:
+                        if frontier in assigned_frontiers:
+                            continue
+                        frontier_pos = self.cell_to_pos(frontier)
+                        dist = self.path_distance(pos, frontier_pos)
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_frontier = frontier
+
                 if best_frontier:
                     assigned_frontiers.add(best_frontier)
                     target = self.cell_to_pos(best_frontier)
                     still_valid[str(rid)] = target
         
+        # Spatial diversity: ensure at least one robot is assigned to
+        # the other room if it has unexplored cells.  Without this, the
+        # greedy algorithm keeps all robots in whichever room they started.
+        wall_cx = int(INTERIOR_WALL_X_LEFT / CELL_SIZE)
+        room_a_assigned = 0
+        room_b_assigned = 0
+        for _, tgt in still_valid.items():
+            tcx = int(tgt[0] / CELL_SIZE)
+            if tcx < wall_cx:
+                room_a_assigned += 1
+            else:
+                room_b_assigned += 1
+
+        room_b_frontiers = [f for f in available_frontiers
+                            if f not in assigned_frontiers and f[0] >= wall_cx]
+        room_a_frontiers = [f for f in available_frontiers
+                            if f not in assigned_frontiers and f[0] < wall_cx]
+
+        # Spatial diversity: ensure at least one robot targets each room —
+        # BUT only if the passage is clear.  Forcing a cross-room assignment
+        # while someone is already in the passage causes the pile-up.
+        if len(robots_in_passage) == 0:
+            if room_b_assigned == 0 and room_b_frontiers and len(still_valid) >= 2:
+                worst_rid = None
+                worst_dist = -1
+                for rid_str, tgt in still_valid.items():
+                    rid = int(rid_str)
+                    if rid == self.robot_id:
+                        continue
+                    if rid in robots:
+                        d = self.path_distance(robots[rid], tgt)
+                        if d > worst_dist:
+                            worst_dist = d
+                            worst_rid = rid_str
+                if worst_rid is not None:
+                    rid = int(worst_rid)
+                    pos = robots[rid]
+                    best_b = min(room_b_frontiers,
+                                 key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
+                    still_valid[worst_rid] = self.cell_to_pos(best_b)
+
+            if room_a_assigned == 0 and room_a_frontiers and len(still_valid) >= 2:
+                worst_rid = None
+                worst_dist = -1
+                for rid_str, tgt in still_valid.items():
+                    rid = int(rid_str)
+                    if rid == self.robot_id:
+                        continue
+                    if rid in robots:
+                        d = self.path_distance(robots[rid], tgt)
+                        if d > worst_dist:
+                            worst_dist = d
+                            worst_rid = rid_str
+                if worst_rid is not None:
+                    rid = int(worst_rid)
+                    pos = robots[rid]
+                    best_a = min(room_a_frontiers,
+                                 key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
+                    still_valid[worst_rid] = self.cell_to_pos(best_a)
+
         # Build final assignments
         assignments = dict(still_valid)
         
@@ -1313,6 +1435,21 @@ class REIPNode:
         wall_cell_y_end = int(INTERIOR_WALL_Y_END / CELL_SIZE)
         robot_on_left = my_cell[0] < wall_cell_x_left
 
+        # Check if any peer is currently in the passage
+        PASSAGE_Y_START = INTERIOR_WALL_Y_END
+        PASSAGE_X_MIN = INTERIOR_WALL_X_LEFT - ROBOT_RADIUS
+        PASSAGE_X_MAX = INTERIOR_WALL_X_RIGHT + ROBOT_RADIUS
+        peer_in_passage = False
+        me_in_passage = (self.y > PASSAGE_Y_START and
+                         PASSAGE_X_MIN < self.x < PASSAGE_X_MAX)
+        if not me_in_passage:
+            for p in self.peers.values():
+                if (time.time() - p.last_seen < PEER_TIMEOUT and
+                    p.y > PASSAGE_Y_START and
+                    PASSAGE_X_MIN < p.x < PASSAGE_X_MAX):
+                    peer_in_passage = True
+                    break
+
         best_dist = float('inf')
         best_cell = None
 
@@ -1322,9 +1459,13 @@ class REIPNode:
                 if cell in self.known_visited or self._is_wall_cell(cx, cy):
                     continue
 
+                cell_on_left = cx < wall_cell_x_left
+                # Hard-skip cross-room if passage is occupied by a peer
+                if peer_in_passage and cell_on_left != robot_on_left:
+                    continue
+
                 dist = abs(cx - my_cell[0]) + abs(cy - my_cell[1])
 
-                cell_on_left = cx < wall_cell_x_left
                 if robot_on_left != cell_on_left and cy < wall_cell_y_end:
                     detour_up = max(0, wall_cell_y_end + 2 - my_cell[1])
                     detour_down = max(0, wall_cell_y_end + 2 - cy)
@@ -1423,7 +1564,21 @@ class REIPNode:
                     if hasattr(self, '_bad_assignments_cache'):
                         self._bad_assignments_cache.clear()
             
-            # Update my state
+            # Split-brain resolution: if I think I'm leader but a trusted
+            # peer with a lower ID also claims leadership, yield to them.
+            # This converges within one election cycle even under packet loss.
+            if self.current_leader == self.robot_id:
+                for pid, peer in self.peers.items():
+                    if (peer.state == 'leader' and pid < self.robot_id and
+                        time.time() - peer.last_seen < PEER_TIMEOUT and
+                        peer.my_trust_for_them > TRUST_THRESHOLD):
+                        self.current_leader = pid
+                        self.trust_in_leader = 1.0
+                        self.suspicion_of_leader = 0.0
+                        self._prev_assignments.clear()
+                        print(f"[ELECTION] Yielding to lower-ID leader R{pid}")
+                        break
+
             if self.current_leader == self.robot_id:
                 self.state = RobotState.LEADER
             else:
@@ -1453,11 +1608,22 @@ class REIPNode:
         self._nav_history = []
         self._escape_until = 0
         self._escape_start = 0
+        self._stuck_count = 0
+        self._tof_emergency_count = 0
+
+    def _init_heading_pd(self):
+        self._smooth_theta = None       # EMA-filtered heading
+        self._prev_heading_err = None   # previous error for D term
+        self._prev_heading_t = 0.0      # timestamp of previous error
+        self._in_pivot = False          # hysteresis flag for pivot turns
 
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
-        25mm threshold catches lateral drift along walls that smaller
-        thresholds miss.  0.5s window fires before the robot digs in."""
+        Skips during pivot turns — the robot intentionally stays in place."""
+        if self._in_pivot:
+            self._nav_history.clear()
+            return False
+
         now = time.time()
 
         if now - self.position_timestamp > 1.0:
@@ -1474,58 +1640,89 @@ class REIPNode:
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
         return elapsed > 0.5 and moved < 25
 
+    def _nearest_navigable_cell(self, cx, cy):
+        """BFS from a wall cell to find the closest non-wall cell."""
+        from collections import deque
+        W, H = self.coverage_width, self.coverage_height
+        q = deque([(cx, cy)])
+        seen = {(cx, cy)}
+        while q:
+            x, y = q.popleft()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < W and 0 <= ny < H and (nx, ny) not in seen:
+                    seen.add((nx, ny))
+                    if not self._is_wall_cell(nx, ny):
+                        return (nx, ny)
+                    q.append((nx, ny))
+        return None
+
     def _route_around_wall(self, target):
-        """If target is across the interior wall, route through the passage.
-        Hardware equivalent of visual_sim's A* pathfinding.
+        """A* pathfinding on the cell grid — mirrors sim's GridWorld pathfinder.
+        Returns the next waypoint (center of the second cell on the path)
+        so the reactive heading controller drives toward it."""
+        import heapq
 
-        Three-stage routing:
-          Stage 0 → go up on your side to the passage entrance
-          Stage 1 → cross above the wall to the other side
-          Stage 2 → done, proceed to real target
-
-        Uses persistent _wall_route_stage so the robot doesn't oscillate
-        between waypoint and final target.
-        """
-        tx, ty = target
-        on_left = self.x < INTERIOR_WALL_X_LEFT
-        target_on_left = tx < INTERIOR_WALL_X_LEFT
-
-        if not hasattr(self, '_wall_route_stage'):
-            self._wall_route_stage = 0
-            self._wall_route_side = None
-
-        different_sides = on_left != target_on_left
-
-        if not different_sides:
-            self._wall_route_stage = 0
-            self._wall_route_side = None
+        my_cell = self.get_cell(self.x, self.y)
+        tgt_cell = self.get_cell(target[0], target[1])
+        if my_cell is None or tgt_cell is None or my_cell == tgt_cell:
             return target
 
-        if self._wall_route_stage == 0 and self.y > INTERIOR_WALL_Y_END + 80:
+        W = self.coverage_width
+        H = self.coverage_height
+        tof_blocked = self.tof_obstacles
+
+        # If starting in a wall cell (corner/edge), find the nearest
+        # navigable cell and head there first.  A* can't route out of
+        # wall cells because all 4-connected neighbors are also walls.
+        if self._is_wall_cell(*my_cell):
+            escape = self._nearest_navigable_cell(*my_cell)
+            if escape:
+                return self.cell_to_pos(escape)
             return target
 
-        passage_y = INTERIOR_WALL_Y_END + 70
-        clearance = DIVIDER_MARGIN + 70
-        rid_offset = (self.robot_id % 5) * 10 - 20
+        # If target is in a wall cell, snap to nearest navigable cell
+        if self._is_wall_cell(*tgt_cell):
+            snap = self._nearest_navigable_cell(*tgt_cell)
+            if snap:
+                tgt_cell = snap
+                target = self.cell_to_pos(snap)
 
-        if self._wall_route_stage == 0:
-            self._wall_route_side = on_left
-            wp_x = (INTERIOR_WALL_X_LEFT - clearance) if on_left else (INTERIOR_WALL_X_RIGHT + clearance)
-            wp = [wp_x, passage_y + rid_offset]
-            if math.sqrt((self.x - wp_x)**2 + (self.y - passage_y - rid_offset)**2) < 130:
-                self._wall_route_stage = 1
-            return wp
+        def neighbors(cx, cy):
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < W and 0 <= ny < H:
+                    if self._is_wall_cell(nx, ny):
+                        continue
+                    if (nx, ny) in tof_blocked and (nx, ny) != tgt_cell:
+                        continue
+                    yield (nx, ny)
 
-        if self._wall_route_stage == 1:
-            other_side = not self._wall_route_side
-            wp_x = (INTERIOR_WALL_X_LEFT - clearance) if other_side else (INTERIOR_WALL_X_RIGHT + clearance)
-            wp = [wp_x, passage_y + rid_offset]
-            if math.sqrt((self.x - wp_x)**2 + (self.y - passage_y - rid_offset)**2) < 130:
-                self._wall_route_stage = 2
-            return wp
+        def heuristic(a, b):
+            return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-        self._wall_route_stage = 0
-        self._wall_route_side = None
+        start = my_cell
+        goal = tgt_cell
+        open_set = [(heuristic(start, goal), 0, start)]
+        came_from = {start: None}
+        g_score = {start: 0}
+
+        while open_set:
+            _, g, cur = heapq.heappop(open_set)
+            if cur == goal:
+                path_cell = goal
+                while came_from.get(path_cell) is not None and came_from[path_cell] != start:
+                    path_cell = came_from[path_cell]
+                return self.cell_to_pos(path_cell)
+            if g > g_score.get(cur, float('inf')):
+                continue
+            for nb in neighbors(*cur):
+                ng = g + 1
+                if ng < g_score.get(nb, float('inf')):
+                    g_score[nb] = ng
+                    came_from[nb] = cur
+                    heapq.heappush(open_set, (ng + heuristic(nb, goal), ng, nb))
+
         return target
 
     def _wall_slide_heading(self, desired_angle):
@@ -1571,7 +1768,7 @@ class REIPNode:
                 repel_x += (tip_dx / tip_dist) * tip_strength
                 repel_y += (tip_dy / tip_dist) * tip_strength
 
-        REPEL_GAIN = 12.0
+        REPEL_GAIN = 8.0
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
@@ -1659,6 +1856,8 @@ class REIPNode:
         """
         if not hasattr(self, '_nav_history'):
             self._init_stuck_detection()
+        if not hasattr(self, '_smooth_theta'):
+            self._init_heading_pd()
 
         # Handle injected faults (identical to sim)
         if self.injected_fault == 'spin':
@@ -1669,15 +1868,29 @@ class REIPNode:
             return (random.uniform(-BASE_SPEED, BASE_SPEED),
                    random.uniform(-BASE_SPEED, BASE_SPEED))
 
-        # Escape mode: reverse briefly, then turn and drive away from obstacle.
+        # Escape mode: pivot toward escape angle, then drive away.
+        # When in a wall zone, skip blind reverse — reversing pushes
+        # the robot deeper into the wall it's already stuck against.
         if time.time() < self._escape_until:
             phase_elapsed = time.time() - self._escape_start
             escape_angle = getattr(self, '_escape_angle', math.atan2(
                 ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x))
 
-            if phase_elapsed < 0.6:
+            in_wall_zone = (
+                self.x < OUTER_WALL_MARGIN + 50 or
+                self.x > ARENA_WIDTH - OUTER_WALL_MARGIN - 50 or
+                self.y < OUTER_WALL_MARGIN + 50 or
+                self.y > ARENA_HEIGHT - OUTER_WALL_MARGIN - 50 or
+                (self.y < INTERIOR_WALL_Y_END and
+                 abs(self.x - INTERIOR_WALL_X) < DIVIDER_MARGIN + 80)
+            )
+
+            reverse_dur = 0.0 if in_wall_zone else 0.4
+            pivot_end = reverse_dur + 0.6
+
+            if phase_elapsed < reverse_dur:
                 return (-BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
-            elif phase_elapsed < 1.2:
+            elif phase_elapsed < pivot_end:
                 diff = escape_angle - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
                 while diff < -math.pi: diff += 2 * math.pi
@@ -1696,28 +1909,27 @@ class REIPNode:
                 self._stuck_count = max(0, self._stuck_count - 1)
                 return (left, right)
 
-        # ToF emergency: ANY sensor reading < 120mm triggers reverse.
-        # All 5 sensors checked — catches side collisions (divider, peers).
-        # 120mm from sensor ≈ 190mm from ArUco center, gives time to react
-        # even with 100ms mux latency + 100ms control loop.
+        # ToF emergency: FRONT-FACING sensors only (front, front_left, front_right).
+        # Side sensors read close when driving parallel to walls — that's normal
+        # and must NOT trigger emergency reversal.
         TOF_EMERGENCY_DIST = 120
-        if not hasattr(self, '_tof_emergency_count'):
-            self._tof_emergency_count = 0
 
-        front_d = self.tof.get('front', 999)
-        fl_d = self.tof.get('front_left', 999)
-        fr_d = self.tof.get('front_right', 999)
-        left_d = self.tof.get('left', 999)
-        right_d = self.tof.get('right', 999)
-        all_tof = [front_d, fl_d, fr_d, left_d, right_d]
-        min_any = min(all_tof)
+        front_d = self.tof.get('front', 9999)
+        fl_d = self.tof.get('front_left', 9999)
+        fr_d = self.tof.get('front_right', 9999)
+        left_d = self.tof.get('left', 9999)
+        right_d = self.tof.get('right', 9999)
+        if front_d <= 0: front_d = 9999
+        if fl_d <= 0: fl_d = 9999
+        if fr_d <= 0: fr_d = 9999
+        if left_d <= 0: left_d = 9999
+        if right_d <= 0: right_d = 9999
+        min_front = min(front_d, fl_d, fr_d)
 
-        if min_any > 20 and min_any < TOF_EMERGENCY_DIST:
+        if min_front > 20 and min_front < TOF_EMERGENCY_DIST:
             self._tof_emergency_count += 1
             if self._tof_emergency_count >= 3:
                 self._tof_emergency_count = 0
-                if not hasattr(self, '_stuck_count'):
-                    self._stuck_count = 0
                 self._stuck_count += 1
                 escape_time = min(2.0 + self._stuck_count * 0.5, 4.0)
                 self._escape_until = time.time() + escape_time
@@ -1752,6 +1964,37 @@ class REIPNode:
         else:
             self._tof_emergency_count = 0
 
+        # Peer collision: if touching another robot, pivot away immediately.
+        # Don't drive forward at all — forward motion just pushes both robots
+        # together harder. Pure rotation to face the flee direction, then the
+        # normal nav code takes over once there's clearance.
+        _closest_peer_dist = 9999.0
+        _flee_px, _flee_py = 0.0, 0.0
+        for pid, peer in self.peers.items():
+            if time.time() - peer.last_seen > PEER_TIMEOUT:
+                continue
+            pdx = self.x - peer.x
+            pdy = self.y - peer.y
+            pdist = math.sqrt(pdx * pdx + pdy * pdy)
+            if pdist < _closest_peer_dist:
+                _closest_peer_dist = pdist
+            if pdist < ROBOT_RADIUS * 1.5 and pdist > 5:
+                _flee_px += pdx / pdist
+                _flee_py += pdy / pdist
+        if _closest_peer_dist < ROBOT_RADIUS * 1.5 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+            flee_angle = math.atan2(_flee_py, _flee_px)
+            diff = flee_angle - self.theta
+            while diff > math.pi: diff -= 2 * math.pi
+            while diff < -math.pi: diff += 2 * math.pi
+            if abs(diff) > math.pi * 0.3:
+                pivot_spd = BASE_SPEED * 0.7
+                if diff > 0:
+                    return (pivot_spd, -pivot_spd)
+                else:
+                    return (-pivot_spd, pivot_spd)
+            else:
+                return (BASE_SPEED * 0.5, BASE_SPEED * 0.5)
+
         # --- Target selection (identical to sim) ---
         target = None
 
@@ -1776,8 +2019,25 @@ class REIPNode:
                     self.leader_assigned_target = None
 
         if not target:
-            self.current_navigation_target = None
-            return (0, 0)
+            return (0.0, 0.0)
+
+        # Arrival detection: mark the target cell as visited.
+        # DO NOT clear the leader assignment here.  The leader will see
+        # the cell in known_visited (via our broadcast) or notice we're
+        # at the target (proximity check) and reassign on its next cycle.
+        # Clearing it here causes the robot to immediately fall back to
+        # local frontier, which defeats the whole point of having a leader.
+        ARRIVAL_RADIUS = CELL_SIZE
+        dist_to_target = math.sqrt((self.x - target[0])**2 + (self.y - target[1])**2)
+        if dist_to_target < ARRIVAL_RADIUS:
+            cell = self.get_cell(target[0], target[1])
+            now = time.time()
+            if cell not in self.my_visited:
+                self.my_visited[cell] = now
+            if cell not in self.known_visited:
+                self.known_visited.add(cell)
+                self.known_visited_time[cell] = now
+            self._stuck_count = 0
 
         # Clamp target outside physical body margin (outer walls + divider).
         tx = max(OUTER_WALL_MARGIN, min(ARENA_WIDTH - OUTER_WALL_MARGIN, target[0]))
@@ -1794,12 +2054,19 @@ class REIPNode:
         # Route around interior wall (equivalent to sim's A* pathfinding)
         target = self._route_around_wall(target)
 
-        # Stuck detection → escape: reverse, then drive to open space
+        # If we've moved into open space, reset the stuck escalation counter
+        # so the robot doesn't carry over long escape durations from a corner.
+        if (self.x > OUTER_WALL_MARGIN + 50 and
+            self.x < ARENA_WIDTH - OUTER_WALL_MARGIN - 50 and
+            self.y > OUTER_WALL_MARGIN + 50 and
+            self.y < ARENA_HEIGHT - OUTER_WALL_MARGIN - 50):
+            if self._stuck_count > 0:
+                self._stuck_count = max(0, self._stuck_count - 1)
+
+        # Stuck detection → escape: pivot away, then drive to open space
         if self._check_stuck():
-            if not hasattr(self, '_stuck_count'):
-                self._stuck_count = 0
             self._stuck_count += 1
-            escape_time = min(2.0 + self._stuck_count * 0.5, 4.0)
+            escape_time = min(1.5 + self._stuck_count * 0.3, 3.0)
             self._escape_until = time.time() + escape_time
             self._escape_start = time.time()
             self._nav_history.clear()
@@ -1848,59 +2115,95 @@ class REIPNode:
         target_angle = self._wall_slide_heading(target_angle)
         target_angle = self._peer_avoidance_heading(target_angle)
 
-        diff = target_angle - self.theta
+        # EMA-filtered heading to suppress ArUco jitter (~5-10° per frame)
+        EMA_ALPHA = 0.35
+        if self._smooth_theta is None:
+            self._smooth_theta = self.theta
+        else:
+            delta = self.theta - self._smooth_theta
+            while delta > math.pi: delta -= 2 * math.pi
+            while delta < -math.pi: delta += 2 * math.pi
+            self._smooth_theta += EMA_ALPHA * delta
+            while self._smooth_theta > math.pi: self._smooth_theta -= 2 * math.pi
+            while self._smooth_theta < -math.pi: self._smooth_theta += 2 * math.pi
+
+        diff = target_angle - self._smooth_theta
         while diff > math.pi: diff -= 2 * math.pi
         while diff < -math.pi: diff += 2 * math.pi
 
-        turn = max(-1, min(1, diff / (math.pi / 3)))
+        KP = 1.0 / (math.pi / 2)
+        KD = 0.2
+        HEADING_DEADBAND = 0.10  # ~5.7° — wider to ignore ArUco noise
+        if abs(diff) < HEADING_DEADBAND:
+            diff = 0.0
+
+        now = time.time()
+        d_term = 0.0
+        if self._prev_heading_err is not None and self._prev_heading_t > 0:
+            dt = now - self._prev_heading_t
+            if 0.01 < dt < 0.5:
+                d_err = diff - self._prev_heading_err
+                while d_err > math.pi: d_err -= 2 * math.pi
+                while d_err < -math.pi: d_err += 2 * math.pi
+                d_term = KD * (d_err / dt) / (math.pi / 2)
+        self._prev_heading_err = diff
+        self._prev_heading_t = now
+
+        turn = max(-1, min(1, KP * diff + d_term))
 
         # ToF-based reactive turn bias: sensors see an obstacle within 200mm,
         # bias turn away. Includes front sensor so the robot steers away from
         # head-on obstacles early (before the 70mm emergency threshold).
         TOF_BIAS_DIST = 300
-        fl = self.tof.get('front_left', 999)
-        fr = self.tof.get('front_right', 999)
-        front_tof = self.tof.get('front', 999)
-        left_tof = self.tof.get('left', 999)
-        right_tof = self.tof.get('right', 999)
+        fl = self.tof.get('front_left', 9999)
+        fr = self.tof.get('front_right', 9999)
+        front_tof = self.tof.get('front', 9999)
+        left_tof = self.tof.get('left', 9999)
+        right_tof = self.tof.get('right', 9999)
+        if fl <= 0: fl = 9999
+        if fr <= 0: fr = 9999
+        if front_tof <= 0: front_tof = 9999
+        if left_tof <= 0: left_tof = 9999
+        if right_tof <= 0: right_tof = 9999
         tof_bias = 0.0
         if fl < TOF_BIAS_DIST and fl > 20:
-            tof_bias += 0.3 * (TOF_BIAS_DIST - fl) / TOF_BIAS_DIST
+            tof_bias += 0.15 * (TOF_BIAS_DIST - fl) / TOF_BIAS_DIST
         if left_tof < TOF_BIAS_DIST and left_tof > 20:
-            tof_bias += 0.15 * (TOF_BIAS_DIST - left_tof) / TOF_BIAS_DIST
+            tof_bias += 0.08 * (TOF_BIAS_DIST - left_tof) / TOF_BIAS_DIST
         if fr < TOF_BIAS_DIST and fr > 20:
-            tof_bias -= 0.3 * (TOF_BIAS_DIST - fr) / TOF_BIAS_DIST
+            tof_bias -= 0.15 * (TOF_BIAS_DIST - fr) / TOF_BIAS_DIST
         if right_tof < TOF_BIAS_DIST and right_tof > 20:
-            tof_bias -= 0.15 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
+            tof_bias -= 0.08 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
         if front_tof < TOF_BIAS_DIST and front_tof > 20:
             steer_sign = 1.0 if (fl > fr or left_tof > right_tof) else -1.0
-            tof_bias += steer_sign * 0.4 * (TOF_BIAS_DIST - front_tof) / TOF_BIAS_DIST
+            tof_bias += steer_sign * 0.2 * (TOF_BIAS_DIST - front_tof) / TOF_BIAS_DIST
         turn = max(-1, min(1, turn + tof_bias))
 
         # --- Motor command ---
-        # Speed scales with heading alignment: full speed when on-target,
-        # slower when turning hard.  Prevents wide arcs that sweep the body
-        # along walls.  cos(diff) = 1 when aligned, 0 at 90°, -1 at 180°.
+        # Speed: pick the MOST RESTRICTIVE single factor (min, not product).
+        # Product of multiple <1.0 factors compounds to near-zero, stalling
+        # the motors below their dead zone.
         alignment = max(0.0, math.cos(diff))
-        effective_speed = BASE_SPEED * (0.4 + 0.6 * alignment)
+        sf_align = 0.7 + 0.3 * alignment
 
-        # Additional ToF taper near obstacles
-        min_front_tof = min(front_d, fl_d, fr_d)
-        if 20 < min_front_tof < 250:
-            tof_speed_factor = max(0.7, min_front_tof / 250)
-            effective_speed *= tof_speed_factor
-
-        # Near obstacles: widen the turn differential so the robot turns
-        # harder without losing forward motion.  Normal: turn * 0.5 per wheel.
-        # Near obstacle: turn * 0.7 per wheel → stronger rotation.
-        min_wall_dist = min(
-            self.x, ARENA_WIDTH - self.x,
-            self.y, ARENA_HEIGHT - self.y)
+        SPEED_TAPER_ZONE = 250
+        wall_dists = [self.x, ARENA_WIDTH - self.x,
+                      self.y, ARENA_HEIGHT - self.y]
         if self.y < INTERIOR_WALL_Y_END:
             if self.x < INTERIOR_WALL_X_LEFT:
-                min_wall_dist = min(min_wall_dist, INTERIOR_WALL_X_LEFT - self.x)
+                wall_dists.append(INTERIOR_WALL_X_LEFT - self.x)
             elif self.x > INTERIOR_WALL_X_RIGHT:
-                min_wall_dist = min(min_wall_dist, self.x - INTERIOR_WALL_X_RIGHT)
+                wall_dists.append(self.x - INTERIOR_WALL_X_RIGHT)
+        nearest_wall = min(wall_dists)
+        sf_wall = 1.0
+        if nearest_wall < SPEED_TAPER_ZONE:
+            sf_wall = 0.45 + 0.55 * (nearest_wall / SPEED_TAPER_ZONE)
+
+        min_front_tof = min(front_d, fl_d, fr_d)
+        sf_tof = 1.0
+        if 20 < min_front_tof < 250:
+            sf_tof = max(0.5, min_front_tof / 250)
+
         min_peer_dist = 9999.0
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > PEER_TIMEOUT:
@@ -1908,23 +2211,37 @@ class REIPNode:
             d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
             min_peer_dist = min(min_peer_dist, d)
 
-        min_obstacle_dist = min(min_wall_dist, min_peer_dist)
-        TURN_BOOST_DIST = 300  # mm, start boosting turn authority
-        if min_obstacle_dist < TURN_BOOST_DIST:
-            proximity = 1.0 - (min_obstacle_dist / TURN_BOOST_DIST)
-            if min_obstacle_dist < 150:
-                # Very close: allow near-pivot (slow wheel ~5%) so robot
-                # rotates in place instead of arcing along the wall
-                turn_mix = 0.95
-            else:
-                turn_mix = 0.5 + 0.4 * proximity  # ramp 0.5 → 0.9
-        else:
-            turn_mix = 0.5
+        sf_peer = 1.0
+        if min_peer_dist < ROBOT_RADIUS * 1.5:
+            sf_peer = 0.10
+        elif min_peer_dist < 400:
+            sf_peer = 0.3 + 0.7 * (min_peer_dist / 400)
 
         MIN_MOTOR_PWM = 25  # Below this, N20 100:1 can't move 217g
+        effective_speed = BASE_SPEED * min(sf_align, sf_wall, sf_tof, sf_peer)
+        effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
+
+        turn_mix = 0.55
+
+        # Pivot turn with hysteresis.  Only pivot for near-reversals;
+        # the differential drive handles everything up to ~110° as an arc.
+        PIVOT_ENTER = math.pi * 0.61   # ~110° — only near-U-turns
+        PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
+        if abs(diff) > PIVOT_ENTER:
+            self._in_pivot = True
+        if abs(diff) < PIVOT_EXIT:
+            self._in_pivot = False
+        if self._in_pivot:
+            pivot_speed = BASE_SPEED * 0.55
+            if diff > 0:
+                left_speed, right_speed = -pivot_speed, pivot_speed
+            else:
+                left_speed, right_speed = pivot_speed, -pivot_speed
+            self._last_turn = turn
+            return (left_speed, right_speed)
+
         left_speed = effective_speed * (1 - turn * turn_mix)
         right_speed = effective_speed * (1 + turn * turn_mix)
-        # Ensure neither motor is in the dead zone when trying to turn
         if abs(turn) > 0.1:
             if abs(left_speed) > 0 and abs(left_speed) < MIN_MOTOR_PWM:
                 left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
@@ -1952,10 +2269,19 @@ class REIPNode:
                 msg = json.loads(data.decode())
                 
                 target = msg.get('robot_id')
-                if target == self.robot_id or target == 'all':
+                if target == self.robot_id or target == 'all' or target == 0:
                     fault = msg.get('fault', msg.get('cmd', 'none'))
-                    
-                    if fault in ('none', 'clear'):
+
+                    if fault == 'start':
+                        self.trial_started = True
+                        self.my_visited.clear()
+                        self.known_visited.clear()
+                        self.known_visited_time.clear()
+                        for p in self.peers.values():
+                            p.visited_cells.clear()
+                        print(f"[START] Trial started — coverage reset, motors engaged")
+                        continue
+                    elif fault in ('none', 'clear'):
                         self.injected_fault = None
                         self.bad_leader_mode = False
                         self.oscillate_leader_mode = False
@@ -2043,27 +2369,30 @@ class REIPNode:
         election_count = 0          # Fast-start: first N elections at higher rate
         last_print = 0
         last_log = 0
+        printed_waiting = False
         
         while self.running:
             start = time.time()
-            
-            # Election (check impeachment first to update trust before voting)
-            # In decentralized mode: no leader, no election, no trust
-            # Fast-start: first 3 elections at 0.5s intervals for rapid
-            # peer discovery and leader convergence, then 2.0s steady-state
+
+            if not self.trial_started and not printed_waiting:
+                print(f"[R{self.robot_id}] Waiting for 'start' command...")
+                printed_waiting = True
+
+            # Elections run even before trial starts so the leader is
+            # already elected by the time motors engage.
             elect_interval = (ELECTION_FAST_INTERVAL
                               if election_count < ELECTION_FAST_COUNT
                               else ELECTION_INTERVAL)
             if not self.decentralized_mode and time.time() - last_election > elect_interval:
-                self.check_impeachment()  # Print warning if low trust
-                self.run_election()       # Actually vote and elect
+                self.check_impeachment()
+                self.run_election()
                 last_election = time.time()
                 election_count += 1
             
-            # motor control - stop if position data is stale (tag occluded)
+            # Motors only engage when: trial started + fresh position data.
             left, right = 0.0, 0.0
             pos_age = time.time() - self.position_timestamp
-            if self.position_timestamp > 0 and pos_age < 1.5:
+            if self.trial_started and self.position_timestamp > 0 and pos_age < 1.5:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:

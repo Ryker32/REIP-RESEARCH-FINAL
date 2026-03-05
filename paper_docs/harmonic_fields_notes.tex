@@ -1,0 +1,325 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,decorations.markings}
+\usepackage{hyperref}
+\geometry{margin=1in}
+
+\title{Harmonic Potential Fields for Multi-Robot Exploration:\\
+Theory, Covariant Derivatives, and Natural Dispersion}
+\author{Working Notes --- W.\ R.\ Kollmyer}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{The Problem with Classical Potential Fields}
+
+In a standard artificial potential field, each cell $x$ in the grid
+carries a scalar potential $\phi(x)$ composed of attractive and
+repulsive terms:
+\begin{equation}
+    \phi(x) = \phi_{\text{attract}}(x) + \phi_{\text{repel}}(x)
+\end{equation}
+The robot follows the negative gradient $-\nabla\phi$ toward low
+potential (unexplored territory) and away from high potential
+(obstacles).
+
+This is elegant but has a fatal flaw: \textbf{local minima}.  Where
+the attractive gradient from a frontier balances the repulsive
+gradient from an obstacle, $\nabla\phi = 0$ and the robot stops
+dead.  It hasn't reached its goal; it's trapped in a force
+equilibrium.
+
+\section{Harmonic Functions: No Local Minima by Construction}
+
+A function $\phi : \Omega \to \mathbb{R}$ is \textbf{harmonic} on a
+domain $\Omega$ if it satisfies the Laplace equation:
+\begin{equation}
+    \nabla^2 \phi = \frac{\partial^2 \phi}{\partial x^2} +
+    \frac{\partial^2 \phi}{\partial y^2} = 0
+    \quad \text{in } \Omega
+    \label{eq:laplace}
+\end{equation}
+
+Harmonic functions have a remarkable property --- the
+\textbf{maximum principle}: a harmonic function on a connected domain
+attains its extrema \emph{only on the boundary}.  In other words:
+
+\begin{quote}
+\emph{There are no local minima or maxima in the interior.}
+\end{quote}
+
+Every interior critical point is a saddle, not a trap.  A robot
+following $-\nabla\phi$ is mathematically guaranteed to reach a
+boundary sink without getting stuck.
+
+\subsection{Why This Works for Exploration}
+
+Set the boundary conditions:
+\begin{itemize}
+    \item \textbf{Unexplored frontier cells} $\to$ $\phi = 0$
+    (attractive sinks)
+    \item \textbf{Obstacle / wall cells} $\to$
+    $\frac{\partial\phi}{\partial n} = 0$ (Neumann: zero flux, the
+    robot slides along walls rather than being attracted or repelled)
+    \item \textbf{Explored cells} $\to$ solve Laplace equation
+    (\ref{eq:laplace}) to fill in the field
+\end{itemize}
+
+The resulting field has smooth gradient flow from every explored cell
+toward the nearest frontier, with no local traps, guaranteed.
+
+\subsection{Discrete Laplace Equation on a Grid}
+
+On a grid with cell size $h$, the Laplace equation becomes a
+simple averaging relation.  For interior cell $(i,j)$:
+\begin{equation}
+    \phi_{i,j} = \frac{1}{4}\bigl(\phi_{i+1,j} + \phi_{i-1,j}
+    + \phi_{i,j+1} + \phi_{i,j-1}\bigr)
+    \label{eq:discrete_laplace}
+\end{equation}
+
+Every interior cell's potential is the average of its four neighbors.
+This is solved by \textbf{iterative relaxation} (Gauss--Seidel or
+Jacobi iteration): initialize $\phi$ with boundary values, then
+repeatedly apply (\ref{eq:discrete_laplace}) until convergence.
+On a $16 \times 12$ grid (192 cells), this converges in
+${\sim}50$--$100$ iterations --- comparable to a single BFS.
+
+The gradient at each cell is:
+\begin{align}
+    \frac{\partial\phi}{\partial x}\bigg|_{i,j} &\approx
+    \frac{\phi_{i+1,j} - \phi_{i-1,j}}{2h} \\
+    \frac{\partial\phi}{\partial y}\bigg|_{i,j} &\approx
+    \frac{\phi_{i,j+1} - \phi_{i,j-1}}{2h}
+\end{align}
+
+The robot at cell $(i,j)$ moves in direction
+$-\nabla\phi = \bigl(-\partial_x\phi,\; -\partial_y\phi\bigr)$.
+
+\section{The Multi-Robot Problem: Everyone Chases the Same Sink}
+
+If five robots all follow $-\nabla\phi$ on the same harmonic field,
+they all converge to the same nearest frontier and collide.  The
+field has no concept of ``this sink is already claimed.''
+
+We need a mechanism that \textbf{naturally disperses} robots across
+different frontiers without explicit assignment.
+
+\section{Covariant Derivatives and Curvature-Based Dispersion}
+
+\subsection{Intuition}
+
+The ordinary gradient $\nabla\phi$ tells each robot \emph{which
+direction to go}.  The \textbf{second-order structure} of the
+field --- how the gradient \emph{changes} from cell to cell ---
+tells us something deeper: how many distinct ``channels'' of
+flow exist nearby, how sharply they diverge, and whether a robot
+is in a bottleneck or an open plain.
+
+If we can measure this second-order structure, we can use it to
+spread robots out: send each robot toward a different
+\textbf{flow channel} based on the local curvature of the field.
+
+\subsection{The Hessian: Curvature of the Potential}
+
+The Hessian matrix of $\phi$ at a point captures the local curvature:
+\begin{equation}
+    H(\phi) = \begin{pmatrix}
+    \dfrac{\partial^2\phi}{\partial x^2} &
+    \dfrac{\partial^2\phi}{\partial x\,\partial y} \\[8pt]
+    \dfrac{\partial^2\phi}{\partial x\,\partial y} &
+    \dfrac{\partial^2\phi}{\partial y^2}
+    \end{pmatrix}
+    \label{eq:hessian}
+\end{equation}
+
+Since $\phi$ is harmonic, $\nabla^2\phi = 0$, which means:
+\begin{equation}
+    \frac{\partial^2\phi}{\partial x^2} =
+    -\frac{\partial^2\phi}{\partial y^2}
+    \label{eq:trace_zero}
+\end{equation}
+
+The Hessian is \textbf{traceless}.  Its eigenvalues are
+$\lambda$ and $-\lambda$ for some $\lambda \geq 0$.  The
+eigenvectors define two orthogonal directions:
+\begin{itemize}
+    \item The \textbf{positive eigenvector} $\mathbf{e}_+$: the
+    direction along which the gradient is \emph{increasing}
+    (flow is converging --- a bottleneck or channel)
+    \item The \textbf{negative eigenvector} $\mathbf{e}_-$: the
+    direction along which the gradient is \emph{decreasing}
+    (flow is diverging --- an opening or fork)
+\end{itemize}
+
+The magnitude $|\lambda|$ measures \emph{how strongly} the flow
+is converging or diverging.
+
+\subsection{Using Curvature to Disperse Robots}
+
+Here is the key idea.  At each cell, decompose the robot's movement
+into two components:
+\begin{equation}
+    \mathbf{v} = \underbrace{-\nabla\phi}_{\text{toward frontier}}
+    \;+\; \underbrace{\beta \cdot
+    \mathbf{e}_-}_{\text{dispersion along divergent axis}}
+    \label{eq:dispersion}
+\end{equation}
+
+where $\beta$ is a dispersion gain modulated by:
+\begin{enumerate}
+    \item \textbf{Peer proximity}: $\beta$ increases when other
+    robots are nearby (more need to spread)
+    \item \textbf{Curvature magnitude}: $\beta \propto |\lambda|$
+    (stronger divergence means more room to spread)
+    \item \textbf{Robot identity}: each robot uses a deterministic
+    offset based on its ID to pick a slightly different direction
+    along $\mathbf{e}_-$, e.g.:
+    \begin{equation}
+        \beta_k = \beta_0 \cdot |\lambda| \cdot
+        \sin\!\bigl(\pi k / N\bigr)
+    \end{equation}
+    where $k$ is the robot's rank among nearby peers and $N$ is
+    the peer count.  Robot 1 drifts left along $\mathbf{e}_-$,
+    Robot 2 drifts right, Robot 3 stays centered, etc.
+\end{enumerate}
+
+The result: at every fork in the flow field, robots naturally
+\textbf{peel off into different channels} proportional to the
+curvature, without any explicit assignment or communication
+beyond position broadcasts.
+
+\subsection{Connection to Covariant Derivatives}
+
+In differential geometry, the \textbf{covariant derivative}
+generalizes the ordinary derivative to curved spaces.  For a
+vector field $\mathbf{V}$ (the gradient flow) on a surface
+(the potential landscape), the covariant derivative
+$\nabla_{\mathbf{u}} \mathbf{V}$ measures how $\mathbf{V}$
+changes as you move in direction $\mathbf{u}$:
+\begin{equation}
+    \nabla_{\mathbf{u}} \mathbf{V} = (\mathbf{u} \cdot \nabla)
+    \mathbf{V} + \text{(connection terms from curvature)}
+\end{equation}
+
+On a flat grid the connection terms vanish and this reduces to the
+directional derivative of the flow field, which is exactly the
+Hessian applied to the direction:
+\begin{equation}
+    \nabla_{\mathbf{u}} (-\nabla\phi) = -H(\phi)\,\mathbf{u}
+    \label{eq:covariant}
+\end{equation}
+
+Equation~(\ref{eq:covariant}) tells us: \emph{if a robot at
+position $x$ moves in direction $\mathbf{u}$, the flow field
+rotates by $-H(\phi)\,\mathbf{u}$}.  Large rotation means the
+flow is diverging --- there's a fork.  Small rotation means the
+flow is uniform --- a corridor.
+
+A robot can compute this quantity locally (the Hessian is just
+second-order finite differences on the grid) and use it to decide:
+\begin{itemize}
+    \item $\|{-H\,\mathbf{u}}\|$ is large $\Rightarrow$ I'm
+    at a fork.  Look for a peer-free branch.
+    \item $\|{-H\,\mathbf{u}}\|$ is small $\Rightarrow$ I'm
+    in a corridor.  Follow the gradient normally.
+\end{itemize}
+
+\subsection{Discrete Computation}
+
+On the grid, all quantities are finite differences.  The Hessian
+entries at cell $(i,j)$ are:
+\begin{align}
+    \phi_{xx} &= \frac{\phi_{i+1,j} - 2\phi_{i,j}
+    + \phi_{i-1,j}}{h^2} \\
+    \phi_{yy} &= \frac{\phi_{i,j+1} - 2\phi_{i,j}
+    + \phi_{i,j-1}}{h^2} \\
+    \phi_{xy} &= \frac{\phi_{i+1,j+1} - \phi_{i+1,j-1}
+    - \phi_{i-1,j+1} + \phi_{i-1,j-1}}{4h^2}
+\end{align}
+
+The eigenvalues of the $2 \times 2$ traceless Hessian are:
+\begin{equation}
+    \lambda = \pm\sqrt{\phi_{xx}^2 + \phi_{xy}^2}
+\end{equation}
+
+and the divergent eigenvector (the direction robots should spread
+along) is:
+\begin{equation}
+    \mathbf{e}_- = \frac{1}{\sqrt{\phi_{xx}^2 + \phi_{xy}^2}}
+    \begin{pmatrix}
+        -\phi_{xy} \\
+        \phi_{xx} - \lambda
+    \end{pmatrix}
+\end{equation}
+
+All of this is $O(1)$ per cell.  No pathfinding, no assignment,
+no auction.
+
+\section{Complete Algorithm}
+
+\begin{enumerate}
+    \item \textbf{Solve the harmonic field}: set frontier cells to
+    $\phi = 0$, walls to Neumann BC, iterate
+    (\ref{eq:discrete_laplace}) until convergence.
+    \item \textbf{Compute gradient}: $-\nabla\phi$ at each cell
+    (central differences).
+    \item \textbf{Compute Hessian}: second-order differences,
+    eigendecomposition at each cell.
+    \item \textbf{Each robot $k$ computes its velocity}:
+    \[
+        \mathbf{v}_k = -\nabla\phi + \beta_k \cdot |\lambda|
+        \cdot \mathbf{e}_- \cdot f(\text{peer proximity})
+    \]
+    \item \textbf{Move}, mark cells visited, recompute field
+    when frontier changes.
+\end{enumerate}
+
+The entire pipeline is $O(W \cdot H \cdot I)$ where $W \times H$
+is the grid size and $I$ is the relaxation iteration count.  For
+$16 \times 12$ with $I = 100$: roughly 200\,000 multiply-adds.
+Microseconds on a Pi Zero.
+
+\section{Why This Matters for REIP}
+
+The harmonic field with curvature-based dispersion replaces two
+components of the current stack:
+\begin{itemize}
+    \item \textbf{A* pathfinding} $\to$ gradient following (no
+    per-agent search)
+    \item \textbf{Leader frontier assignment} $\to$ curvature-based
+    dispersion (no explicit allocation)
+\end{itemize}
+
+The leader's role reduces to:
+\begin{enumerate}
+    \item Computing the harmonic field (global map knowledge)
+    \item Broadcasting the field (one message, all robots use it)
+    \item Trust governance (REIP's actual contribution)
+\end{enumerate}
+
+A faulty leader could broadcast a corrupted field, but the
+verification is straightforward: each follower can recompute
+$\phi$ in its local neighborhood from its own visited-cell set
+and check whether the leader's broadcast is consistent.  Field
+corruption is detectable the same way bad frontier assignments
+are --- by comparing against local knowledge.
+
+\section*{References}
+
+\begin{itemize}
+    \item C.~I. Connolly and R.~A. Grupen, ``The applications of
+    harmonic functions to robotics,'' \emph{J.\ Robotic Systems},
+    vol.~10, no.~7, pp.~931--946, 1993.
+    \item J.-O. Kim and P.~K. Khosla, ``Real-time obstacle avoidance
+    using harmonic potential functions,'' \emph{IEEE Trans.\ Robot.\
+    Autom.}, vol.~8, no.~3, pp.~338--349, 1992.
+    \item S.~M. LaValle, \emph{Planning Algorithms}, Cambridge
+    University Press, 2006, Ch.~4 (potential functions) and Ch.~8
+    (navigation functions).
+\end{itemize}
+
+\end{document}

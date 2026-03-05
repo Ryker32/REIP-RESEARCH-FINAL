@@ -113,7 +113,9 @@ class PositionServer:
         # Network — bind to WiFi interface so broadcasts reach robots
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.socket.bind(("192.168.20.214", 0))
+        bind_ip = self._detect_wifi_ip()
+        self.socket.bind((bind_ip, 0))
+        print(f"  Network: bound to {bind_ip}")
         
         # State
         self.running = False
@@ -144,6 +146,18 @@ class PositionServer:
         print("  'c' = calibrate              'v' = toggle video")
         print("  'e' = toggle exploration overlay\n")
     
+    @staticmethod
+    def _detect_wifi_ip() -> str:
+        """Auto-detect the LAN IP on the 192.168.20.x subnet, fall back to 0.0.0.0."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect((BROADCAST_IP, 1))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "0.0.0.0"
+
     # ==================== State listener ====================
     def _start_state_listener(self):
         """Listen on UDP_PEER_PORT for robot peer_state broadcasts."""
@@ -157,16 +171,31 @@ class PositionServer:
     def _state_listener_loop(self):
         while True:
             try:
-                data, _ = self._state_sock.recvfrom(65536)
+                data, addr = self._state_sock.recvfrom(65536)
                 msg = json.loads(data.decode())
-                if msg.get('type') == 'peer_state':
+                if msg.get('type') == 'reset_coverage':
+                    self._visited_cells.clear()
+                    print("[RESET] Coverage cleared for new trial")
+                elif msg.get('type') == 'peer_state':
                     rid = msg.get('robot_id')
                     if rid:
                         with self._state_lock:
                             self.robot_states[rid] = msg
+                        self._relay_peer_state(data, rid)
             except socket.timeout:
                 pass
             except Exception:
+                pass
+
+    def _relay_peer_state(self, raw_data: bytes, sender_id: int):
+        """Forward a peer_state to every robot except the sender."""
+        for rid, ip in ROBOT_IPS.items():
+            if rid == sender_id:
+                continue
+            try:
+                target = ip if ip else BROADCAST_IP
+                self.socket.sendto(raw_data, (target, UDP_PORT))
+            except OSError:
                 pass
 
     # ==================== Recording (background thread) ====================
@@ -188,6 +217,7 @@ class PositionServer:
 
         log_path = os.path.join(self.trial_dir, "robot_states.jsonl")
         self.state_log_file = open(log_path, 'w')
+        self._write_calibration_header()
 
         print(f"[REC] Recording to {self.trial_dir}")
 
@@ -204,6 +234,32 @@ class PositionServer:
                     self.state_log_file.write(state_line)
             if not batch:
                 time.sleep(0.005)
+
+    def _write_calibration_header(self):
+        """Write calibration/homography data as first JSONL line so post-processing
+        can reconstruct arena-to-pixel transforms without the live server."""
+        header = {
+            'type': 'calibration',
+            'arena_width_mm': ARENA_WIDTH_MM,
+            'arena_height_mm': ARENA_HEIGHT_MM,
+            'cam_h': self.CAM_H,
+            'corner_h': self.CORNER_H,
+            'robot_tag_h': self.ROBOT_TAG_H,
+            'camera_center_x': self.CAMERA_CENTER_X,
+            'camera_center_y': self.CAMERA_CENTER_Y,
+            'floor_scale': self.FLOOR_SCALE,
+            'robot_scale': self.ROBOT_SCALE,
+            'homography': self.homography.tolist() if self.homography is not None else None,
+            'inv_homography': self.inv_homography.tolist() if self.inv_homography is not None else None,
+            'corner_dst_pts': [[-115, 0], [2110, 0],
+                               [2110, ARENA_HEIGHT_MM], [-113, ARENA_HEIGHT_MM]],
+            'cell_size': 125,
+            'interior_wall_x_left': 1000,
+            'interior_wall_x_right': 1036,
+            'interior_wall_y_end': 1200,
+        }
+        if self.state_log_file:
+            self.state_log_file.write(json.dumps(header) + '\n')
 
     def _enqueue_frame(self, frame, poses):
         """Queue a frame + state for background writing."""
@@ -226,6 +282,8 @@ class PositionServer:
                 'predicted_target': st.get('predicted_target'),
                 'commanded_target': st.get('commanded_target'),
                 'coverage_count': st.get('coverage_count'),
+                'visited_cells': st.get('visited_cells'),
+                'fault': st.get('fault'),
             }
         state_line = json.dumps(record) + '\n'
         with self._rec_lock:
@@ -323,8 +381,12 @@ class PositionServer:
         ], dtype=np.float32)
         
         # Compute homography (pixel→arena) and its inverse (arena→pixel)
-        self.homography, _ = cv2.findHomography(src_pts, dst_pts)
-        self.inv_homography = np.linalg.inv(self.homography)
+        H, _ = cv2.findHomography(src_pts, dst_pts)
+        if H is None:
+            print("[WARN] findHomography returned None, keeping previous homography")
+            return
+        self.homography = H
+        self.inv_homography = np.linalg.inv(H)
         self._cell_polys = []  # invalidate cache so overlay rebuilds
         
         if self.frame_count % 100 == 0:
@@ -352,15 +414,28 @@ class PositionServer:
                 cx = np.mean(corner[:, 0])
                 cy = np.mean(corner[:, 1])
                 
-                # Orientation: "forward" = top of marker (bottom-mid → top-mid)
+                # Orientation: transform marker top/bottom midpoints to
+                # arena space so heading is correct regardless of camera rotation.
                 top_mid = (corner[0] + corner[1]) / 2
                 bot_mid = (corner[2] + corner[3]) / 2
-                dx = top_mid[0] - bot_mid[0]
-                dy = top_mid[1] - bot_mid[1]
-                theta = np.arctan2(-dy, dx)
-                
+
                 # Convert to arena coords
                 x_mm, y_mm = self.pixel_to_arena(cx, cy)
+
+                if self.homography is not None:
+                    top_arena = cv2.perspectiveTransform(
+                        np.array([[[top_mid[0], top_mid[1]]]], dtype=np.float32),
+                        self.homography)[0][0]
+                    bot_arena = cv2.perspectiveTransform(
+                        np.array([[[bot_mid[0], bot_mid[1]]]], dtype=np.float32),
+                        self.homography)[0][0]
+                    theta = float(np.arctan2(
+                        top_arena[1] - bot_arena[1],
+                        top_arena[0] - bot_arena[0]))
+                else:
+                    dx = top_mid[0] - bot_mid[0]
+                    dy = top_mid[1] - bot_mid[1]
+                    theta = float(np.arctan2(-dy, dx))
                 
                 pose = {
                     'robot_id': int(marker_id),
@@ -394,11 +469,14 @@ class PositionServer:
         }
         data = json.dumps(msg).encode()
         
-        target_ip = ROBOT_IPS.get(robot_id)
-        if target_ip:
-            self.socket.sendto(data, (target_ip, UDP_PORT))
-        else:
-            self.socket.sendto(data, (BROADCAST_IP, UDP_PORT))
+        try:
+            target_ip = ROBOT_IPS.get(robot_id)
+            if target_ip:
+                self.socket.sendto(data, (target_ip, UDP_PORT))
+            else:
+                self.socket.sendto(data, (BROADCAST_IP, UDP_PORT))
+        except OSError:
+            pass
     
     def arena_to_pixel(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
         """Convert floor-level arena coords to pixel coords for overlay drawing.
@@ -414,8 +492,8 @@ class PositionServer:
 
     def _is_wall_cell(self, cx: int, cy: int) -> bool:
         """Mirror of robot's _is_wall_cell for overlay rendering."""
-        OUTER_WALL_MARGIN = 115  # swept radius (100) + 15mm gap
-        DIVIDER_MARGIN = 125
+        OUTER_WALL_MARGIN = 110  # match robot ROBOT_RADIUS — excludes perimeter cells
+        DIVIDER_MARGIN = 64   # match robot BODY_HALF_WIDTH
         BODY_RADIUS = 77
         CELL_SIZE = 125
         INTERIOR_WALL_X_LEFT = 1000
@@ -430,8 +508,6 @@ class PositionServer:
             return True
         if y < INTERIOR_WALL_Y_END and (
             INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
-            return True
-        if INTERIOR_WALL_X_LEFT - BODY_RADIUS < x < INTERIOR_WALL_X_RIGHT + BODY_RADIUS:
             return True
         return False
 
@@ -485,9 +561,10 @@ class PositionServer:
 
         cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
 
-        pct = len(visited) / max(1, self._num_explorable) * 100
+        explorable_visited = sum(1 for c in visited if not self._is_wall_cell(c[0], c[1]))
+        pct = explorable_visited / max(1, self._num_explorable) * 100
         h, w = frame.shape[:2]
-        cov_text = f"Coverage: {len(visited)} cells ({pct:.0f}%)"
+        cov_text = f"Coverage: {explorable_visited} cells ({pct:.0f}%)"
         cov_size = cv2.getTextSize(cov_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
         cv2.putText(frame, cov_text, ((w - cov_size[0]) // 2, 85),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
@@ -497,8 +574,8 @@ class PositionServer:
         if self.inv_homography is None:
             return
 
-        WALL_MARGIN = 115  # OUTER_WALL_MARGIN (swept radius + gap)
-        DIVIDER_MARGIN = 125
+        WALL_MARGIN = 0    # no software padding — ToF handles avoidance
+        DIVIDER_MARGIN = 64   # match robot BODY_HALF_WIDTH
         CELL_SIZE = 125
         INTERIOR_WALL_X_LEFT = 1000
         INTERIOR_WALL_X_RIGHT = 1036
@@ -586,9 +663,15 @@ class PositionServer:
                 cv2.circle(frame, (px, py), 28, (0, 255, 255), 1)
 
             # --- Heading arrow (green, short) ---
-            arrow_len = 40
-            ax = int(px + arrow_len * np.cos(-pose['theta']))
-            ay = int(py + arrow_len * np.sin(-pose['theta']))
+            # Convert arena-space heading to pixel-space arrow via arena_to_pixel
+            arrow_mm = 60
+            hx_arena = pose['x'] + arrow_mm * np.cos(pose['theta'])
+            hy_arena = pose['y'] + arrow_mm * np.sin(pose['theta'])
+            if self.inv_homography is not None:
+                ax, ay = self.arena_to_pixel(hx_arena, hy_arena)
+            else:
+                ax = int(px + 40 * np.cos(-pose['theta']))
+                ay = int(py + 40 * np.sin(-pose['theta']))
             cv2.arrowedLine(frame, (px, py), (ax, ay), (0, 255, 0), 2)
 
             # --- Navigation target arrow (cyan, longer) ---
@@ -749,16 +832,16 @@ class PositionServer:
                 self.frame_count = 0
                 self.last_fps_time = time.time()
 
+            # Record CLEAN frame + state BEFORE overlays are drawn
+            if self.recording:
+                self._enqueue_frame(frame, poses)
+
             if self.show_video:
                 if self.show_exploration:
                     self.draw_exploration_overlay(frame)
                 self.draw_arena_contour(frame)
                 self.draw_overlay(frame, poses)
                 cv2.imshow('Position Server', frame)
-
-            # Record frame + state (non-blocking, queued to background thread)
-            if self.recording:
-                self._enqueue_frame(frame, poses)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
@@ -777,6 +860,9 @@ class PositionServer:
             elif key == ord('e'):
                 self.show_exploration = not self.show_exploration
                 print(f"Exploration overlay: {'ON' if self.show_exploration else 'OFF'}")
+            elif key == ord('n'):
+                self._visited_cells.clear()
+                print("Coverage reset — new trial")
 
             elapsed = time.time() - start
             if elapsed < interval:

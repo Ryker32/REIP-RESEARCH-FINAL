@@ -148,12 +148,20 @@ def deploy_and_launch(controller):
     print(f"[DEPLOY] Phase 2: launching all robots simultaneously...")
     for rid, ssh in ssh_connections.items():
         try:
-            cmd = (f'nohup python3 /home/pi/reip/{remote_script} {rid}'
+            cmd = (f'cd /home/pi/reip && nohup python3 {remote_script} {rid}'
                    f'{decentralized_flag}'
                    f' > /tmp/reip_{rid}.log 2>&1 &')
             ssh.exec_command(cmd)
         except Exception as e:
-            print(f"  R{rid}: launch error - {e}")
+            print(f"  R{rid}: launch error ({e}), reconnecting...")
+            try:
+                ssh.close()
+                ssh2 = _ssh_connect(HOSTS[rid])
+                ssh2.exec_command(cmd)
+                ssh_connections[rid] = ssh2
+                print(f"  R{rid}: relaunched OK")
+            except Exception as e2:
+                print(f"  R{rid}: relaunch FAILED - {e2}")
 
     # Brief pause then verify all running
     time.sleep(2)
@@ -266,10 +274,27 @@ def run_single_trial(controller, fault_type, trial_num, output_dir):
     # Phase 1: Deploy and launch
     deploy_and_launch(controller)
 
+    # Give robots a few seconds to get localized and elect a leader,
+    # then send the start signal so they all begin simultaneously.
+    print(f"\n[WAIT] Giving robots 10s for boot + localization + leader election...")
+    time.sleep(10)
+
+    # Reset coverage on the position server overlay
+    _reset_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    _reset_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    _reset_sock.sendto(json.dumps({'type': 'reset_coverage'}).encode(),
+                       (BROADCAST_IP, UDP_PEER_PORT))
+    _reset_sock.close()
+
+    print(f"[START] Sending start signal to all robots...")
+    for _ in range(5):
+        inject_fault(0, 'start')
+        time.sleep(0.2)
+
     t0 = time.time()
     fault_robots = []
 
-    print(f"\n[t=0.0s] Robots launched. Trial clock started.")
+    print(f"\n[t=0.0s] Trial clock started.")
     print(f"         Position server should be running + recording.\n")
 
     try:

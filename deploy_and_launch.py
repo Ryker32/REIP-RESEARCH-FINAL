@@ -13,29 +13,39 @@ HOSTS = {
 PASSWORD = 'clanker'
 LOCAL_FILE = os.path.join(os.path.dirname(__file__), 'robot', 'reip_node.py')
 
-def deploy_all(local_file=None, remote_script='reip_node.py'):
+def deploy_all(local_file=None, remote_script='reip_node.py', max_retries=3):
     """Upload code to all robots (no launch yet). Returns open SSH connections."""
     if local_file is None:
         local_file = LOCAL_FILE
     connections = {}
     for rid, host in sorted(HOSTS.items()):
-        try:
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(host, username='pi', password=PASSWORD, timeout=8)
-            ssh.exec_command('pkill -f reip_node; pkill -f raft_node')
-            sftp = ssh.open_sftp()
-            for d in ['/home/pi/reip', '/home/pi/reip/logs', '/home/pi/reip/baselines']:
-                try:
-                    sftp.mkdir(d)
-                except:
-                    pass
-            sftp.put(local_file, f'/home/pi/reip/{remote_script}')
-            sftp.close()
-            connections[rid] = ssh
-            print(f"  R{rid}: uploaded {remote_script}")
-        except Exception as e:
-            print(f"  R{rid}: ERROR - {e}")
+        for attempt in range(1, max_retries + 1):
+            try:
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(host, username='pi', password=PASSWORD, timeout=10)
+                ssh.exec_command('pkill -f reip_node; pkill -f raft_node')
+                sftp = ssh.open_sftp()
+                for d in ['/home/pi/reip', '/home/pi/reip/logs', '/home/pi/reip/baselines']:
+                    try:
+                        sftp.mkdir(d)
+                    except OSError:
+                        pass
+                sftp.put(local_file, f'/home/pi/reip/{remote_script}')
+                sftp.close()
+                connections[rid] = ssh
+                print(f"  R{rid}: uploaded {remote_script}")
+                break
+            except Exception as e:
+                if attempt < max_retries:
+                    print(f"  R{rid}: attempt {attempt}/{max_retries} failed ({e}), retrying in 3s...")
+                    time.sleep(3)
+                else:
+                    print(f"  R{rid}: FAILED after {max_retries} attempts - {e}")
+    failed = [rid for rid in HOSTS if rid not in connections]
+    if failed:
+        print(f"\n  WARNING: {len(failed)} robot(s) failed to connect: {failed}")
+    print(f"  {len(connections)}/{len(HOSTS)} robots deployed successfully.")
     return connections
 
 
@@ -44,7 +54,7 @@ def launch_all(connections, remote_script='reip_node.py'):
     print("  Launching all simultaneously...")
     for rid, ssh in connections.items():
         try:
-            cmd = (f'nohup python3 /home/pi/reip/{remote_script} {rid} '
+            cmd = (f'cd /home/pi/reip && nohup python3 {remote_script} {rid} '
                    f'> /tmp/reip_{rid}.log 2>&1 &')
             ssh.exec_command(cmd)
         except Exception as e:

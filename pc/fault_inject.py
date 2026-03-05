@@ -33,7 +33,18 @@ import threading
 UDP_FAULT_PORT = 5300
 UDP_PEER_PORT = 5200
 BROADCAST_IP = "192.168.20.255"
-WIFI_BIND_IP = "192.168.20.214"
+def _detect_wifi_ip() -> str:
+    """Auto-detect the LAN IP on the robot subnet, fall back to 0.0.0.0."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((BROADCAST_IP, 1))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "0.0.0.0"
+
+WIFI_BIND_IP = _detect_wifi_ip()
 NUM_ROBOTS = 5
 
 class FaultInjector:
@@ -76,8 +87,23 @@ class FaultInjector:
             self.active_faults[robot_id] = fault_type
             print(f"Injected '{fault_type}' fault on Robot {robot_id}")
     
+    def send_start(self):
+        """Broadcast 'start' to all robots so they begin moving."""
+        msg = {'type': 'fault_inject', 'robot_id': 0, 'fault': 'start',
+               'timestamp': time.time()}
+        data = json.dumps(msg).encode()
+        if self.sim_mode:
+            for rid in range(1, NUM_ROBOTS + 1):
+                self.socket.sendto(data, ('127.0.0.1', UDP_FAULT_PORT + rid))
+        else:
+            for _ in range(3):
+                self.socket.sendto(data, (BROADCAST_IP, UDP_FAULT_PORT))
+                time.sleep(0.05)
+        print("START sent to all robots — motors engaged")
+
     def run(self):
         print("=== REIP Fault Injector ===")
+        print("Trial control:    start              <-- START THE TRIAL")
         print("Motor faults:     spin <id>, stop <id>, erratic <id>")
         print("Leadership fault: bad_leader <id>  <-- KEY DEMO")
         print("Control:          clear <id>, status, quit\n")
@@ -92,7 +118,10 @@ class FaultInjector:
                 
                 if parts[0] == 'quit':
                     break
-                    
+
+                elif parts[0] == 'start':
+                    self.send_start()
+
                 elif parts[0] == 'status':
                     if self.active_faults:
                         print("Active faults:")
@@ -130,7 +159,11 @@ class FaultInjector:
         """Eavesdrop on peer broadcasts to find the current leader."""
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("0.0.0.0", UDP_PEER_PORT) if self.sim_mode else (WIFI_BIND_IP, UDP_PEER_PORT))
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except (AttributeError, OSError):
+            pass
+        sock.bind(("0.0.0.0", UDP_PEER_PORT))
         sock.settimeout(0.2)
 
         leader_votes: dict[int, int] = {}
@@ -144,6 +177,8 @@ class FaultInjector:
                     if lid:
                         leader_votes[lid] = leader_votes.get(lid, 0) + 1
             except socket.timeout:
+                pass
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError):
                 pass
         sock.close()
 
@@ -163,6 +198,7 @@ class FaultInjector:
         print(f"  2nd inject: t={delay2}s")
         print(f"  Duration:   {duration}s\n")
 
+        self.send_start()
         t0 = time.time()
 
         # ---- First fault injection ----

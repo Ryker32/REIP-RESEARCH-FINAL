@@ -36,6 +36,15 @@ ROBOT_COLORS = {
     '5': '#8e44ad',  # purple
 }
 
+COL_SENSE   = '#7f8c8d'
+CMD_COL     = '#c0392b'       # dark red — leader command
+PRED_COL    = '#27ae60'       # green — agent belief / navigation
+COL_LEADER  = 'gold'
+VEC_LW      = 2.2
+VEC_ALP     = 0.88
+MUT_SC      = 12
+MIN_ARROW_DIST = 20
+
 def find_frame_at_time(frames, target_t):
     """Find the frame closest to target_t."""
     best = None
@@ -48,47 +57,75 @@ def find_frame_at_time(frames, target_t):
     return best
 
 
+def _draw_arrow(ax, rx, ry, tx, ty, arrow_len, color, ls, zorder,
+                walls=None):
+    """Draw directional arrow, suppressing if it crosses a wall."""
+    import math
+    dist = math.hypot(tx - rx, ty - ry)
+    if dist < MIN_ARROW_DIST:
+        return
+    dx = (tx - rx) / dist * arrow_len
+    dy = (ty - ry) / dist * arrow_len
+    tip_x, tip_y = rx + dx, ry + dy
+    if walls:
+        for x1, y1, x2, y2 in walls:
+            if _segments_intersect(rx, ry, tip_x, tip_y, x1, y1, x2, y2):
+                return
+    ax.annotate(
+        '', xy=(tip_x, tip_y), xytext=(rx, ry),
+        arrowprops=dict(arrowstyle='-|>', color=color, lw=VEC_LW,
+                        alpha=VEC_ALP, linestyle=ls, mutation_scale=MUT_SC),
+        zorder=zorder)
+
+
 def render_frame(ax, frame, arena_w, arena_h, cell_size, walls,
                  fault_time_1=None, fault_time_2=None, show_legend=False):
-    """Render a single exploration frame on the given axes."""
+    """Render a single frame with sim_environment-style vector annotations."""
+    import math
     cols = arena_w // cell_size
     rows = arena_h // cell_size
     t = frame['t']
     coverage = frame['coverage']
     visited = set(tuple(c) for c in frame.get('visited_cells', []))
     robots = frame.get('robots', {})
-    
-    # Draw grid cells
+    arrow_len = cell_size * 1.8
+
+    is_fault_active = fault_time_1 and t >= fault_time_1
+
+    # Grid cells
     for c in range(cols):
         for r in range(rows):
             x0 = c * cell_size
             y0 = r * cell_size
-            if (c, r) in visited:
-                color = '#ffffff'  # explored = white
-            else:
-                color = '#c8ddf0'  # unexplored = light blue
+            color = '#ffffff' if (c, r) in visited else '#c8ddf0'
             rect = Rectangle((x0, y0), cell_size, cell_size,
                             facecolor=color, edgecolor='#e0e0e0',
                             linewidth=0.3, zorder=1)
             ax.add_patch(rect)
-    
-    # Draw walls
+
+    # Grid lines (faint)
+    for i in range(cols + 1):
+        ax.axvline(i * cell_size, color='#cccccc', lw=0.3, alpha=0.3, zorder=1)
+    for j in range(rows + 1):
+        ax.axhline(j * cell_size, color='#cccccc', lw=0.3, alpha=0.3, zorder=1)
+
+    # Walls
     for wall in walls:
         x1, y1, x2, y2 = wall
-        ax.plot([x1, x2], [y1, y2], color='#333333', linewidth=3, zorder=10)
-    
-    # Draw arena border
+        ax.plot([x1, x2], [y1, y2], color='#222222', linewidth=4,
+                solid_capstyle='butt', zorder=5)
+
+    # Arena border
     ax.plot([0, arena_w, arena_w, 0, 0],
             [0, 0, arena_h, arena_h, 0],
             color='#333333', linewidth=1.5, zorder=10)
-    
-    # Detect frontiers (cells adjacent to unexplored that are explored)
+
+    # Frontiers
     frontier_cells = set()
     for (c, r) in visited:
         for dc, dr in [(-1,0),(1,0),(0,-1),(0,1)]:
             nc, nr = c+dc, r+dr
             if 0 <= nc < cols and 0 <= nr < rows and (nc, nr) not in visited:
-                # Check wall crossing
                 cx1 = c * cell_size + cell_size // 2
                 cy1 = r * cell_size + cell_size // 2
                 cx2 = nc * cell_size + cell_size // 2
@@ -101,108 +138,144 @@ def render_frame(ax, frame, arena_w, arena_h, cell_size, walls,
                         break
                 if not blocked:
                     frontier_cells.add((nc, nr))
-    
-    # Draw frontier markers
-    for (c, r) in frontier_cells:
-        fx = c * cell_size + cell_size / 2
-        fy = r * cell_size + cell_size / 2
-        ax.plot(fx, fy, 's', color='#f1c40f', markersize=4,
-                markeredgecolor='#333', markeredgewidth=0.5, zorder=5)
-    
+
+    if frontier_cells:
+        fx = [c * cell_size + cell_size / 2 for c, r in frontier_cells]
+        fy = [r * cell_size + cell_size / 2 for c, r in frontier_cells]
+        ax.scatter(fx, fy, marker='s', s=28, c='#f1c40f',
+                   edgecolors='k', linewidths=0.4, zorder=4)
+
     # Find leader
     leader_id = None
     for rid, rdata in robots.items():
         if rdata.get('state') == 'leader':
             leader_id = rid
             break
-    
-    # Draw robots
-    for rid, rdata in robots.items():
+
+    # Draw robots with sim_environment-style annotations
+    sense_r = 170
+    for rid in sorted(robots.keys()):
+        rdata = robots[rid]
         rx, ry = rdata['x'], rdata['y']
         color = ROBOT_COLORS.get(rid, '#888888')
         is_leader = (rid == leader_id)
-        
-        # Robot marker
-        marker_size = 9 if is_leader else 7
         zorder = 20 if is_leader else 15
-        
-        ax.plot(rx, ry, 'o', color=color, markersize=marker_size,
-                markeredgecolor='white' if is_leader else '#333',
-                markeredgewidth=1.5 if is_leader else 0.8, zorder=zorder)
-        
-        # Leader crown
+
+        # Sensor sweep circle
+        ax.add_patch(Circle((rx, ry), sense_r,
+                            color=(0.2, 0.9, 0.2, 0.06), zorder=2))
+        ax.add_patch(Circle((rx, ry), sense_r, color=COL_SENSE,
+                            fill=False, ls='dashed', lw=0.6, alpha=0.4,
+                            zorder=6))
+
+        # Arrows — same logic as sim_environment.png
+        cmd  = rdata.get('commanded_target') or rdata.get('target')
+        pred = rdata.get('predicted_target')
+        wp   = rdata.get('next_waypoint')
+
         if is_leader:
-            crown = Circle((rx, ry), cell_size * 0.8,
-                          facecolor='none', edgecolor='#f1c40f',
-                          linewidth=2, linestyle='-', zorder=zorder-1)
-            ax.add_patch(crown)
-        
-        # Robot label
-        ax.text(rx + cell_size * 0.35, ry + cell_size * 0.35,
-                f'R{rid}', fontsize=5.5, fontweight='bold',
-                color='black', zorder=25,
-                path_effects=[pe.withStroke(linewidth=1.5, foreground='white')])
-        
-        # Target arrow (if has target)
-        target = rdata.get('target')
-        if target and target[0] is not None:
-            tx, ty = target
-            dx, dy = tx - rx, ty - ry
-            dist = (dx**2 + dy**2)**0.5
-            if dist > cell_size * 0.5:
-                # Normalize to reasonable arrow length
-                arrow_len = min(dist, cell_size * 2.5)
-                dx_norm = dx / dist * arrow_len
-                dy_norm = dy / dist * arrow_len
-                ax.annotate('', xy=(rx + dx_norm, ry + dy_norm), xytext=(rx, ry),
-                           arrowprops=dict(arrowstyle='->', color=color,
-                                          lw=1.2, alpha=0.6),
-                           zorder=zorder-2)
-        
-        # Suspicion indicator (red glow if suspicious)
+            src = pred or wp
+            if src:
+                _draw_arrow(ax, rx, ry, src[0], src[1],
+                            arrow_len, PRED_COL, 'solid', 12,
+                            walls=walls if not is_fault_active else None)
+        else:
+            if is_fault_active:
+                if cmd:
+                    _draw_arrow(ax, rx, ry, cmd[0], cmd[1],
+                                arrow_len, CMD_COL, 'dashed', 11)
+                if pred:
+                    _draw_arrow(ax, rx, ry, pred[0], pred[1],
+                                arrow_len, PRED_COL, 'solid', 13)
+            else:
+                drawn = False
+                if pred:
+                    d = math.hypot(pred[0] - rx, pred[1] - ry)
+                    if d >= MIN_ARROW_DIST:
+                        dx = (pred[0] - rx) / d * arrow_len
+                        dy = (pred[1] - ry) / d * arrow_len
+                        if not any(_segments_intersect(rx, ry, rx+dx, ry+dy,
+                                   w[0], w[1], w[2], w[3]) for w in walls):
+                            _draw_arrow(ax, rx, ry, pred[0], pred[1],
+                                        arrow_len, PRED_COL, 'solid', 13)
+                            drawn = True
+                if not drawn and wp:
+                    _draw_arrow(ax, rx, ry, wp[0], wp[1],
+                                arrow_len, PRED_COL, 'solid', 13, walls=walls)
+
+        # Robot marker
+        if is_leader:
+            ax.plot(rx, ry, 's', ms=10, color=COL_LEADER, mec='k',
+                    mew=1.2, zorder=zorder)
+            ax.add_patch(Circle((rx, ry), cell_size * 0.8, color=COL_LEADER,
+                                fill=False, lw=2, alpha=0.9, zorder=zorder-1))
+        else:
+            ax.plot(rx, ry, 'o', color=color, markersize=8,
+                    markeredgecolor='k', markeredgewidth=0.8, zorder=zorder)
+
+        # Label
+        ax.text(rx + cell_size * 0.3, ry + cell_size * 0.3,
+                f'R{rid}', fontsize=6, fontweight='bold', color='k',
+                bbox=dict(facecolor='white', alpha=0.85, edgecolor='k',
+                          boxstyle='round,pad=0.1', linewidth=0.4),
+                zorder=25)
+
+        # Suspicion indicator
         suspicion = rdata.get('suspicion', 0)
         if suspicion > 0.1:
-            sus_ring = Circle((rx, ry), cell_size * 0.6,
-                            facecolor='red', alpha=min(0.4, suspicion * 0.5),
-                            edgecolor='none', zorder=zorder-3)
-            ax.add_patch(sus_ring)
-    
+            ax.add_patch(Circle((rx, ry), cell_size * 0.5,
+                                facecolor='red', alpha=min(0.4, suspicion * 0.5),
+                                edgecolor='none', zorder=zorder-3))
+
+    # Room labels
+    ax.text(arena_w * 0.25, arena_h * 0.50, 'Room A', fontsize=8,
+            ha='center', va='center', color='gray', fontstyle='italic',
+            alpha=0.45)
+    ax.text(arena_w * 0.75, arena_h * 0.50, 'Room B', fontsize=8,
+            ha='center', va='center', color='gray', fontstyle='italic',
+            alpha=0.45)
+    ax.text(arena_w * 0.5, arena_h * 0.88, 'Passage', fontsize=6,
+            ha='center', va='center', color='gray', alpha=0.4)
+
     # Title with metrics
     status_parts = [f't = {t:.0f}s', f'Cov = {coverage:.0f}%']
     if leader_id:
         status_parts.append(f'Leader = R{leader_id}')
-    
-    # Fault indicator
     if fault_time_1 and t >= fault_time_1:
         if fault_time_2 and t >= fault_time_2:
             status_parts.append('FAULT ×2')
         else:
             status_parts.append('FAULT')
-    
+
     ax.set_title('  |  '.join(status_parts), fontsize=7.5, fontweight='bold',
                  pad=3)
-    
-    ax.set_xlim(-10, arena_w + 10)
-    ax.set_ylim(-10, arena_h + 10)
+
+    ax.set_xlim(0, arena_w)
+    ax.set_ylim(0, arena_h)
     ax.set_aspect('equal')
     ax.set_xticks([])
     ax.set_yticks([])
-    
+
     if show_legend:
         from matplotlib.lines import Line2D
+        import matplotlib.patches as mp
         legend_elements = [
-            Line2D([0], [0], marker='o', color='w', markerfacecolor='#f1c40f',
-                   markeredgecolor='#333', markersize=6, label='Leader'),
-            Line2D([0], [0], marker='o', color='w', markerfacecolor='#2980b9',
-                   markeredgecolor='#333', markersize=5, label='Follower'),
-            Line2D([0], [0], marker='s', color='w', markerfacecolor='#f1c40f',
-                   markeredgecolor='#333', markersize=4, label='Frontier'),
+            mp.Patch(facecolor=COL_LEADER, edgecolor='k', label='Leader'),
+            Line2D([0], [0], marker='o', color='w',
+                   markerfacecolor='#2980b9', markeredgecolor='k',
+                   markersize=6, label='Follower'),
+            Line2D([0], [0], marker='s', color='w',
+                   markerfacecolor='#f1c40f', markeredgecolor='k',
+                   markersize=4, label='Frontier'),
             Rectangle((0,0), 1, 1, facecolor='#ffffff', edgecolor='#ccc',
                       label='Explored'),
             Rectangle((0,0), 1, 1, facecolor='#c8ddf0', edgecolor='#ccc',
                       label='Unexplored'),
+            Line2D([0], [0], color=PRED_COL, lw=2, label='Agent belief'),
+            Line2D([0], [0], color=CMD_COL, lw=2, ls='dashed',
+                   label='Leader command'),
         ]
-        ax.legend(handles=legend_elements, loc='lower right', fontsize=5.5,
+        ax.legend(handles=legend_elements, loc='lower right', fontsize=5,
                  framealpha=0.9, edgecolor='#ccc', handletextpad=0.3,
                  borderpad=0.3, labelspacing=0.2)
 

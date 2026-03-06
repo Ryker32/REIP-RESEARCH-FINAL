@@ -60,7 +60,7 @@ except ImportError:
 UDP_POSITION_PORT = 5100
 UDP_PEER_PORT = 5200
 UDP_FAULT_PORT = 5300
-BROADCAST_IP = "255.255.255.255"
+BROADCAST_IP = "192.168.20.255"
 NUM_ROBOTS = 5             # Number of robots in swarm
 
 # Arena
@@ -190,6 +190,7 @@ class PeerInfo:
     visited_cells: Set[tuple] = field(default_factory=set)
     assigned_target: Optional[Tuple[float, float]] = None  # Leader's assignment for them
     last_seen: float = 0
+    last_peer_seq: int = -1
 
 # ============== Hardware Interface ==============
 class Hardware:
@@ -327,6 +328,7 @@ class REIPNode:
         self.theta = 0.0
         self.state = RobotState.IDLE
         self.position_timestamp = 0.0
+        self.position_rx_mono = 0.0
         self._pos_initialized = False
         
         # Sensor data
@@ -358,10 +360,18 @@ class REIPNode:
         # Task assignment
         self.leader_assigned_target: Optional[Tuple[float, float]] = None
         self.leader_assignment_time: float = 0.0  # When assignment was received
+        self.leader_assignment_rx_mono: float = 0.0
         self.my_assigned_target: Optional[Tuple[float, float]] = None  # Leader's own target
         self._prev_assignments: Dict[str, Tuple[float, float]] = {}   # Assignment persistence cache
         self.my_predicted_target: Optional[Tuple[float, float]] = None
         self.current_navigation_target: Optional[Tuple[float, float]] = None  # What I'm ACTUALLY navigating to
+        self._peer_seq = 0
+        self._raw_navigation_target: Optional[Tuple[float, float]] = None
+        self._last_command_source = "startup"
+        self._last_stop_reason = "waiting_for_start"
+        self._last_target_angle = 0.0
+        self._last_heading_error = 0.0
+        self._last_motor_cmd = (0.0, 0.0)
         
         # Assignment staleness
         self.ASSIGNMENT_STALE_TIME = 5.0  # seconds — must survive WiFi drops (leader broadcasts at 5Hz)
@@ -491,6 +501,8 @@ class REIPNode:
             'suspicion': self.suspicion_of_leader,
             'predicted_target': to_list(self.my_predicted_target),
             'commanded_target': to_list(self.leader_assigned_target),
+            'raw_navigation_target': to_list(self._raw_navigation_target),
+            'navigation_target': to_list(self.current_navigation_target),
             'leader_self_target': to_list(self.my_assigned_target) if self.state == RobotState.LEADER else None,
             'my_visited_count': len(self.my_visited),
             'known_visited_count': len(self.known_visited),
@@ -501,20 +513,33 @@ class REIPNode:
             'first_bad_command_time': self.first_bad_command_time,
             'first_decay_time': self.first_decay_time,
             'impeachment_time': self.impeachment_time,
-            'decentralized': self.decentralized_mode
+            'decentralized': self.decentralized_mode,
+            'position_rx_age': time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else None,
+            'leader_assignment_rx_age': time.monotonic() - self.leader_assignment_rx_mono if self.leader_assignment_rx_mono > 0 else None,
+            'target_angle': self._last_target_angle,
+            'heading_error': self._last_heading_error,
+            'in_pivot': self._in_pivot,
+            'stuck_count': getattr(self, '_stuck_count', 0),
+            'escape_active': time.monotonic() < getattr(self, '_escape_until', 0.0),
+            'stop_reason': self._last_stop_reason,
+            'command_source': self._last_command_source,
+            'tof': dict(self.tof),
+            'motor_cmd': [self._last_motor_cmd[0], self._last_motor_cmd[1]],
         }
         self.log_file.write(json.dumps(record) + '\n')
         self.log_file.flush()
     
     # ==================== POSITION ====================
     def receive_position(self):
-        """Receive our position from camera server AND relayed peer states"""
-        msg_count = 0
+        """Receive our position from the camera server.
+
+        In sim, this socket may also carry relayed peer state messages.
+        Hardware mode should treat the position server as localization-only.
+        """
         try:
             while True:
                 data, addr = self.pos_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
-                msg_count += 1
                 
                 # Handle position updates for us
                 if msg.get('type') == 'position':
@@ -531,25 +556,18 @@ class REIPNode:
                             self.y += POS_EMA * (raw_y - self.y)
                         self.theta = msg['theta']
                         self.position_timestamp = msg.get('timestamp', time.time())
+                        self.position_rx_mono = time.monotonic()
                         
-                        # Mark cells the robot body covers as visited.
-                        # Robot body is 128mm wide, cell is 125mm — the robot
-                        # physically overlaps the center cell plus its direct
-                        # neighbors.  Only mark non-wall cells.
-                        now = time.time()
-                        _cell = self.get_cell(self.x, self.y)
-                        if _cell is not None:
-                            cx, cy = _cell
-                            for dx, dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)):
-                                nc = (cx+dx, cy+dy)
-                                if (0 <= nc[0] < self.coverage_width and
-                                    0 <= nc[1] < self.coverage_height and
-                                    not self._is_wall_cell(nc[0], nc[1]) and
-                                    nc not in self.my_visited):
-                                    self.my_visited[nc] = now
-                                    if nc not in self.known_visited:
-                                        self.known_visited.add(nc)
-                                        self.known_visited_time[nc] = now
+                        # Mark only the center cell to keep hardware coverage
+                        # accounting aligned with the trust story.
+                        now_mono = time.monotonic()
+                        cell = self.get_cell(self.x, self.y)
+                        if cell is not None and not self._is_wall_cell(*cell):
+                            if cell not in self.my_visited:
+                                self.my_visited[cell] = now_mono
+                            if cell not in self.known_visited:
+                                self.known_visited.add(cell)
+                                self.known_visited_time[cell] = now_mono
                 
                 # Handle relayed peer states (from visual_sim acting as relay)
                 elif msg.get('type') == 'peer_state':
@@ -618,10 +636,12 @@ class REIPNode:
         assignments = {}
         if self.state == RobotState.LEADER:
             assignments = self.compute_task_assignments()
+        self._peer_seq += 1
         
         msg = {
             'type': 'peer_state',
             'robot_id': self.robot_id,
+            'peer_seq': self._peer_seq,
             'x': self.x,
             'y': self.y,
             'theta': self.theta,
@@ -680,6 +700,16 @@ class REIPNode:
             self.peers[peer_id] = PeerInfo(robot_id=peer_id)
         
         peer = self.peers[peer_id]
+        peer_seq = msg.get('peer_seq')
+        if peer_seq is not None:
+            try:
+                peer_seq = int(peer_seq)
+            except (TypeError, ValueError):
+                peer_seq = None
+        if peer_seq is not None and peer_seq <= peer.last_peer_seq:
+            return
+        if peer_seq is not None:
+            peer.last_peer_seq = peer_seq
         peer.x = msg.get('x', 0)
         peer.y = msg.get('y', 0)
         peer.theta = msg.get('theta', 0)
@@ -690,13 +720,13 @@ class REIPNode:
         peer.last_seen = time.time()
         
         # Merge their visited cells (with timestamps for causality)
-        now = time.time()
+        now_mono = time.monotonic()
         for cell in msg.get('visited_cells', []):
             cell_tuple = tuple(cell)
             peer.visited_cells.add(cell_tuple)
             if cell_tuple not in self.known_visited:
                 self.known_visited.add(cell_tuple)
-                self.known_visited_time[cell_tuple] = now  # When WE learned about it
+                self.known_visited_time[cell_tuple] = now_mono  # When WE learned about it
         
         # If this peer is the leader, get my assignment
         if msg.get('leader_id') == peer_id and peer_id == self.current_leader:
@@ -712,9 +742,8 @@ class REIPNode:
                 # assignment only triggers ONE assessment, which may not be
                 # enough to cross the suspicion threshold.
                 self.leader_assigned_target = new_target
-                # Use leader's SEND timestamp, not receive time
-                # This is critical for causality-aware trust checking
                 self.leader_assignment_time = msg.get('timestamp', time.time())
+                self.leader_assignment_rx_mono = time.monotonic()
                 # Verify each assignment broadcast using three-tier trust
                 self.assess_leader_command()
         
@@ -824,7 +853,7 @@ class REIPNode:
             return  # I am leader or no leader
         
         # Only skip if we haven't received ANY position data yet
-        if self.x == 0 and self.y == 0 and self.position_timestamp == 0:
+        if self.x == 0 and self.y == 0 and self.position_rx_mono == 0:
             return  # No position data at all
         
         target = self.leader_assigned_target
@@ -843,7 +872,9 @@ class REIPNode:
         # a cell visited 0.1s before the assignment triggers a false positive
         # because the leader's map hadn't received the update yet.
         
-        assignment_time = self.leader_assignment_time
+        assignment_time = self.leader_assignment_rx_mono
+        if assignment_time <= 0:
+            return
         causality_cutoff = assignment_time - CAUSALITY_GRACE_PERIOD
         dist_to_target = self.distance((self.x, self.y), target)
         
@@ -864,7 +895,7 @@ class REIPNode:
         
         # Tier 3: Cell in known_visited (peer-reported, with causality)
         elif cell in self.known_visited and cell not in self.my_visited:
-            known_time = self.known_visited_time.get(cell, time.time())
+            known_time = self.known_visited_time.get(cell, time.monotonic())
             # Only penalize if we knew about it before the assignment
             if known_time < causality_cutoff:
                 suspicion_added += WEIGHT_PEER
@@ -1150,7 +1181,7 @@ class REIPNode:
                     if dist < CELL_SIZE:
                         # Robot reached target — treat as explored, reassign
                         self.known_visited.add(cell)
-                        self.known_visited_time[cell] = time.time()
+                        self.known_visited_time[cell] = time.monotonic()
                         continue
                     still_valid[rid_str] = prev_target
                     assigned_frontiers.add(cell)
@@ -1606,8 +1637,9 @@ class REIPNode:
 
     def _init_stuck_detection(self):
         self._nav_history = []
-        self._escape_until = 0
-        self._escape_start = 0
+        self._escape_until = 0.0
+        self._escape_start = 0.0
+        self._escape_angle = 0.0
         self._stuck_count = 0
         self._tof_emergency_count = 0
 
@@ -1616,6 +1648,23 @@ class REIPNode:
         self._prev_heading_err = None   # previous error for D term
         self._prev_heading_t = 0.0      # timestamp of previous error
         self._in_pivot = False          # hysteresis flag for pivot turns
+        self._pivot_start_mono = 0.0
+
+    def _finalize_motor_command(self, left: float, right: float,
+                                stop_reason: Optional[str] = None) -> Tuple[float, float]:
+        """Rate-limit PWM changes so the hardware doesn't twitch between steps."""
+        MAX_PWM_STEP = 20.0
+        prev_left, prev_right = self._last_motor_cmd
+        left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+        right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
+        if abs(left) < 1e-6:
+            left = 0.0
+        if abs(right) < 1e-6:
+            right = 0.0
+        self._last_motor_cmd = (left, right)
+        if stop_reason is not None:
+            self._last_stop_reason = stop_reason
+        return (left, right)
 
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
@@ -1624,9 +1673,9 @@ class REIPNode:
             self._nav_history.clear()
             return False
 
-        now = time.time()
+        now = time.monotonic()
 
-        if now - self.position_timestamp > 1.0:
+        if self.position_rx_mono == 0.0 or now - self.position_rx_mono > 1.0:
             self._nav_history.clear()
             return False
 
@@ -1638,7 +1687,7 @@ class REIPNode:
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 2.0 and moved < 30
+        return elapsed > 1.5 and moved < 20
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -1771,7 +1820,7 @@ class REIPNode:
                 repel_x += (tip_dx / tip_dist) * tip_strength
                 repel_y += (tip_dy / tip_dist) * tip_strength
 
-        REPEL_GAIN = 8.0
+        REPEL_GAIN = 4.0
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
@@ -1864,12 +1913,41 @@ class REIPNode:
 
         # Handle injected faults (identical to sim)
         if self.injected_fault == 'spin':
-            return (BASE_SPEED, -BASE_SPEED)
+            self._last_command_source = "fault_spin"
+            return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "fault_spin")
         elif self.injected_fault == 'stop':
-            return (0, 0)
+            self._last_command_source = "fault_stop"
+            return self._finalize_motor_command(0.0, 0.0, "fault_stop")
         elif self.injected_fault == 'erratic':
-            return (random.uniform(-BASE_SPEED, BASE_SPEED),
-                   random.uniform(-BASE_SPEED, BASE_SPEED))
+            self._last_command_source = "fault_erratic"
+            return self._finalize_motor_command(
+                random.uniform(-BASE_SPEED, BASE_SPEED),
+                random.uniform(-BASE_SPEED, BASE_SPEED),
+                "fault_erratic"
+            )
+
+        # Escape mode: briefly back out, pivot toward open space, then resume.
+        if time.monotonic() < self._escape_until:
+            self._last_command_source = "escape_mode"
+            phase_elapsed = time.monotonic() - self._escape_start
+            escape_angle = self._escape_angle
+            if phase_elapsed < 0.30:
+                return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
+            if phase_elapsed < 0.80:
+                diff = escape_angle - self.theta
+                while diff > math.pi: diff -= 2 * math.pi
+                while diff < -math.pi: diff += 2 * math.pi
+                if diff > 0:
+                    return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "escape_pivot")
+                return self._finalize_motor_command(-BASE_SPEED, BASE_SPEED, "escape_pivot")
+            safe_angle = self._wall_slide_heading(escape_angle)
+            diff = safe_angle - self.theta
+            while diff > math.pi: diff -= 2 * math.pi
+            while diff < -math.pi: diff += 2 * math.pi
+            turn = max(-1, min(1, diff / (math.pi / 4)))
+            left = BASE_SPEED * (1 - turn * 0.5)
+            right = BASE_SPEED * (1 + turn * 0.5)
+            return self._finalize_motor_command(left, right, "escape_drive")
 
         # Read ToF sensors (used later for turn bias and speed taper).
         front_d = self.tof.get('front', 9999)
@@ -1901,17 +1979,18 @@ class REIPNode:
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
         if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+            self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
                 if diff > 0:
-                    return (0.0, BASE_SPEED)
+                    return self._finalize_motor_command(0.0, BASE_SPEED, "peer_emergency")
                 else:
-                    return (BASE_SPEED, 0.0)
+                    return self._finalize_motor_command(BASE_SPEED, 0.0, "peer_emergency")
             else:
-                return (BASE_SPEED * 0.5, BASE_SPEED * 0.5)
+                return self._finalize_motor_command(BASE_SPEED * 0.5, BASE_SPEED * 0.5, "peer_emergency")
 
         # --- Target selection (identical to sim) ---
         target = None
@@ -1920,10 +1999,12 @@ class REIPNode:
 
         if self.decentralized_mode:
             target = self.my_predicted_target
+            self._last_command_source = "decentralized_frontier"
         elif self.state == RobotState.LEADER:
             target = self.my_assigned_target if self.my_assigned_target else self.my_predicted_target
+            self._last_command_source = "leader_frontier"
         else:
-            assignment_age = time.time() - self.leader_assignment_time
+            assignment_age = time.monotonic() - self.leader_assignment_rx_mono if self.leader_assignment_rx_mono > 0 else float('inf')
             assignment_valid = (
                 self.leader_assigned_target is not None and
                 assignment_age < self.ASSIGNMENT_STALE_TIME
@@ -1931,22 +2012,26 @@ class REIPNode:
 
             if self.trust_in_leader > TRUST_THRESHOLD and assignment_valid:
                 target = self.leader_assigned_target
+                self._last_command_source = "leader_assigned"
             else:
                 target = self.my_predicted_target
+                self._last_command_source = "predicted_frontier"
                 if not assignment_valid and self.leader_assigned_target:
                     self.leader_assigned_target = None
 
         if not target:
-            return (30.0, 30.0)
+            self.current_navigation_target = None
+            self._raw_navigation_target = None
+            return self._finalize_motor_command(0.0, 0.0, "no_target")
 
         ARRIVAL_RADIUS = CELL_SIZE
         dist_to_target = math.sqrt((self.x - target[0])**2 + (self.y - target[1])**2)
         if dist_to_target < ARRIVAL_RADIUS:
             cell = self.get_cell(target[0], target[1])
-            now = time.time()
-            if cell not in self.my_visited:
+            now = time.monotonic()
+            if cell and cell not in self.my_visited:
                 self.my_visited[cell] = now
-            if cell not in self.known_visited:
+            if cell and cell not in self.known_visited:
                 self.known_visited.add(cell)
                 self.known_visited_time[cell] = now
             self._stuck_count = 0
@@ -1969,10 +2054,40 @@ class REIPNode:
             else:
                 tx = INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST
         target = (tx, ty)
-        self.current_navigation_target = target
+        self._raw_navigation_target = target
 
         # Route around interior wall (equivalent to sim's A* pathfinding)
         target = self._route_around_wall(target)
+        self.current_navigation_target = target
+
+        # If the robot has been grinding in place, switch to a short escape.
+        if self._check_stuck():
+            self._stuck_count += 1
+            self._escape_start = time.monotonic()
+            self._escape_until = self._escape_start + min(1.2 + self._stuck_count * 0.3, 2.5)
+            self._nav_history.clear()
+
+            flee_x = ARENA_WIDTH / 2 - self.x
+            flee_y = ARENA_HEIGHT / 2 - self.y
+            if self.x < 300:
+                flee_x += 300 - self.x
+            if ARENA_WIDTH - self.x < 300:
+                flee_x -= 300 - (ARENA_WIDTH - self.x)
+            if self.y < 300:
+                flee_y += 300 - self.y
+            if ARENA_HEIGHT - self.y < 300:
+                flee_y -= 300 - (ARENA_HEIGHT - self.y)
+            if self.y < INTERIOR_WALL_Y_END:
+                if 0 < INTERIOR_WALL_X_LEFT - self.x < 300:
+                    flee_x -= 1.0
+                if 0 < self.x - INTERIOR_WALL_X_RIGHT < 300:
+                    flee_x += 1.0
+            if abs(flee_x) < 1e-3 and abs(flee_y) < 1e-3:
+                flee_x = math.cos(self.robot_id * 1.2566)
+                flee_y = math.sin(self.robot_id * 1.2566)
+            self._escape_angle = math.atan2(flee_y, flee_x)
+            self._last_command_source = "stuck_escape"
+            return self._finalize_motor_command(-BASE_SPEED * 0.5, -BASE_SPEED * 0.5, "stuck_escape")
 
         # --- Navigate to target ---
         dx = target[0] - self.x
@@ -1983,6 +2098,7 @@ class REIPNode:
         # (equivalent to sim's wall collision + component-wise motion)
         target_angle = self._wall_slide_heading(target_angle)
         target_angle = self._peer_avoidance_heading(target_angle)
+        self._last_target_angle = target_angle
 
         # EMA-filtered heading to suppress ArUco jitter (~5-10° per frame)
         EMA_ALPHA = 0.25
@@ -2004,6 +2120,7 @@ class REIPNode:
         HEADING_DEADBAND = 0.17  # ~10° — reject ArUco jitter
         if abs(diff) < HEADING_DEADBAND:
             diff = 0.0
+        self._last_heading_error = diff
 
         turn = max(-1, min(1, KP * diff))
 
@@ -2068,10 +2185,17 @@ class REIPNode:
 
         PIVOT_ENTER = math.pi * 0.61   # ~110°
         PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
-        if abs(diff) > PIVOT_ENTER:
+        if abs(diff) > PIVOT_ENTER and not self._in_pivot:
             self._in_pivot = True
+            self._pivot_start_mono = time.monotonic()
         if abs(diff) < PIVOT_EXIT:
             self._in_pivot = False
+        if self._in_pivot and self._pivot_start_mono > 0 and time.monotonic() - self._pivot_start_mono > 1.0:
+            self._in_pivot = False
+            self._escape_start = time.monotonic()
+            self._escape_until = self._escape_start + 0.8
+            self._escape_angle = target_angle
+            return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
             pivot_fast = BASE_SPEED
             pivot_slow = 0.0
@@ -2080,7 +2204,7 @@ class REIPNode:
             else:
                 left_speed, right_speed = pivot_fast, pivot_slow
             self._last_turn = turn
-            return (left_speed, right_speed)
+            return self._finalize_motor_command(left_speed, right_speed, "pivot_turn")
 
         left_speed = effective_speed * (1 - turn * turn_mix)
         right_speed = effective_speed * (1 + turn * turn_mix)
@@ -2091,7 +2215,7 @@ class REIPNode:
                 right_speed = math.copysign(MIN_MOTOR_PWM, right_speed)
 
         self._last_turn = turn
-        return (left_speed, right_speed)
+        return self._finalize_motor_command(left_speed, right_speed, "tracking")
     
     # ==================== FAULT INJECTION ====================
     def receive_fault_injection(self):
@@ -2119,6 +2243,16 @@ class REIPNode:
                         self.my_visited.clear()
                         self.known_visited.clear()
                         self.known_visited_time.clear()
+                        self.leader_assignment_rx_mono = 0.0
+                        self.current_navigation_target = None
+                        self._raw_navigation_target = None
+                        self._escape_until = 0.0
+                        self._escape_start = 0.0
+                        self._stuck_count = 0
+                        self._last_stop_reason = "trial_started"
+                        self._last_command_source = "trial_started"
+                        self._last_motor_cmd = (0.0, 0.0)
+                        self._nav_history.clear()
                         for p in self.peers.values():
                             p.visited_cells.clear()
                         print(f"[START] Trial started — coverage reset, motors engaged")
@@ -2233,11 +2367,18 @@ class REIPNode:
             
             # Motors only engage when: trial started + fresh position data.
             left, right = 0.0, 0.0
-            pos_age = time.time() - self.position_timestamp
-            if self.trial_started and self.position_timestamp > 0 and pos_age < 1.5:
+            pos_age = time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else float('inf')
+            if self.trial_started and self.position_rx_mono > 0 and pos_age < 1.5:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:
+                if not self.trial_started:
+                    self._last_stop_reason = "trial_not_started"
+                elif self.position_rx_mono == 0:
+                    self._last_stop_reason = "no_position"
+                else:
+                    self._last_stop_reason = "stale_position"
+                self._last_motor_cmd = (0.0, 0.0)
                 self.hw.stop()
             
             # Logging (for visualization)

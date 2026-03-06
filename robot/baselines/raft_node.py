@@ -53,7 +53,7 @@ except ImportError:
 UDP_POSITION_PORT = 5100
 UDP_PEER_PORT = 5200
 UDP_FAULT_PORT = 5300
-BROADCAST_IP = "255.255.255.255"
+BROADCAST_IP = "192.168.20.255"
 NUM_ROBOTS = 5
 
 ARENA_WIDTH = 2000
@@ -231,6 +231,7 @@ class RAFTNode:
         self.y = 0.0
         self.theta = 0.0
         self.position_timestamp = 0.0
+        self.position_rx_mono = 0.0
         self._pos_initialized = False
         
         # Sensors
@@ -248,6 +249,7 @@ class RAFTNode:
         # Peers
         self.peers: Dict[int, dict] = {}
         self.peer_timeout = 3.0
+        self._peer_seq = 0
         
         # Coverage
         self.coverage_width = int(ARENA_WIDTH / CELL_SIZE)
@@ -259,6 +261,13 @@ class RAFTNode:
         self.assigned_target: Optional[Tuple[float, float]] = None
         self._prev_assignments: Dict[str, Tuple[float, float]] = {}  # Assignment persistence
         self.current_navigation_target: Optional[Tuple[float, float]] = None
+        self._raw_navigation_target: Optional[Tuple[float, float]] = None
+        self.assigned_target_rx_mono = 0.0
+        self._last_command_source = "startup"
+        self._last_stop_reason = "waiting_for_start"
+        self._last_target_angle = 0.0
+        self._last_heading_error = 0.0
+        self._last_motor_cmd = (0.0, 0.0)
         
         # Logging
         self.log_file = None
@@ -332,9 +341,23 @@ class RAFTNode:
             'state': self.state.value,
             'leader_id': self.current_leader,
             'term': self.current_term,
+            'raw_navigation_target': list(self._raw_navigation_target) if self._raw_navigation_target else None,
+            'navigation_target': list(self.current_navigation_target) if self.current_navigation_target else None,
+            'commanded_target': list(self.assigned_target) if self.assigned_target else None,
             'my_visited_count': len(self.my_visited),
             'known_visited_count': len(self.known_visited),
-            'fault': self.injected_fault
+            'fault': self.injected_fault,
+            'position_rx_age': time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else None,
+            'assigned_target_rx_age': time.monotonic() - self.assigned_target_rx_mono if self.assigned_target_rx_mono > 0 else None,
+            'target_angle': self._last_target_angle,
+            'heading_error': self._last_heading_error,
+            'in_pivot': self._in_pivot if hasattr(self, '_in_pivot') else False,
+            'stuck_count': getattr(self, '_stuck_count', 0),
+            'escape_active': time.monotonic() < getattr(self, '_escape_until', 0.0),
+            'stop_reason': self._last_stop_reason,
+            'command_source': self._last_command_source,
+            'tof': dict(self.tof),
+            'motor_cmd': [self._last_motor_cmd[0], self._last_motor_cmd[1]],
         }
         self.log_file.write(json.dumps(record) + '\n')
         self.log_file.flush()
@@ -357,18 +380,12 @@ class RAFTNode:
                         self.y += POS_EMA * (raw_y - self.y)
                     self.theta = msg['theta']
                     self.position_timestamp = msg.get('timestamp', time.time())
+                    self.position_rx_mono = time.monotonic()
 
-                    _cell = self.get_cell(self.x, self.y)
-                    if _cell is not None:
-                        cx, cy = _cell
-                        for dx, dy in ((0,0),(1,0),(-1,0),(0,1),(0,-1)):
-                            nc = (cx+dx, cy+dy)
-                            if (0 <= nc[0] < self.coverage_width and
-                                0 <= nc[1] < self.coverage_height and
-                                not self._is_wall_cell(nc[0], nc[1]) and
-                                nc not in self.my_visited):
-                                self.my_visited.add(nc)
-                                self.known_visited.add(nc)
+                    cell = self.get_cell(self.x, self.y)
+                    if cell is not None and not self._is_wall_cell(*cell):
+                        self.my_visited.add(cell)
+                        self.known_visited.add(cell)
                 elif msg.get('type') == 'peer_state':
                     peer_id = msg.get('robot_id')
                     if peer_id and peer_id != self.robot_id:
@@ -458,10 +475,12 @@ class RAFTNode:
         assignments = {}
         if self.state == RaftState.LEADER:
             assignments = self.compute_task_assignments()
+        self._peer_seq += 1
         
         msg = {
             'type': 'peer_state',
             'robot_id': self.robot_id,
+            'peer_seq': self._peer_seq,
             'x': self.x, 'y': self.y, 'theta': self.theta,
             'state': self.state.value,
             'term': self.current_term,
@@ -535,6 +554,7 @@ class RAFTNode:
             assignments = msg.get('assignments', {})
             if str(self.robot_id) in assignments:
                 self.assigned_target = tuple(assignments[str(self.robot_id)])
+                self.assigned_target_rx_mono = time.monotonic()
     
     def handle_vote_request(self, msg: dict):
         """Handle vote request from candidate"""
@@ -570,11 +590,22 @@ class RAFTNode:
         """Update peer info"""
         peer_id = msg.get('robot_id')
         if peer_id and peer_id != self.robot_id:
+            existing = self.peers.get(peer_id, {})
+            peer_seq = msg.get('peer_seq')
+            if peer_seq is not None:
+                try:
+                    peer_seq = int(peer_seq)
+                except (TypeError, ValueError):
+                    peer_seq = None
+            if peer_seq is not None and peer_seq <= existing.get('last_peer_seq', -1):
+                return
             self.peers[peer_id] = {
                 'x': msg.get('x', 0),
                 'y': msg.get('y', 0),
                 'theta': msg.get('theta', 0),
-                'last_seen': time.time()
+                'last_seen': time.time(),
+                'last_peer_seq': peer_seq if peer_seq is not None else existing.get('last_peer_seq', -1),
+                'visited_cells': existing.get('visited_cells', set())
             }
             # Merge coverage
             for cell in msg.get('visited_cells', []):
@@ -886,8 +917,9 @@ class RAFTNode:
     # ==================== NAVIGATION ====================
     def _init_stuck_detection(self):
         self._nav_history = []
-        self._escape_until = 0
-        self._escape_start = 0
+        self._escape_until = 0.0
+        self._escape_start = 0.0
+        self._escape_angle = 0.0
         self._stuck_count = 0
         self._tof_emergency_count = 0
 
@@ -896,6 +928,22 @@ class RAFTNode:
         self._prev_heading_err = None
         self._prev_heading_t = 0.0
         self._in_pivot = False
+        self._pivot_start_mono = 0.0
+
+    def _finalize_motor_command(self, left: float, right: float,
+                                stop_reason: Optional[str] = None) -> Tuple[float, float]:
+        MAX_PWM_STEP = 20.0
+        prev_left, prev_right = self._last_motor_cmd
+        left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+        right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
+        if abs(left) < 1e-6:
+            left = 0.0
+        if abs(right) < 1e-6:
+            right = 0.0
+        self._last_motor_cmd = (left, right)
+        if stop_reason is not None:
+            self._last_stop_reason = stop_reason
+        return (left, right)
 
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
@@ -904,9 +952,9 @@ class RAFTNode:
             self._nav_history.clear()
             return False
 
-        now = time.time()
+        now = time.monotonic()
 
-        if now - self.position_timestamp > 1.0:
+        if self.position_rx_mono == 0.0 or now - self.position_rx_mono > 1.0:
             self._nav_history.clear()
             return False
 
@@ -918,7 +966,7 @@ class RAFTNode:
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 2.0 and moved < 30
+        return elapsed > 1.5 and moved < 20
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -1040,7 +1088,7 @@ class RAFTNode:
                 repel_x += (tip_dx / tip_dist) * tip_strength
                 repel_y += (tip_dy / tip_dist) * tip_strength
 
-        REPEL_GAIN = 8.0
+        REPEL_GAIN = 4.0
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
@@ -1119,18 +1167,25 @@ class RAFTNode:
 
         # Fault injection
         if self.injected_fault == 'spin':
-            return (BASE_SPEED, -BASE_SPEED)
+            self._last_command_source = "fault_spin"
+            return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "fault_spin")
         elif self.injected_fault == 'stop':
-            return (0, 0)
+            self._last_command_source = "fault_stop"
+            return self._finalize_motor_command(0.0, 0.0, "fault_stop")
         elif self.injected_fault == 'erratic':
-            return (random.uniform(-BASE_SPEED, BASE_SPEED),
-                   random.uniform(-BASE_SPEED, BASE_SPEED))
+            self._last_command_source = "fault_erratic"
+            return self._finalize_motor_command(
+                random.uniform(-BASE_SPEED, BASE_SPEED),
+                random.uniform(-BASE_SPEED, BASE_SPEED),
+                "fault_erratic"
+            )
 
         # Escape mode: pivot toward escape angle, then drive away.
         # When in a wall zone, skip blind reverse — reversing pushes
         # the robot deeper into the wall it's already stuck against.
-        if time.time() < self._escape_until:
-            phase_elapsed = time.time() - self._escape_start
+        if time.monotonic() < self._escape_until:
+            self._last_command_source = "escape_mode"
+            phase_elapsed = time.monotonic() - self._escape_start
             escape_angle = getattr(self, '_escape_angle', math.atan2(
                 ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x))
 
@@ -1147,17 +1202,17 @@ class RAFTNode:
             pivot_end = reverse_dur + 0.6
 
             if phase_elapsed < reverse_dur:
-                return (-BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
+                return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
             elif phase_elapsed < pivot_end:
                 diff = escape_angle - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
                 while diff < -math.pi: diff += 2 * math.pi
                 if abs(diff) < 0.25:
-                    return (BASE_SPEED * 0.6, BASE_SPEED * 0.6)
+                    return self._finalize_motor_command(BASE_SPEED * 0.6, BASE_SPEED * 0.6, "escape_drive")
                 elif diff > 0:
-                    return (BASE_SPEED, -BASE_SPEED)
+                    return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "escape_pivot")
                 else:
-                    return (-BASE_SPEED, BASE_SPEED)
+                    return self._finalize_motor_command(-BASE_SPEED, BASE_SPEED, "escape_pivot")
             else:
                 safe_angle = self._wall_slide_heading(escape_angle)
                 diff = safe_angle - self.theta
@@ -1167,7 +1222,7 @@ class RAFTNode:
                 left = BASE_SPEED * (1 - turn * 0.5)
                 right = BASE_SPEED * (1 + turn * 0.5)
                 self._stuck_count = max(0, self._stuck_count - 1)
-                return (left, right)
+                return self._finalize_motor_command(left, right, "escape_drive")
 
         # ToF emergency: FRONT-FACING sensors only.
         # Side sensors read close when driving parallel to walls — that's normal.
@@ -1191,8 +1246,8 @@ class RAFTNode:
                 self._tof_emergency_count = 0
                 self._stuck_count += 1
                 escape_time = min(2.0 + self._stuck_count * 0.5, 4.0)
-                self._escape_until = time.time() + escape_time
-                self._escape_start = time.time()
+                self._escape_until = time.monotonic() + escape_time
+                self._escape_start = time.monotonic()
                 self._nav_history.clear()
                 flee_x, flee_y = 0.0, 0.0
                 if self.x < 300: flee_x += 1.0
@@ -1208,7 +1263,8 @@ class RAFTNode:
                     flee_x = math.cos(self.robot_id * 1.2566)
                     flee_y = math.sin(self.robot_id * 1.2566)
                 self._escape_angle = math.atan2(flee_y, flee_x)
-                return (-BASE_SPEED * 0.7, -BASE_SPEED * 0.7)
+                self._last_command_source = "tof_emergency"
+                return self._finalize_motor_command(-BASE_SPEED * 0.7, -BASE_SPEED * 0.7, "tof_emergency")
         else:
             self._tof_emergency_count = 0
 
@@ -1227,17 +1283,18 @@ class RAFTNode:
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
         if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+            self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
                 if diff > 0:
-                    return (0.0, BASE_SPEED)
+                    return self._finalize_motor_command(0.0, BASE_SPEED, "peer_emergency")
                 else:
-                    return (BASE_SPEED, 0.0)
+                    return self._finalize_motor_command(BASE_SPEED, 0.0, "peer_emergency")
             else:
-                return (BASE_SPEED * 0.5, BASE_SPEED * 0.5)
+                return self._finalize_motor_command(BASE_SPEED * 0.5, BASE_SPEED * 0.5, "peer_emergency")
 
         target = None
         if self.state == RaftState.LEADER:
@@ -1245,21 +1302,26 @@ class RAFTNode:
                 target = self.assigned_target if self.assigned_target else self.get_my_frontier()
             else:
                 target = self.get_my_frontier()
+            self._last_command_source = "leader_frontier"
         elif self.assigned_target:
             target = self.assigned_target  # Follow blindly!
+            self._last_command_source = "leader_assigned"
         else:
             target = self.get_my_frontier()
+            self._last_command_source = "predicted_frontier"
 
         if not target:
-            return (30.0, 30.0)
+            self.current_navigation_target = None
+            self._raw_navigation_target = None
+            return self._finalize_motor_command(0.0, 0.0, "no_target")
 
         ARRIVAL_RADIUS = CELL_SIZE
         dist_to_target = math.sqrt((self.x - target[0])**2 + (self.y - target[1])**2)
         if dist_to_target < ARRIVAL_RADIUS:
             cell = self.get_cell(target[0], target[1])
-            now = time.time()
+            now = time.monotonic()
             if cell and cell not in self.my_visited:
-                self.my_visited[cell] = now
+                self.my_visited.add(cell)
             if cell and cell not in self.known_visited:
                 self.known_visited.add(cell)
             self._stuck_count = 0
@@ -1279,10 +1341,11 @@ class RAFTNode:
             else:
                 tx = INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST
         target = (tx, ty)
-        self.current_navigation_target = target
+        self._raw_navigation_target = target
 
         # Route around interior wall
         target = self._route_around_wall(target)
+        self.current_navigation_target = target
 
         if (self.x > OUTER_WALL_MARGIN + 50 and
             self.x < ARENA_WIDTH - OUTER_WALL_MARGIN - 50 and
@@ -1295,8 +1358,8 @@ class RAFTNode:
         if self._check_stuck():
             self._stuck_count += 1
             escape_time = min(1.5 + self._stuck_count * 0.3, 3.0)
-            self._escape_until = time.time() + escape_time
-            self._escape_start = time.time()
+            self._escape_until = time.monotonic() + escape_time
+            self._escape_start = time.monotonic()
             self._nav_history.clear()
 
             flee_x, flee_y = 0.0, 0.0
@@ -1329,7 +1392,8 @@ class RAFTNode:
                 flee_y = math.sin(self.robot_id * 1.2566)
 
             self._escape_angle = math.atan2(flee_y, flee_x)
-            return (-BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
+            self._last_command_source = "stuck_escape"
+            return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "stuck_escape")
 
         # Navigate to target
         dx = target[0] - self.x
@@ -1339,6 +1403,7 @@ class RAFTNode:
         # Wall-sliding and peer avoidance
         target_angle = self._wall_slide_heading(target_angle)
         target_angle = self._peer_avoidance_heading(target_angle)
+        self._last_target_angle = target_angle
 
         EMA_ALPHA = 0.25
         if self._smooth_theta is None:
@@ -1359,6 +1424,7 @@ class RAFTNode:
         HEADING_DEADBAND = 0.17  # ~10° — reject ArUco jitter
         if abs(diff) < HEADING_DEADBAND:
             diff = 0.0
+        self._last_heading_error = diff
 
         turn = max(-1, min(1, KP * diff))
 
@@ -1428,10 +1494,17 @@ class RAFTNode:
 
         PIVOT_ENTER = math.pi * 0.61   # ~110°
         PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
-        if abs(diff) > PIVOT_ENTER:
+        if abs(diff) > PIVOT_ENTER and not self._in_pivot:
             self._in_pivot = True
+            self._pivot_start_mono = time.monotonic()
         if abs(diff) < PIVOT_EXIT:
             self._in_pivot = False
+        if self._in_pivot and self._pivot_start_mono > 0 and time.monotonic() - self._pivot_start_mono > 1.0:
+            self._in_pivot = False
+            self._escape_start = time.monotonic()
+            self._escape_until = self._escape_start + 0.8
+            self._escape_angle = target_angle
+            return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
             pivot_fast = BASE_SPEED
             pivot_slow = 0.0
@@ -1440,7 +1513,7 @@ class RAFTNode:
             else:
                 left_speed, right_speed = pivot_fast, pivot_slow
             self._last_turn = turn
-            return (left_speed, right_speed)
+            return self._finalize_motor_command(left_speed, right_speed, "pivot_turn")
 
         left_speed = effective_speed * (1 - turn * turn_mix)
         right_speed = effective_speed * (1 + turn * turn_mix)
@@ -1451,7 +1524,7 @@ class RAFTNode:
                 right_speed = math.copysign(MIN_MOTOR_PWM, right_speed)
 
         self._last_turn = turn
-        return (left_speed, right_speed)
+        return self._finalize_motor_command(left_speed, right_speed, "tracking")
     
     # ==================== FAULT INJECTION ====================
     def receive_fault_injection(self):
@@ -1466,9 +1539,18 @@ class RAFTNode:
                         self.trial_started = True
                         self.my_visited.clear()
                         self.known_visited.clear()
-                        self.known_visited_time.clear()
+                        self.assigned_target_rx_mono = 0.0
+                        self.current_navigation_target = None
+                        self._raw_navigation_target = None
+                        self._escape_until = 0.0
+                        self._escape_start = 0.0
+                        self._stuck_count = 0
+                        self._last_stop_reason = "trial_started"
+                        self._last_command_source = "trial_started"
+                        self._last_motor_cmd = (0.0, 0.0)
+                        self._nav_history.clear()
                         for p in self.peers.values():
-                            p.visited_cells.clear()
+                            p['visited_cells'] = set()
                         print(f"[START] Trial started — coverage reset, motors engaged")
                         continue
                     elif fault in ('none', 'clear'):
@@ -1571,11 +1653,18 @@ class RAFTNode:
                 printed_waiting = True
 
             left, right = 0.0, 0.0
-            pos_age = time.time() - self.position_timestamp
-            if self.trial_started and self.position_timestamp > 0 and pos_age < 1.5:
+            pos_age = time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else float('inf')
+            if self.trial_started and self.position_rx_mono > 0 and pos_age < 1.5:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:
+                if not self.trial_started:
+                    self._last_stop_reason = "trial_not_started"
+                elif self.position_rx_mono == 0:
+                    self._last_stop_reason = "no_position"
+                else:
+                    self._last_stop_reason = "stale_position"
+                self._last_motor_cmd = (0.0, 0.0)
                 self.hw.stop()
             
             if time.time() - last_log > 0.2:

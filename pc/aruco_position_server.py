@@ -15,6 +15,7 @@ import socket
 import threading
 import os
 import math
+from collections import deque
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 
@@ -103,6 +104,8 @@ class PositionServer:
         self.homography = None      # 3x3 pixel→arena transform
         self.inv_homography = None  # 3x3 arena→pixel (for overlay drawing)
         self.use_homography = True  # Try to use corner markers
+        self._corner_history = deque(maxlen=20)
+        self._homography_locked = False
         
         # Fallback linear calibration
         self.pixels_per_mm_x = actual_w / ARENA_WIDTH_MM
@@ -181,7 +184,6 @@ class PositionServer:
                     if rid:
                         with self._state_lock:
                             self.robot_states[rid] = msg
-                        self._relay_peer_state(data, rid)
             except socket.timeout:
                 pass
             except Exception:
@@ -341,6 +343,8 @@ class PositionServer:
           103 = top-left (0, ARENA_HEIGHT)
         """
         if ids is None:
+            if not self._homography_locked:
+                self._corner_history.clear()
             return
         
         ids_flat = ids.flatten()
@@ -357,6 +361,8 @@ class PositionServer:
         
         if len(corner_pixels) < 4:
             # Not all corners visible, keep previous homography
+            if not self._homography_locked:
+                self._corner_history.clear()
             return
         
         # Source points (pixel coordinates of corner markers)
@@ -380,17 +386,25 @@ class PositionServer:
             [-113, ARENA_HEIGHT_MM],   # TL — 11.3 cm left of origin
         ], dtype=np.float32)
         
+        if self._homography_locked:
+            return
+
+        self._corner_history.append(src_pts)
+        if len(self._corner_history) < self._corner_history.maxlen:
+            return
+
+        stable_src_pts = np.median(np.stack(self._corner_history, axis=0), axis=0).astype(np.float32)
+
         # Compute homography (pixel→arena) and its inverse (arena→pixel)
-        H, _ = cv2.findHomography(src_pts, dst_pts)
+        H, _ = cv2.findHomography(stable_src_pts, dst_pts)
         if H is None:
             print("[WARN] findHomography returned None, keeping previous homography")
             return
         self.homography = H
         self.inv_homography = np.linalg.inv(H)
         self._cell_polys = []  # invalidate cache so overlay rebuilds
-        
-        if self.frame_count % 100 == 0:
-            print(f"[HOMOGRAPHY] Updated from corner markers")
+        self._homography_locked = True
+        print(f"[HOMOGRAPHY] Locked after {len(self._corner_history)} stable frames")
     
     def detect_and_send(self, frame: np.ndarray) -> Dict[int, dict]:
         """Detect markers and send positions to each robot"""

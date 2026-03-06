@@ -87,17 +87,24 @@ def _kill_one(rid, host):
         print(f"  R{rid}: {e}")
 
 
-def kill_all():
-    print("[KILL] Stopping all robots...")
+def kill_all(robot_ids=None):
+    if robot_ids is None:
+        robot_ids = sorted(HOSTS.keys())
+    print(f"[KILL] Stopping robots: {robot_ids}")
     import concurrent.futures
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        futs = {ex.submit(_kill_one, rid, host): rid for rid, host in HOSTS.items()}
+        futs = {
+            ex.submit(_kill_one, rid, HOSTS[rid]): rid
+            for rid in robot_ids
+        }
         concurrent.futures.wait(futs, timeout=10)
     time.sleep(0.5)
 
 
-def clear_robot_logs():
+def clear_robot_logs(robot_ids=None):
     """Remove old logs so collect_logs only gets this trial's data."""
+    if robot_ids is None:
+        robot_ids = sorted(HOSTS.keys())
     import concurrent.futures
     def _clear_one(rid, host):
         try:
@@ -107,12 +114,14 @@ def clear_robot_logs():
         except Exception:
             pass
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        futs = [ex.submit(_clear_one, rid, host) for rid, host in HOSTS.items()]
+        futs = [ex.submit(_clear_one, rid, HOSTS[rid]) for rid in robot_ids]
         concurrent.futures.wait(futs, timeout=10)
 
 
-def deploy_and_launch(controller):
+def deploy_and_launch(controller, robot_ids=None):
     """Two-phase deploy: upload code to ALL robots, then launch ALL simultaneously."""
+    if robot_ids is None:
+        robot_ids = sorted(HOSTS.keys())
     if controller == 'raft':
         local_file = RAFT_LOCAL
         remote_script = 'baselines/raft_node.py'
@@ -125,7 +134,8 @@ def deploy_and_launch(controller):
     # --- Phase 1: Kill old processes + upload code (sequential, no launch yet) ---
     print(f"[DEPLOY] Phase 1: uploading {remote_script} to all robots...")
     ssh_connections = {}
-    for rid, host in sorted(HOSTS.items()):
+    for rid in sorted(robot_ids):
+        host = HOSTS[rid]
         try:
             ssh = _ssh_connect(host)
             ssh.exec_command('pkill -f reip_node; pkill -f raft_node')
@@ -176,10 +186,13 @@ def deploy_and_launch(controller):
             print(f"  R{rid}: verify error - {e}")
 
 
-def collect_logs(trial_dir):
+def collect_logs(trial_dir, robot_ids=None):
+    if robot_ids is None:
+        robot_ids = sorted(HOSTS.keys())
     os.makedirs(trial_dir, exist_ok=True)
     print(f"[LOGS] Collecting to {trial_dir}")
-    for rid, host in HOSTS.items():
+    for rid in robot_ids:
+        host = HOSTS[rid]
         try:
             ssh = _ssh_connect(host)
             sftp = ssh.open_sftp()
@@ -240,7 +253,9 @@ def clear_faults(robot_ids):
 
 
 # ==================== Single trial ====================
-def run_single_trial(controller, fault_type, trial_num, output_dir):
+def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=None):
+    if robot_ids is None:
+        robot_ids = sorted(HOSTS.keys())
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     trial_name = f"{controller}_{fault_type or 'none'}_t{trial_num}"
     trial_dir = os.path.join(output_dir, f"{trial_name}_{ts}")
@@ -250,6 +265,7 @@ def run_single_trial(controller, fault_type, trial_num, output_dir):
     print(f" TRIAL: {trial_name}")
     print(f" Controller: {controller}")
     print(f" Fault: {fault_type or 'none'}")
+    print(f" Robots: {robot_ids}")
     print(f" Duration: {EXPERIMENT_DURATION}s")
     if fault_type and fault_type != 'none':
         print(f" Fault #1 at t={FAULT_INJECT_TIME_1}s")
@@ -268,11 +284,11 @@ def run_single_trial(controller, fault_type, trial_num, output_dir):
     }
 
     # Phase 0: Kill old processes + clear old logs
-    kill_all()
-    clear_robot_logs()
+    kill_all(robot_ids)
+    clear_robot_logs(robot_ids)
 
     # Phase 1: Deploy and launch
-    deploy_and_launch(controller)
+    deploy_and_launch(controller, robot_ids)
 
     # Give robots a few seconds to get localized and elect a leader,
     # then send the start signal so they all begin simultaneously.
@@ -358,11 +374,11 @@ def run_single_trial(controller, fault_type, trial_num, output_dir):
 
     clear_faults([r for r in fault_robots if r])
     time.sleep(0.5)
-    kill_all()
+    kill_all(robot_ids)
 
     # Phase 4: Collect logs
     time.sleep(2)
-    collect_logs(trial_dir)
+    collect_logs(trial_dir, robot_ids)
 
     # Save metadata
     meta_path = os.path.join(trial_dir, 'trial_meta.json')
@@ -404,6 +420,20 @@ def run_batch(output_dir, trials_per=TRIALS_PER_CONDITION):
 
 # ==================== Entry ====================
 if __name__ == '__main__':
+    def _parse_robot_ids(spec: str):
+        ids = []
+        for chunk in spec.split(','):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            rid = int(chunk)
+            if rid not in HOSTS:
+                raise ValueError(f"Unknown robot id: {rid}")
+            ids.append(rid)
+        if not ids:
+            raise ValueError("No robot ids provided")
+        return sorted(set(ids))
+
     parser = argparse.ArgumentParser(description="Automated hardware trial runner")
     parser.add_argument('--controller', default='reip',
                         choices=['reip', 'raft', 'decentralized'])
@@ -417,11 +447,14 @@ if __name__ == '__main__':
                         help='Trials per condition in batch mode')
     parser.add_argument('--duration', type=int, default=EXPERIMENT_DURATION,
                         help='Trial duration in seconds')
+    parser.add_argument('--robots', default='1,2,3,4,5',
+                        help='Comma-separated robot IDs to include, e.g. 1 or 1,2,3')
     args = parser.parse_args()
 
     EXPERIMENT_DURATION = args.duration
+    robot_ids = _parse_robot_ids(args.robots)
 
     if args.batch:
         run_batch(args.output, args.trials_per)
     else:
-        run_single_trial(args.controller, args.fault, args.trial, args.output)
+        run_single_trial(args.controller, args.fault, args.trial, args.output, robot_ids)

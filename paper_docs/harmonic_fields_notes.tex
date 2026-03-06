@@ -308,6 +308,240 @@ and check whether the leader's broadcast is consistent.  Field
 corruption is detectable the same way bad frontier assignments
 are --- by comparing against local knowledge.
 
+\section{Extension to 3D Terrain: Where Covariant Derivatives
+Actually Matter}
+
+On a flat grid, calling the Hessian a ``covariant derivative'' is
+technically correct but overkill --- the curvature corrections are
+all zero.  On terrain with elevation, they're not.  This is where
+the full differential geometry machinery earns its keep.
+
+\subsection{Terrain as a Riemannian Manifold}
+
+Model the terrain as a heightmap $z = h(x,y)$.  A robot driving on
+this surface lives on a 2D manifold embedded in 3D space.  The
+\textbf{metric tensor} at each point encodes how distances are
+distorted by slope:
+\begin{equation}
+    g = \begin{pmatrix}
+    1 + \left(\dfrac{\partial h}{\partial x}\right)^{\!2} &
+    \dfrac{\partial h}{\partial x}\dfrac{\partial h}{\partial y}
+    \\[10pt]
+    \dfrac{\partial h}{\partial x}\dfrac{\partial h}{\partial y} &
+    1 + \left(\dfrac{\partial h}{\partial y}\right)^{\!2}
+    \end{pmatrix}
+    \label{eq:metric}
+\end{equation}
+
+On flat ground, $h = \text{const}$, so $g = I$ (the identity) and
+everything collapses back to ordinary calculus.  On a 30-degree
+slope, $|\partial h / \partial x| \approx 0.58$, and the $(1,1)$
+entry becomes $1.33$ --- distances in the uphill direction are 15\%
+longer than they ``look'' from above.
+
+\subsection{The Laplace--Beltrami Operator}
+
+The flat Laplace equation $\nabla^2\phi = 0$ generalizes on a
+curved surface to the \textbf{Laplace--Beltrami equation}:
+\begin{equation}
+    \Delta_{\mathrm{LB}}\,\phi =
+    \frac{1}{\sqrt{|g|}}\,\partial_i\!\left(
+    \sqrt{|g|}\; g^{ij}\,\partial_j\phi
+    \right) = 0
+    \label{eq:laplace_beltrami}
+\end{equation}
+where $|g| = \det(g)$ and $g^{ij}$ is the inverse metric.
+
+This does two things the flat version cannot:
+\begin{enumerate}
+    \item \textbf{Weights distances by slope.}  Steep regions
+    have larger $\sqrt{|g|}$, which increases the effective
+    ``resistance'' of those cells.  The resulting potential field
+    naturally routes robots around steep hills rather than over
+    them --- not because you programmed a slope penalty, but
+    because the geometry itself makes uphill paths longer.
+    \item \textbf{Accounts for surface curvature.}  On a saddle
+    (hill crest or valley merge), the metric changes rapidly.
+    The Laplace--Beltrami operator captures this, producing
+    gradient flow that respects the true surface geometry.
+\end{enumerate}
+
+\subsection{Adding Energy Cost: The Weighted Metric}
+
+Raw surface distance isn't the only cost.  Going uphill burns more
+energy than going downhill.  You can encode this by \emph{warping}
+the metric with a cost function $c(x,y)$:
+\begin{equation}
+    \tilde{g}_{ij} = c(x,y) \cdot g_{ij}
+    \label{eq:weighted_metric}
+\end{equation}
+
+A simple choice is slope-dependent cost:
+\begin{equation}
+    c(x,y) = 1 + \alpha\,\max\!\bigl(0,\;
+    \mathbf{n} \cdot \hat{\mathbf{z}}\bigr)^{-1}
+\end{equation}
+where $\mathbf{n}$ is the surface normal and $\alpha$ controls how
+much you penalize uphill movement.  Flat ground: $c = 1 + \alpha$.
+Vertical cliff: $c \to \infty$ (impassable).  The field
+automatically routes around it.
+
+Solving Laplace--Beltrami with the weighted metric
+$\tilde{g}$ produces a potential field where ``short'' means
+``cheap to traverse,'' not ``geometrically close.''  Downhill
+shortcuts appear as low-potential channels; steep slopes become
+high-potential barriers.
+
+\subsection{The ``OH SHIT'' Problem: Dynamic Obstacle Insertion}
+
+A robot is following $-\nabla\phi$ down a smooth gradient toward a
+frontier when its LiDAR/ToF suddenly detects a rock 500\,mm ahead.
+The current field says ``drive straight through it.''  What now?
+
+\subsubsection{Boundary Condition Update}
+
+The rock becomes a new obstacle in the grid.  Mark those cells with
+Neumann boundary conditions ($\partial\phi/\partial n = 0$), then
+re-solve the field.  The potential redistributes: the gradient now
+flows \emph{around} the rock.
+
+The problem: full re-solve on a large grid is slow.
+
+\subsubsection{Local Relaxation (The Practical Answer)}
+
+Harmonic functions have a critical property: \textbf{changes to
+boundary conditions decay exponentially with distance}.  Inserting a
+rock at cell $(i_0, j_0)$ significantly changes $\phi$ only within
+a radius $\sim\! 3$--$5$ cells.  Beyond that, the perturbation is
+negligible.
+
+So you only re-iterate cells in a local patch:
+\begin{equation}
+    \text{Re-solve } \phi_{i,j} \;\text{ for }\;
+    |i - i_0| \leq R,\; |j - j_0| \leq R
+\end{equation}
+with $R \approx 5$.  On a $(2R+1)^2 = 121$-cell patch, convergence
+takes ${\sim}20$ iterations = 2\,400 operations.  Sub-millisecond,
+even on a Pi Zero.
+
+The robot's gradient updates within one control cycle.  From its
+perspective: the field smoothly ``bends'' around the newly detected
+obstacle, and the robot arcs around it without any explicit replanning
+step.
+
+\subsubsection{Superposition (The Elegant Answer)}
+
+The Laplace equation is \textbf{linear}.  If $\phi_1$ solves
+$\nabla^2\phi_1 = 0$ (old field) and $\phi_2$ solves
+$\nabla^2\phi_2 = 0$ with only the rock's boundary conditions, then:
+\begin{equation}
+    \phi_{\text{new}} = \phi_1 + \phi_2
+\end{equation}
+also satisfies the Laplace equation with both the old and new
+boundary conditions.
+
+You can precompute a library of ``single obstacle response''
+fields $\phi_{\text{rock}}$ for a rock at different positions.
+When a new obstacle appears, look up the nearest precomputed
+response and add it.  The field updates in $O(1)$.
+
+In practice, this is overkill for small grids but powerful for
+large-scale outdoor environments where a full re-solve would be
+too expensive.
+
+\subsection{The Vector Transform: Parallel Transport}
+
+Here is where the covariant derivative \emph{genuinely} matters
+and cannot be reduced to ordinary calculus.
+
+On flat ground, a vector ``pointing east'' means the same thing
+everywhere.  On a hillside, ``east'' at the base and ``east'' at
+the summit are \emph{different directions in 3D space} because the
+surface has curved underneath.
+
+When a robot computes $-\nabla\phi$ at position $A$ and then drives
+to position $B$, the gradient at $B$ lives in a different tangent
+plane.  Comparing or interpolating between them requires
+\textbf{parallel transport}: sliding the vector from $A$'s tangent
+plane to $B$'s tangent plane along the surface, accounting for
+curvature.
+
+The covariant derivative formalizes this.  For the gradient vector
+field $\mathbf{V} = -\nabla\phi$, transported along direction
+$\mathbf{u}$:
+\begin{equation}
+    \nabla_{\mathbf{u}} \mathbf{V} =
+    \partial_{\mathbf{u}} \mathbf{V}
+    + \Gamma^k_{ij}\, u^i V^j\, \mathbf{e}_k
+    \label{eq:covariant_terrain}
+\end{equation}
+
+The $\Gamma^k_{ij}$ are the \textbf{Christoffel symbols} ---
+computed from derivatives of the metric tensor (\ref{eq:metric}).
+On flat ground, $\Gamma = 0$ and this reduces to the ordinary
+directional derivative (the Hessian story from Section~4).
+On terrain, $\Gamma \neq 0$ and the correction terms matter.
+
+\subsubsection{What the Christoffel Symbols Physically Mean}
+
+For a heightmap, the Christoffel symbols encode:
+\begin{itemize}
+    \item \textbf{Slope gradient}: how the tilt changes as you move.
+    A robot driving along a contour line on a hill experiences a
+    ``centrifugal'' correction pulling it downhill --- $\Gamma$
+    captures this.
+    \item \textbf{Twist}: on a saddle-shaped surface, moving
+    ``north'' rotates your local ``east'' vector.  Without the
+    $\Gamma$ correction, the robot's gradient-following would
+    slowly drift off-course as the surface twists underneath it.
+\end{itemize}
+
+For a discrete heightmap grid, the Christoffel symbols are computed
+from first and second derivatives of $h(x,y)$:
+\begin{align}
+    \Gamma^x_{xx} &= \frac{h_x\, h_{xx}}{1 + h_x^2 + h_y^2}
+    \\
+    \Gamma^x_{xy} &= \frac{h_x\, h_{xy}}{1 + h_x^2 + h_y^2}
+    \\
+    \Gamma^y_{xx} &= \frac{h_y\, h_{xx}}{1 + h_x^2 + h_y^2}
+\end{align}
+(and symmetrically for the other components).  These are $O(1)$ per
+cell from finite differences on the heightmap.
+
+\subsection{Putting It Together: Terrain-Aware Dynamic Navigation}
+
+The complete pipeline for a robot on 3D terrain with dynamic
+obstacles:
+
+\begin{enumerate}
+    \item \textbf{Build the heightmap} from LiDAR / depth camera.
+    Compute the metric tensor $g_{ij}$ at each cell.
+    \item \textbf{Solve Laplace--Beltrami} (\ref{eq:laplace_beltrami})
+    with weighted metric (\ref{eq:weighted_metric}).
+    Frontier = 0, obstacles = Neumann.
+    \item \textbf{Follow} $-g^{ij}\partial_j\phi$ (the
+    \emph{metric-compatible gradient}, not the flat gradient).
+    This vector lives in the surface tangent plane and
+    accounts for slope cost.
+    \item \textbf{On new obstacle detection}: local relaxation
+    (re-solve a $10 \times 10$ patch), or superposition of a
+    precomputed obstacle response.  Field updates within one
+    control cycle.
+    \item \textbf{For multi-robot dispersion}: compute the
+    \emph{covariant} Hessian (including Christoffel corrections)
+    and decompose into convergent/divergent eigenvectors.  Robots
+    spread along the divergent axis at forks, exactly as in
+    Section~4 but now respecting surface geometry.
+\end{enumerate}
+
+The key difference from the flat case: step~3 uses $g^{ij}$ (the
+inverse metric) to convert the raw partial derivatives into a
+direction that actually makes sense on the tilted surface, and
+step~5 uses $\Gamma^k_{ij}$ to correctly identify where flow
+channels diverge on curved terrain.  Without these corrections, a
+robot on a hillside would systematically drift downhill when it
+should be contouring, and would misidentify forks at saddle points.
+
 \section*{References}
 
 \begin{itemize}
@@ -320,6 +554,12 @@ are --- by comparing against local knowledge.
     \item S.~M. LaValle, \emph{Planning Algorithms}, Cambridge
     University Press, 2006, Ch.~4 (potential functions) and Ch.~8
     (navigation functions).
+    \item E.~Rimon and D.~E. Koditschek, ``Exact robot navigation
+    using artificial potential functions,'' \emph{IEEE Trans.\ Robot.\
+    Autom.}, vol.~8, no.~5, pp.~501--518, 1992.
+    \item M.~P. do Carmo, \emph{Riemannian Geometry}, Birkh\"auser,
+    1992 (Chapters 2--3: metric tensors, covariant derivatives,
+    Christoffel symbols on surfaces).
 \end{itemize}
 
 \end{document}

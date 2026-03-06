@@ -1632,13 +1632,13 @@ class REIPNode:
 
         self._nav_history.append((now, self.x, self.y))
         self._nav_history = [(t, x, y) for t, x, y in self._nav_history
-                             if now - t < 2.0]
+                             if now - t < 3.0]
         if len(self._nav_history) < 2:
             return False
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 0.5 and moved < 25
+        return elapsed > 2.0 and moved < 30
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -1726,15 +1726,19 @@ class REIPNode:
         return target
 
     def _wall_slide_heading(self, desired_angle):
-        """Modify heading to avoid walls using separate outer/divider margins.
+        """Modify heading to avoid walls.
 
-        Three layers:
-          1. Soft quadratic repulsion starting at REPULSION_ZONE
-          2. Hard clamp at WALL_MARGIN / DIVIDER_MARGIN
-          3. Deadlock escape toward center if both components zeroed
+        The hard clamp (wall-slide) must trigger BEFORE physical contact.
+        ROBOT_RADIUS=110mm means the edge touches at 110mm from the wall.
+        We clamp heading at ROBOT_RADIUS + 60mm so the robot starts
+        sliding along the wall with clearance to spare.  The soft
+        repulsion zone is just an early nudge for diagonal approaches.
         """
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
+
+        SLIDE_DIST = ROBOT_RADIUS + 60
+        DIV_SLIDE_DIST = BODY_HALF_WIDTH + 60
 
         def _repel(dist_to_wall, zone):
             if dist_to_wall < zone:
@@ -1757,12 +1761,11 @@ class REIPNode:
             if 0 < d_right < div_zone:
                 repel_x += _repel(d_right, div_zone)
 
-        # Repulsion around both wall tip corners.
         for tip_x in [INTERIOR_WALL_X_LEFT, INTERIOR_WALL_X_RIGHT]:
             tip_dx = self.x - tip_x
             tip_dy = self.y - INTERIOR_WALL_Y_END
             tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
-            TIP_ZONE = DIVIDER_MARGIN + 30
+            TIP_ZONE = DIV_SLIDE_DIST
             if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + 50:
                 tip_strength = _repel(tip_dist, TIP_ZONE)
                 repel_x += (tip_dx / tip_dist) * tip_strength
@@ -1772,20 +1775,20 @@ class REIPNode:
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
-        if self.x < WALL_MARGIN and hx < 0:
+        if self.x < SLIDE_DIST and hx < 0:
             hx = 0
-        if self.x > ARENA_WIDTH - WALL_MARGIN and hx > 0:
+        if self.x > ARENA_WIDTH - SLIDE_DIST and hx > 0:
             hx = 0
-        if self.y < WALL_MARGIN and hy < 0:
+        if self.y < SLIDE_DIST and hy < 0:
             hy = 0
-        if self.y > ARENA_HEIGHT - WALL_MARGIN and hy > 0:
+        if self.y > ARENA_HEIGHT - SLIDE_DIST and hy > 0:
             hy = 0
         if self.y < INTERIOR_WALL_Y_END:
             d_from_right = self.x - INTERIOR_WALL_X_RIGHT
             d_from_left = INTERIOR_WALL_X_LEFT - self.x
-            if 0 < d_from_right < DIVIDER_MARGIN and hx < 0:
+            if 0 < d_from_right < DIV_SLIDE_DIST and hx < 0:
                 hx = 0
-            elif 0 < d_from_left < DIVIDER_MARGIN and hx > 0:
+            elif 0 < d_from_left < DIV_SLIDE_DIST and hx > 0:
                 hx = 0
 
         if abs(hx) < 0.01 and abs(hy) < 0.01:
@@ -1820,9 +1823,9 @@ class REIPNode:
             if dist < PEER_AVOID_DIST and dist > 5:
                 n_close += 1
                 strength = (PEER_AVOID_DIST - dist) / PEER_AVOID_DIST
-                if dist < ROBOT_RADIUS:
+                if dist < 2 * ROBOT_RADIUS:
                     strength *= 6.0
-                elif dist < 2 * ROBOT_RADIUS:
+                elif dist < 2 * ROBOT_RADIUS + 100:
                     strength *= 3.0
                 repel_x += (dx / dist) * strength
                 repel_y += (dy / dist) * strength
@@ -1838,7 +1841,7 @@ class REIPNode:
         if abs(repel_x) < 0.01 and abs(repel_y) < 0.01:
             return desired_angle
 
-        if closest_dist < ROBOT_RADIUS:
+        if closest_dist < 2 * ROBOT_RADIUS:
             return math.atan2(repel_y, repel_x)
 
         hx += repel_x * PEER_REPEL_GAIN
@@ -1868,52 +1871,7 @@ class REIPNode:
             return (random.uniform(-BASE_SPEED, BASE_SPEED),
                    random.uniform(-BASE_SPEED, BASE_SPEED))
 
-        # Escape mode: pivot toward escape angle, then drive away.
-        # When in a wall zone, skip blind reverse — reversing pushes
-        # the robot deeper into the wall it's already stuck against.
-        if time.time() < self._escape_until:
-            phase_elapsed = time.time() - self._escape_start
-            escape_angle = getattr(self, '_escape_angle', math.atan2(
-                ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x))
-
-            in_wall_zone = (
-                self.x < OUTER_WALL_MARGIN + 50 or
-                self.x > ARENA_WIDTH - OUTER_WALL_MARGIN - 50 or
-                self.y < OUTER_WALL_MARGIN + 50 or
-                self.y > ARENA_HEIGHT - OUTER_WALL_MARGIN - 50 or
-                (self.y < INTERIOR_WALL_Y_END and
-                 abs(self.x - INTERIOR_WALL_X) < DIVIDER_MARGIN + 80)
-            )
-
-            reverse_dur = 0.0 if in_wall_zone else 0.4
-            pivot_end = reverse_dur + 0.6
-
-            if phase_elapsed < reverse_dur:
-                return (-BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
-            elif phase_elapsed < pivot_end:
-                diff = escape_angle - self.theta
-                while diff > math.pi: diff -= 2 * math.pi
-                while diff < -math.pi: diff += 2 * math.pi
-                if diff > 0:
-                    return (BASE_SPEED, -BASE_SPEED)
-                else:
-                    return (-BASE_SPEED, BASE_SPEED)
-            else:
-                safe_angle = self._wall_slide_heading(escape_angle)
-                diff = safe_angle - self.theta
-                while diff > math.pi: diff -= 2 * math.pi
-                while diff < -math.pi: diff += 2 * math.pi
-                turn = max(-1, min(1, diff / (math.pi / 4)))
-                left = BASE_SPEED * (1 - turn * 0.5)
-                right = BASE_SPEED * (1 + turn * 0.5)
-                self._stuck_count = max(0, self._stuck_count - 1)
-                return (left, right)
-
-        # ToF emergency: FRONT-FACING sensors only (front, front_left, front_right).
-        # Side sensors read close when driving parallel to walls — that's normal
-        # and must NOT trigger emergency reversal.
-        TOF_EMERGENCY_DIST = 120
-
+        # Read ToF sensors (used later for turn bias and speed taper).
         front_d = self.tof.get('front', 9999)
         fl_d = self.tof.get('front_left', 9999)
         fr_d = self.tof.get('front_right', 9999)
@@ -1924,50 +1882,11 @@ class REIPNode:
         if fr_d <= 0: fr_d = 9999
         if left_d <= 0: left_d = 9999
         if right_d <= 0: right_d = 9999
-        min_front = min(front_d, fl_d, fr_d)
 
-        if min_front > 20 and min_front < TOF_EMERGENCY_DIST:
-            self._tof_emergency_count += 1
-            if self._tof_emergency_count >= 3:
-                self._tof_emergency_count = 0
-                self._stuck_count += 1
-                escape_time = min(2.0 + self._stuck_count * 0.5, 4.0)
-                self._escape_until = time.time() + escape_time
-                self._escape_start = time.time()
-                self._nav_history.clear()
-                # Flee from nearest wall/divider, not blindly toward center
-                flee_x, flee_y = 0.0, 0.0
-                if self.x < 300: flee_x += 1.0
-                if ARENA_WIDTH - self.x < 300: flee_x -= 1.0
-                if self.y < 300: flee_y += 1.0
-                if ARENA_HEIGHT - self.y < 300: flee_y -= 1.0
-                if self.y < INTERIOR_WALL_Y_END:
-                    if 0 < INTERIOR_WALL_X_LEFT - self.x < 300:
-                        flee_x -= 1.0
-                    if 0 < self.x - INTERIOR_WALL_X_RIGHT < 300:
-                        flee_x += 1.0
-                if abs(flee_x) < 0.01 and abs(flee_y) < 0.01:
-                    flee_x = math.cos(self.robot_id * 1.2566)
-                    flee_y = math.sin(self.robot_id * 1.2566)
-                self._escape_angle = math.atan2(flee_y, flee_x)
-                return (-BASE_SPEED * 0.7, -BASE_SPEED * 0.7)
-            # Reverse away from whichever side is closest
-            rev = BASE_SPEED * 0.6
-            if left_d < right_d and left_d < front_d:
-                return (-rev * 0.3, -rev)       # reverse turning right
-            elif right_d < left_d and right_d < front_d:
-                return (-rev, -rev * 0.3)       # reverse turning left
-            elif fr_d < fl_d:
-                return (-rev, -rev * 0.4)
-            else:
-                return (-rev * 0.4, -rev)
-        else:
-            self._tof_emergency_count = 0
-
-        # Peer collision: if touching another robot, pivot away immediately.
-        # Don't drive forward at all — forward motion just pushes both robots
-        # together harder. Pure rotation to face the flee direction, then the
-        # normal nav code takes over once there's clearance.
+        # Peer collision: pivot away BEFORE physical contact.
+        # Contact = 2*ROBOT_RADIUS = 220mm center-to-center.
+        # Trigger at 280mm: 60mm clearance + margin for 200ms position staleness.
+        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         _closest_peer_dist = 9999.0
         _flee_px, _flee_py = 0.0, 0.0
         for pid, peer in self.peers.items():
@@ -1978,20 +1897,19 @@ class REIPNode:
             pdist = math.sqrt(pdx * pdx + pdy * pdy)
             if pdist < _closest_peer_dist:
                 _closest_peer_dist = pdist
-            if pdist < ROBOT_RADIUS * 1.5 and pdist > 5:
+            if pdist < PEER_CONTACT_DIST and pdist > 5:
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
-        if _closest_peer_dist < ROBOT_RADIUS * 1.5 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+        if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             flee_angle = math.atan2(_flee_py, _flee_px)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
-                pivot_spd = BASE_SPEED * 0.7
                 if diff > 0:
-                    return (pivot_spd, -pivot_spd)
+                    return (0.0, BASE_SPEED)
                 else:
-                    return (-pivot_spd, pivot_spd)
+                    return (BASE_SPEED, 0.0)
             else:
                 return (BASE_SPEED * 0.5, BASE_SPEED * 0.5)
 
@@ -2019,14 +1937,8 @@ class REIPNode:
                     self.leader_assigned_target = None
 
         if not target:
-            return (0.0, 0.0)
+            return (30.0, 30.0)
 
-        # Arrival detection: mark the target cell as visited.
-        # DO NOT clear the leader assignment here.  The leader will see
-        # the cell in known_visited (via our broadcast) or notice we're
-        # at the target (proximity check) and reassign on its next cycle.
-        # Clearing it here causes the robot to immediately fall back to
-        # local frontier, which defeats the whole point of having a leader.
         ARRIVAL_RADIUS = CELL_SIZE
         dist_to_target = math.sqrt((self.x - target[0])**2 + (self.y - target[1])**2)
         if dist_to_target < ARRIVAL_RADIUS:
@@ -2038,72 +1950,29 @@ class REIPNode:
                 self.known_visited.add(cell)
                 self.known_visited_time[cell] = now
             self._stuck_count = 0
+            if self.state == RobotState.LEADER:
+                self.my_assigned_target = None
+            if self.leader_assigned_target == target:
+                self.leader_assigned_target = None
 
-        # Clamp target outside physical body margin (outer walls + divider).
-        tx = max(OUTER_WALL_MARGIN, min(ARENA_WIDTH - OUTER_WALL_MARGIN, target[0]))
-        ty = max(OUTER_WALL_MARGIN, min(ARENA_HEIGHT - OUTER_WALL_MARGIN, target[1]))
+        # Clamp target outside the wall-slide zone so the robot never
+        # aims at a point it will be prevented from reaching.
+        # Must match SLIDE_DIST / DIV_SLIDE_DIST from _wall_slide_heading.
+        SLIDE_DIST = ROBOT_RADIUS + 60
+        DIV_SLIDE_DIST = BODY_HALF_WIDTH + 60
+        tx = max(SLIDE_DIST, min(ARENA_WIDTH - SLIDE_DIST, target[0]))
+        ty = max(SLIDE_DIST, min(ARENA_HEIGHT - SLIDE_DIST, target[1]))
         if ty < INTERIOR_WALL_Y_END and (
-                INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < tx < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
+                INTERIOR_WALL_X_LEFT - DIV_SLIDE_DIST < tx < INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST):
             if tx < INTERIOR_WALL_X:
-                tx = INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN
+                tx = INTERIOR_WALL_X_LEFT - DIV_SLIDE_DIST
             else:
-                tx = INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN
+                tx = INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST
         target = (tx, ty)
         self.current_navigation_target = target
 
         # Route around interior wall (equivalent to sim's A* pathfinding)
         target = self._route_around_wall(target)
-
-        # If we've moved into open space, reset the stuck escalation counter
-        # so the robot doesn't carry over long escape durations from a corner.
-        if (self.x > OUTER_WALL_MARGIN + 50 and
-            self.x < ARENA_WIDTH - OUTER_WALL_MARGIN - 50 and
-            self.y > OUTER_WALL_MARGIN + 50 and
-            self.y < ARENA_HEIGHT - OUTER_WALL_MARGIN - 50):
-            if self._stuck_count > 0:
-                self._stuck_count = max(0, self._stuck_count - 1)
-
-        # Stuck detection → escape: pivot away, then drive to open space
-        if self._check_stuck():
-            self._stuck_count += 1
-            escape_time = min(1.5 + self._stuck_count * 0.3, 3.0)
-            self._escape_until = time.time() + escape_time
-            self._escape_start = time.time()
-            self._nav_history.clear()
-
-            flee_x, flee_y = 0.0, 0.0
-            for pid, peer in self.peers.items():
-                if time.time() - peer.last_seen > PEER_TIMEOUT:
-                    continue
-                d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
-                if d < 400 and d > 5:
-                    flee_x += (self.x - peer.x) / d
-                    flee_y += (self.y - peer.y) / d
-            # Outer walls
-            flee_range = 300.0
-            if self.x < flee_range:
-                flee_x += (flee_range - self.x) / flee_range
-            if ARENA_WIDTH - self.x < flee_range:
-                flee_x -= (flee_range - (ARENA_WIDTH - self.x)) / flee_range
-            if self.y < flee_range:
-                flee_y += (flee_range - self.y) / flee_range
-            if ARENA_HEIGHT - self.y < flee_range:
-                flee_y -= (flee_range - (ARENA_HEIGHT - self.y)) / flee_range
-            # Interior divider — flee away from whichever face is closer
-            if self.y < INTERIOR_WALL_Y_END:
-                d_to_left = abs(self.x - INTERIOR_WALL_X_LEFT)
-                d_to_right = abs(self.x - INTERIOR_WALL_X_RIGHT)
-                if d_to_left < flee_range:
-                    flee_x += -(flee_range - d_to_left) / flee_range if self.x > INTERIOR_WALL_X_LEFT else (flee_range - d_to_left) / flee_range
-                if d_to_right < flee_range:
-                    flee_x += (flee_range - d_to_right) / flee_range if self.x > INTERIOR_WALL_X_RIGHT else -(flee_range - d_to_right) / flee_range
-
-            if abs(flee_x) < 0.01 and abs(flee_y) < 0.01:
-                flee_x = math.cos(self.robot_id * 1.2566)
-                flee_y = math.sin(self.robot_id * 1.2566)
-
-            self._escape_angle = math.atan2(flee_y, flee_x)
-            return (-BASE_SPEED * 0.6, -BASE_SPEED * 0.6)
 
         # --- Navigate to target ---
         dx = target[0] - self.x
@@ -2116,7 +1985,7 @@ class REIPNode:
         target_angle = self._peer_avoidance_heading(target_angle)
 
         # EMA-filtered heading to suppress ArUco jitter (~5-10° per frame)
-        EMA_ALPHA = 0.35
+        EMA_ALPHA = 0.25
         if self._smooth_theta is None:
             self._smooth_theta = self.theta
         else:
@@ -2132,60 +2001,33 @@ class REIPNode:
         while diff < -math.pi: diff += 2 * math.pi
 
         KP = 1.0 / (math.pi / 2)
-        KD = 0.2
-        HEADING_DEADBAND = 0.10  # ~5.7° — wider to ignore ArUco noise
+        HEADING_DEADBAND = 0.17  # ~10° — reject ArUco jitter
         if abs(diff) < HEADING_DEADBAND:
             diff = 0.0
 
-        now = time.time()
-        d_term = 0.0
-        if self._prev_heading_err is not None and self._prev_heading_t > 0:
-            dt = now - self._prev_heading_t
-            if 0.01 < dt < 0.5:
-                d_err = diff - self._prev_heading_err
-                while d_err > math.pi: d_err -= 2 * math.pi
-                while d_err < -math.pi: d_err += 2 * math.pi
-                d_term = KD * (d_err / dt) / (math.pi / 2)
-        self._prev_heading_err = diff
-        self._prev_heading_t = now
+        turn = max(-1, min(1, KP * diff))
 
-        turn = max(-1, min(1, KP * diff + d_term))
-
-        # ToF-based reactive turn bias: sensors see an obstacle within 200mm,
-        # bias turn away. Includes front sensor so the robot steers away from
-        # head-on obstacles early (before the 70mm emergency threshold).
+        # ToF-based reactive turn bias: steer away from detected obstacles.
         TOF_BIAS_DIST = 300
-        fl = self.tof.get('front_left', 9999)
-        fr = self.tof.get('front_right', 9999)
-        front_tof = self.tof.get('front', 9999)
-        left_tof = self.tof.get('left', 9999)
-        right_tof = self.tof.get('right', 9999)
-        if fl <= 0: fl = 9999
-        if fr <= 0: fr = 9999
-        if front_tof <= 0: front_tof = 9999
-        if left_tof <= 0: left_tof = 9999
-        if right_tof <= 0: right_tof = 9999
         tof_bias = 0.0
-        if fl < TOF_BIAS_DIST and fl > 20:
-            tof_bias += 0.15 * (TOF_BIAS_DIST - fl) / TOF_BIAS_DIST
-        if left_tof < TOF_BIAS_DIST and left_tof > 20:
-            tof_bias += 0.08 * (TOF_BIAS_DIST - left_tof) / TOF_BIAS_DIST
-        if fr < TOF_BIAS_DIST and fr > 20:
-            tof_bias -= 0.15 * (TOF_BIAS_DIST - fr) / TOF_BIAS_DIST
-        if right_tof < TOF_BIAS_DIST and right_tof > 20:
-            tof_bias -= 0.08 * (TOF_BIAS_DIST - right_tof) / TOF_BIAS_DIST
-        if front_tof < TOF_BIAS_DIST and front_tof > 20:
-            steer_sign = 1.0 if (fl > fr or left_tof > right_tof) else -1.0
-            tof_bias += steer_sign * 0.2 * (TOF_BIAS_DIST - front_tof) / TOF_BIAS_DIST
+        if fl_d < TOF_BIAS_DIST and fl_d > 20:
+            tof_bias += 0.15 * (TOF_BIAS_DIST - fl_d) / TOF_BIAS_DIST
+        if left_d < TOF_BIAS_DIST and left_d > 20:
+            tof_bias += 0.08 * (TOF_BIAS_DIST - left_d) / TOF_BIAS_DIST
+        if fr_d < TOF_BIAS_DIST and fr_d > 20:
+            tof_bias -= 0.15 * (TOF_BIAS_DIST - fr_d) / TOF_BIAS_DIST
+        if right_d < TOF_BIAS_DIST and right_d > 20:
+            tof_bias -= 0.08 * (TOF_BIAS_DIST - right_d) / TOF_BIAS_DIST
+        if front_d < TOF_BIAS_DIST and front_d > 20:
+            steer_sign = 1.0 if (fl_d > fr_d or left_d > right_d) else -1.0
+            tof_bias += steer_sign * 0.2 * (TOF_BIAS_DIST - front_d) / TOF_BIAS_DIST
         turn = max(-1, min(1, turn + tof_bias))
 
         # --- Motor command ---
-        # Speed: pick the MOST RESTRICTIVE single factor (min, not product).
-        # Product of multiple <1.0 factors compounds to near-zero, stalling
-        # the motors below their dead zone.
-        alignment = max(0.0, math.cos(diff))
-        sf_align = 0.7 + 0.3 * alignment
-
+        # Speed factors: wall proximity and obstacle proximity slow the robot
+        # for safety.  sf_align is intentionally ABSENT — on real hardware,
+        # reducing speed when misaligned starves the slow wheel below its
+        # stall threshold, preventing the differential from turning at all.
         SPEED_TAPER_ZONE = 250
         wall_dists = [self.x, ARENA_WIDTH - self.x,
                       self.y, ARENA_HEIGHT - self.y]
@@ -2211,32 +2053,32 @@ class REIPNode:
             d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
             min_peer_dist = min(min_peer_dist, d)
 
+        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         sf_peer = 1.0
-        if min_peer_dist < ROBOT_RADIUS * 1.5:
+        if min_peer_dist < PEER_CONTACT_DIST:
             sf_peer = 0.10
         elif min_peer_dist < 400:
             sf_peer = 0.3 + 0.7 * (min_peer_dist / 400)
 
-        MIN_MOTOR_PWM = 25  # Below this, N20 100:1 can't move 217g
-        effective_speed = BASE_SPEED * min(sf_align, sf_wall, sf_tof, sf_peer)
+        MIN_MOTOR_PWM = 25
+        effective_speed = BASE_SPEED * min(sf_wall, sf_tof, sf_peer)
         effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
 
         turn_mix = 0.55
 
-        # Pivot turn with hysteresis.  Only pivot for near-reversals;
-        # the differential drive handles everything up to ~110° as an arc.
-        PIVOT_ENTER = math.pi * 0.61   # ~110° — only near-U-turns
+        PIVOT_ENTER = math.pi * 0.61   # ~110°
         PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
         if abs(diff) > PIVOT_ENTER:
             self._in_pivot = True
         if abs(diff) < PIVOT_EXIT:
             self._in_pivot = False
         if self._in_pivot:
-            pivot_speed = BASE_SPEED * 0.55
+            pivot_fast = BASE_SPEED
+            pivot_slow = 0.0
             if diff > 0:
-                left_speed, right_speed = -pivot_speed, pivot_speed
+                left_speed, right_speed = pivot_slow, pivot_fast
             else:
-                left_speed, right_speed = pivot_speed, -pivot_speed
+                left_speed, right_speed = pivot_fast, pivot_slow
             self._last_turn = turn
             return (left_speed, right_speed)
 

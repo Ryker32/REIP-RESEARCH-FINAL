@@ -80,7 +80,7 @@ INTERIOR_WALL_Y_END = 1200
 OUTER_WALL_MARGIN = ROBOT_RADIUS      # ~110mm — excludes perimeter cells
 DIVIDER_MARGIN = BODY_HALF_WIDTH       # 64mm — robot body extends this far from center
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = 220                  # mm, must match reip_node.py
+REPULSION_ZONE = 220                  # mm — soft repulsion, wide enough to steer clear
 
 # RAFT parameters - NO TRUST, only heartbeats
 HEARTBEAT_INTERVAL = 0.5   # Leader sends heartbeat this often
@@ -912,13 +912,13 @@ class RAFTNode:
 
         self._nav_history.append((now, self.x, self.y))
         self._nav_history = [(t, x, y) for t, x, y in self._nav_history
-                             if now - t < 2.0]
+                             if now - t < 3.0]
         if len(self._nav_history) < 2:
             return False
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 0.5 and moved < 25
+        return elapsed > 2.0 and moved < 30
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -995,15 +995,19 @@ class RAFTNode:
         return target
 
     def _wall_slide_heading(self, desired_angle):
-        """Modify heading to avoid walls using separate outer/divider margins.
+        """Modify heading to avoid walls.
 
-        Three layers:
-          1. Soft quadratic repulsion starting at REPULSION_ZONE
-          2. Hard clamp at WALL_MARGIN / DIVIDER_MARGIN
-          3. Deadlock escape toward center if both components zeroed
+        The hard clamp (wall-slide) must trigger BEFORE physical contact.
+        ROBOT_RADIUS=110mm means the edge touches at 110mm from the wall.
+        We clamp heading at ROBOT_RADIUS + 60mm so the robot starts
+        sliding along the wall with clearance to spare.  The soft
+        repulsion zone is just an early nudge for diagonal approaches.
         """
         hx = math.cos(desired_angle)
         hy = math.sin(desired_angle)
+
+        SLIDE_DIST = ROBOT_RADIUS + 60
+        DIV_SLIDE_DIST = BODY_HALF_WIDTH + 60
 
         def _repel(dist_to_wall, zone):
             if dist_to_wall < zone:
@@ -1030,7 +1034,7 @@ class RAFTNode:
             tip_dx = self.x - tip_x
             tip_dy = self.y - INTERIOR_WALL_Y_END
             tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
-            TIP_ZONE = DIVIDER_MARGIN + 30
+            TIP_ZONE = DIV_SLIDE_DIST
             if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + 50:
                 tip_strength = _repel(tip_dist, TIP_ZONE)
                 repel_x += (tip_dx / tip_dist) * tip_strength
@@ -1040,20 +1044,20 @@ class RAFTNode:
         hx += repel_x * REPEL_GAIN
         hy += repel_y * REPEL_GAIN
 
-        if self.x < WALL_MARGIN and hx < 0:
+        if self.x < SLIDE_DIST and hx < 0:
             hx = 0
-        if self.x > ARENA_WIDTH - WALL_MARGIN and hx > 0:
+        if self.x > ARENA_WIDTH - SLIDE_DIST and hx > 0:
             hx = 0
-        if self.y < WALL_MARGIN and hy < 0:
+        if self.y < SLIDE_DIST and hy < 0:
             hy = 0
-        if self.y > ARENA_HEIGHT - WALL_MARGIN and hy > 0:
+        if self.y > ARENA_HEIGHT - SLIDE_DIST and hy > 0:
             hy = 0
         if self.y < INTERIOR_WALL_Y_END:
             d_from_right = self.x - INTERIOR_WALL_X_RIGHT
             d_from_left = INTERIOR_WALL_X_LEFT - self.x
-            if 0 < d_from_right < DIVIDER_MARGIN and hx < 0:
+            if 0 < d_from_right < DIV_SLIDE_DIST and hx < 0:
                 hx = 0
-            elif 0 < d_from_left < DIVIDER_MARGIN and hx > 0:
+            elif 0 < d_from_left < DIV_SLIDE_DIST and hx > 0:
                 hx = 0
 
         if abs(hx) < 0.01 and abs(hy) < 0.01:
@@ -1084,9 +1088,9 @@ class RAFTNode:
             if dist < PEER_AVOID_DIST and dist > 5:
                 n_close += 1
                 strength = (PEER_AVOID_DIST - dist) / PEER_AVOID_DIST
-                if dist < ROBOT_RADIUS:
+                if dist < 2 * ROBOT_RADIUS:
                     strength *= 6.0
-                elif dist < 2 * ROBOT_RADIUS:
+                elif dist < 2 * ROBOT_RADIUS + 100:
                     strength *= 3.0
                 repel_x += (dx / dist) * strength
                 repel_y += (dy / dist) * strength
@@ -1099,7 +1103,7 @@ class RAFTNode:
         if abs(repel_x) < 0.01 and abs(repel_y) < 0.01:
             return desired_angle
 
-        if closest_dist < ROBOT_RADIUS:
+        if closest_dist < 2 * ROBOT_RADIUS:
             return math.atan2(repel_y, repel_x)
 
         hx += repel_x * PEER_REPEL_GAIN
@@ -1148,7 +1152,9 @@ class RAFTNode:
                 diff = escape_angle - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
                 while diff < -math.pi: diff += 2 * math.pi
-                if diff > 0:
+                if abs(diff) < 0.25:
+                    return (BASE_SPEED * 0.6, BASE_SPEED * 0.6)
+                elif diff > 0:
                     return (BASE_SPEED, -BASE_SPEED)
                 else:
                     return (-BASE_SPEED, BASE_SPEED)
@@ -1203,18 +1209,10 @@ class RAFTNode:
                     flee_y = math.sin(self.robot_id * 1.2566)
                 self._escape_angle = math.atan2(flee_y, flee_x)
                 return (-BASE_SPEED * 0.7, -BASE_SPEED * 0.7)
-            rev = BASE_SPEED * 0.6
-            if left_d < right_d and left_d < front_d:
-                return (-rev * 0.3, -rev)
-            elif right_d < left_d and right_d < front_d:
-                return (-rev, -rev * 0.3)
-            elif fr_d < fl_d:
-                return (-rev, -rev * 0.4)
-            else:
-                return (-rev * 0.4, -rev)
         else:
             self._tof_emergency_count = 0
 
+        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         _closest_peer_dist = 9999.0
         _flee_px, _flee_py = 0.0, 0.0
         for pid, peer in self.peers.items():
@@ -1225,20 +1223,19 @@ class RAFTNode:
             pdist = math.sqrt(pdx * pdx + pdy * pdy)
             if pdist < _closest_peer_dist:
                 _closest_peer_dist = pdist
-            if pdist < ROBOT_RADIUS * 1.5 and pdist > 5:
+            if pdist < PEER_CONTACT_DIST and pdist > 5:
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
-        if _closest_peer_dist < ROBOT_RADIUS * 1.5 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+        if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             flee_angle = math.atan2(_flee_py, _flee_px)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
-                pivot_spd = BASE_SPEED * 0.7
                 if diff > 0:
-                    return (pivot_spd, -pivot_spd)
+                    return (0.0, BASE_SPEED)
                 else:
-                    return (-pivot_spd, pivot_spd)
+                    return (BASE_SPEED, 0.0)
             else:
                 return (BASE_SPEED * 0.5, BASE_SPEED * 0.5)
 
@@ -1254,7 +1251,7 @@ class RAFTNode:
             target = self.get_my_frontier()
 
         if not target:
-            return (0.0, 0.0)
+            return (30.0, 30.0)
 
         ARRIVAL_RADIUS = CELL_SIZE
         dist_to_target = math.sqrt((self.x - target[0])**2 + (self.y - target[1])**2)
@@ -1266,16 +1263,21 @@ class RAFTNode:
             if cell and cell not in self.known_visited:
                 self.known_visited.add(cell)
             self._stuck_count = 0
+            if self.state == RaftState.LEADER:
+                self.assigned_target = None
 
-        # Clamp target outside physical body margin (outer walls + divider)
-        tx = max(OUTER_WALL_MARGIN, min(ARENA_WIDTH - OUTER_WALL_MARGIN, target[0]))
-        ty = max(OUTER_WALL_MARGIN, min(ARENA_HEIGHT - OUTER_WALL_MARGIN, target[1]))
+        # Clamp target outside the wall-slide zone so the robot never
+        # aims at a point it will be prevented from reaching.
+        SLIDE_DIST = ROBOT_RADIUS + 60
+        DIV_SLIDE_DIST = BODY_HALF_WIDTH + 60
+        tx = max(SLIDE_DIST, min(ARENA_WIDTH - SLIDE_DIST, target[0]))
+        ty = max(SLIDE_DIST, min(ARENA_HEIGHT - SLIDE_DIST, target[1]))
         if ty < INTERIOR_WALL_Y_END and (
-                INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < tx < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
+                INTERIOR_WALL_X_LEFT - DIV_SLIDE_DIST < tx < INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST):
             if tx < INTERIOR_WALL_X:
-                tx = INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN
+                tx = INTERIOR_WALL_X_LEFT - DIV_SLIDE_DIST
             else:
-                tx = INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN
+                tx = INTERIOR_WALL_X_RIGHT + DIV_SLIDE_DIST
         target = (tx, ty)
         self.current_navigation_target = target
 
@@ -1338,7 +1340,7 @@ class RAFTNode:
         target_angle = self._wall_slide_heading(target_angle)
         target_angle = self._peer_avoidance_heading(target_angle)
 
-        EMA_ALPHA = 0.35
+        EMA_ALPHA = 0.25
         if self._smooth_theta is None:
             self._smooth_theta = self.theta
         else:
@@ -1354,24 +1356,11 @@ class RAFTNode:
         while diff < -math.pi: diff += 2 * math.pi
 
         KP = 1.0 / (math.pi / 2)
-        KD = 0.2
-        HEADING_DEADBAND = 0.10
+        HEADING_DEADBAND = 0.17  # ~10° — reject ArUco jitter
         if abs(diff) < HEADING_DEADBAND:
             diff = 0.0
 
-        now = time.time()
-        d_term = 0.0
-        if self._prev_heading_err is not None and self._prev_heading_t > 0:
-            dt = now - self._prev_heading_t
-            if 0.01 < dt < 0.5:
-                d_err = diff - self._prev_heading_err
-                while d_err > math.pi: d_err -= 2 * math.pi
-                while d_err < -math.pi: d_err += 2 * math.pi
-                d_term = KD * (d_err / dt) / (math.pi / 2)
-        self._prev_heading_err = diff
-        self._prev_heading_t = now
-
-        turn = max(-1, min(1, KP * diff + d_term))
+        turn = max(-1, min(1, KP * diff))
 
         # ToF-based reactive turn bias (includes front sensor)
         TOF_BIAS_DIST = 300
@@ -1399,9 +1388,6 @@ class RAFTNode:
             tof_bias += steer_sign * 0.2 * (TOF_BIAS_DIST - front_tof) / TOF_BIAS_DIST
         turn = max(-1, min(1, turn + tof_bias))
 
-        alignment = max(0.0, math.cos(diff))
-        sf_align = 0.7 + 0.3 * alignment
-
         SPEED_TAPER_ZONE = 250
         wall_dists = [self.x, ARENA_WIDTH - self.x,
                       self.y, ARENA_HEIGHT - self.y]
@@ -1427,30 +1413,32 @@ class RAFTNode:
             d = math.sqrt((self.x - peer['x'])**2 + (self.y - peer['y'])**2)
             min_peer_dist = min(min_peer_dist, d)
 
+        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         sf_peer = 1.0
-        if min_peer_dist < ROBOT_RADIUS * 1.5:
+        if min_peer_dist < PEER_CONTACT_DIST:
             sf_peer = 0.10
         elif min_peer_dist < 400:
             sf_peer = 0.3 + 0.7 * (min_peer_dist / 400)
 
         MIN_MOTOR_PWM = 25
-        effective_speed = BASE_SPEED * min(sf_align, sf_wall, sf_tof, sf_peer)
+        effective_speed = BASE_SPEED * min(sf_wall, sf_tof, sf_peer)
         effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
 
         turn_mix = 0.55
 
-        PIVOT_ENTER = math.pi * 0.61   # ~110° — only near-U-turns
+        PIVOT_ENTER = math.pi * 0.61   # ~110°
         PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
         if abs(diff) > PIVOT_ENTER:
             self._in_pivot = True
         if abs(diff) < PIVOT_EXIT:
             self._in_pivot = False
         if self._in_pivot:
-            pivot_speed = BASE_SPEED * 0.55
+            pivot_fast = BASE_SPEED
+            pivot_slow = 0.0
             if diff > 0:
-                left_speed, right_speed = -pivot_speed, pivot_speed
+                left_speed, right_speed = pivot_slow, pivot_fast
             else:
-                left_speed, right_speed = pivot_speed, -pivot_speed
+                left_speed, right_speed = pivot_fast, pivot_slow
             self._last_turn = turn
             return (left_speed, right_speed)
 

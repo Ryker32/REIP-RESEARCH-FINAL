@@ -14,12 +14,29 @@
 \usepackage{placeins}   % provides \FloatBarrier
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+% --- Math polish ---
+\usepackage{mathtools}   % extensions to amsmath (IEEE-safe)
+\usepackage{bm}          % bold math symbols
+\usepackage{amsthm}      % theorem / definition / corollary environments
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\atanTwo}{atan2}
+
+\newcommand{\Ind}{\mathbb{I}}          % indicator
+\newcommand{\norm}[1]{\lVert #1\rVert}
+\newcommand{\clip}[1]{\left[#1\right]_+} % positive-part (max(0,·))
+
+% consistent "defined as"
+\newcommand{\defeq}{\coloneqq}
 
 \begin{document}
 
-\title{Democracy in Robots: Strengthening Multi-Robot Swarms\\
-by Detecting, Removing, and Replacing Compromised Leaders\\
-Using a Novel Trust-Based Framework}
+\title{Democracy in Robots: Detecting, Removing, and Replacing Compromised Leaders in Multi Robot Swarms Using a Novel Trust-Based Framework}
 
 \author{\IEEEauthorblockN{William R. Kollmyer}
 \IEEEauthorblockA{\textit{Olympia High School}\\
@@ -67,30 +84,19 @@ robotics, autonomous swarms, distributed fault detection
 %=========================================================================
 
 \subsection{Motivation and Context}
-Frontier-based exploration, where robots navigate toward boundaries
-between known and unknown space~\cite{yamauchi1997frontier}, underpins
-autonomous mapping for applications ranging from disaster response to
-planetary science.  Multi-robot teams can cover $N$~times more area than
-a single platform, but only when coordination prevents redundant
-exploration, collisions, and uncovered
-regions~\cite{burgard2000collaborative}.
 
-The need for resilient multi-robot coordination is immediate.
-Approximately 45,000 people die annually in earthquake-related
-structural collapses alone, with survival probability dropping below
-50\% after 24~hours~\cite{undrr2020}.  Robot search teams could cover
-rubble fields without risking first responders~\cite{murphy2004rescue},
-and autonomous mining fleets already require resilient coordination when
-individual vehicles degrade~\cite{marshall2016robotics}, but these
-deployments are only viable if the system can survive equipment failures
+
+Approximately 45,000 people die annually in earthquake-related structural collapses alone, with survival probability dropping below 50\% after 24~hours~\cite{undrr2020}. Robot search teams could cover rubble fields and explore destroyed buildings using specialized instruments without risking the lives of heroic first responders~\cite{murphy2004rescue}. Furthermore, in space exploration, teams of robots could help keep humans from developing deadly levels of radiation exposure by conducting research on the soil of Mars or other solar bodies. Self-sustaining, resilient robot teams remain a critical topic in today's world. Furthermore, for  Mars, one-way communication delays of 4--24~minutes eliminate the efficiency of human-in-the-loop oversight. \cite{mcbrayer2022comm}
+
+Multi robot exploration teams enable surface mapping, disaster-response surveys, and autonomous inspection missions faster than single robots can cover in any given time \cite{yamauchi1997frontier, burgard2000collaborative}. Hierarchical leader-follower coordination remains relevant because a designated leader allocates frontiers, manages conflicts, and provides a global context that improves task efficiency over purely decentralized swarms \cite{burgard2000collaborative}.
+
+
+
+
+Autonomous mining fleets already require resilient coordination when individual vehicles degrade~\cite{marshall2016robotics}, but these deployments are only viable if the system can survive equipment failures
 autonomously.  The DARPA Subterranean Challenge confirmed that
 coordinated multi-robot teams consistently outperform single platforms
-in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission
-will deploy
-cooperative autonomous rovers on the lunar surface where communication
-blackouts make centralized human control
-infeasible~\cite{cadre2024, whittaker2012lunar}.  On Mars, one-way
-communication delays of 4--24~minutes eliminate human-in-the-loop
+in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission will deploy cooperative autonomous rovers on the lunar surface where communication blackouts make centralized human control infeasible~\cite{cadre2024, whittaker2012lunar}.  On Mars, one-way communication delays of 4--24~minutes eliminate human-in-the-loop
 oversight entirely---robot teams must self-govern.
 
 Leader--follower architectures are widely adopted for these
@@ -109,6 +115,9 @@ Multi-robot teams cannot be trusted in life-critical missions if a
 single compromised leader can silently waste the entire team's effort.
 
 \subsection{Problem Statement}
+However, when leader-follower systems are used within adversarial or limited-communication contexts, sensor faults, adversarial interference, and Large Language Model (LLM) hallucinations within AI-based leaders can cause system-wide interference from the single point of failure at the leader \cite{douceur2002sybil}, \cite{ji2023hallucination}.
+
+
 Classical Byzantine Fault-Tolerant (BFT) protocols assume reliable
 all-to-all communication and honest supermajorities rarely achievable
 in range-limited robotic teams~\cite{lamport1982byzantine,
@@ -325,9 +334,9 @@ Pololu D30V30F5 5V Regulator  & 1 & 14.95 \\
 VL53L0X ToF Sensor            & 5 &  2.60 \\
 TCA9548A I2C Multiplexer      & 1 &  1.67 \\
 Pololu 1/2'' Ball Caster      & 1 &  2.95 \\
-N20 Rubber Wheels (3mm D)     & 2 &  2.00 \\
+N20 Rubber Wheels (43mm D)     & 2 &  2.00 \\
 2S LiPo 7.4V 1000mAh         & 1 &  8.50 \\
-32GB microSD Card             & 1 &  6.99 \\
+16GB microSD Card             & 1 &  6.99 \\
 3D-Printed Chassis (~60g PLA) & 1 &  3.00 \\
 \hline
 \textbf{Per robot}            &   & \textbf{\$84.56} \\
@@ -371,32 +380,55 @@ complementary: governance is the trigger, fallback is the safety net.
 \section{REIP Methodology}
 %=========================================================================
 
+Table~\ref{tab:notation} consolidates the notation used throughout this
+section.
+
+\begin{table}[t]
+\centering
+\caption{Principal notation for the REIP trust model.}
+\label{tab:notation}
+\small
+\begin{tabular}{@{}cl@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$S_t$                    & Accumulated suspicion at cycle $t$ \\
+$T_t$                    & Trust in current leader at cycle $t$ \\
+$w_t$                    & Evidence weight for leader's command at $t$ \\
+$w_d$                    & Direction-consistency suspicion bonus \\
+$\sigma$                 & Suspicion threshold per trust decrement \\
+$r$                      & Recovery rate (decay when $w_t = 0$) \\
+$\Delta_{\text{decay}}$  & Trust decrement per threshold crossing \\
+$\tau_{\text{imp}}$      & Impeachment trigger threshold \\
+$T_{\min}$               & Trust floor \\
+$\delta_b$               & Broadcast grace period (causality gate) \\
+$\mathcal{V}_i$          & Personally visited cells of robot~$i$ \\
+$\mathcal{F}$            & Set of unexplored frontier cells \\
+$\mathcal{E}$            & Eligible candidate set for election \\
+$\clip{\cdot}$           & Positive-part operator $\max(0,\cdot)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{From Reactive to Proactive Detection}
 \label{sec:sim_trust}
 
-Reactive trust models monitor outcome discrepancies---e.g., comparing
-predicted coverage gain against observed gain using statistical
-detectors such as CUSUM~\cite{page1954cusum} or Bayesian change-point
-analysis~\cite{gelman2013bayesian}.  While effective at scale (a reactive
-variant achieved a 76~pp resilience advantage across 2\,000 GridWorld
-trials), reactive detection has a fundamental limitation: followers must
-\emph{execute} potentially bad commands before measuring their damage.
-In continuous-time physical environments, each bad command wastes
-movement, battery, and mission time.
-
-The proactive model described below eliminates this cost by verifying
-commands \emph{before execution} against locally held evidence ranked
-by source reliability.
+Reactive trust models require followers to \emph{execute} a command
+before measuring its damage---an unacceptable cost when battery and
+mission time are finite.  An earlier REIP prototype using
+CUSUM~\cite{page1954cusum} and Bayesian change-point
+analysis~\cite{gelman2013bayesian} confirmed this limitation across
+2\,000 GridWorld trials.  The proactive model below eliminates this
+cost entirely: commands are verified \emph{before execution} against
+locally held evidence ranked by source reliability.
 
 %---------------------------------------------------
 \subsection{Proactive Trust Model: Three-Tier Verification}
 \label{sec:hw_trust}
 
-The proactive trust model verifies leader commands \emph{before
-execution}, eliminating the physical cost of following bad commands.
-This is the trust model used in all multiroom and hardware experiments;
-it runs identical code on simulation processes and Raspberry Pi
-Zero~2W nodes.
+This section details the proactive trust model used in all multiroom
+and hardware experiments; identical code runs on simulation processes
+and Raspberry Pi Zero~2W nodes.
 
 \subsubsection{Information Zones and Verification}
 Each robot maintains two overlapping information zones that determine
@@ -417,142 +449,65 @@ map built from peer broadcasts.  This data may be stale: a cell reported
 as unexplored 2 seconds ago may have been visited by another robot since
 the last broadcast.  The three-tier model weights evidence accordingly.
 
-\subsubsection{Confidence-Weighted Suspicion}
+\subsubsection{Evidence Ordering and Trust Dynamics}
+
 When the leader assigns a target cell, the follower checks it against
-three tiers of local knowledge ranked by reliability:
+three tiers of local knowledge.  We formalize the ordering and the
+resulting dynamics as two definitions.
 
-\begin{enumerate}
-    \item \textbf{Tier~1 --- Personal visit history} ($w_1 = 1.0$):
-    The assigned cell is in the robot's own visited set.  This is ground
-    truth; the command is provably wasteful.
-    \item \textbf{Tier~2 --- ToF obstacle detection} ($w_2 = 1.0$):
-    The assigned cell is within current ToF range and contains a detected
-    obstacle.  This is directly and physically verifiable.
-    \item \textbf{Tier~3 --- Peer-reported coverage} ($w_3 = 0.3$):
-    The assigned cell appears in the merged belief map from peer
-    broadcasts but not in the robot's own visited set.  This evidence
-    may be stale.
-\end{enumerate}
+\begin{definition}[Evidence Ordering]
+\label{def:evidence}
+Evidence sources are totally ordered by reliability:
+\[
+    \text{Tier\,1\,(personal)} \;\succ\;
+    \text{Tier\,2\,(sensor)} \;\succ\;
+    \text{Tier\,3\,(peer)},
+\]
+with confidence weights $w_1 = w_2 = 1.0 > w_3 = 0.3$.
+\begin{itemize}[nosep]
+    \item \textbf{Tier~1}: the assigned cell is in $\mathcal{V}_i$
+          (ground truth---provably wasteful).
+    \item \textbf{Tier~2}: the assigned cell is within ToF range and
+          contains a detected obstacle (physically verifiable).
+    \item \textbf{Tier~3}: the assigned cell appears in the merged peer
+          belief map but not in $\mathcal{V}_i$ (may be stale).
+\end{itemize}
+Higher-confidence evidence yields a tighter detection bound
+(Theorem~\ref{thm:detection}).
+\end{definition}
 
-Suspicion accumulates when a bad command is detected and decays slowly
-for good commands:
-\begin{equation}
-    S(t{+}1) = \begin{cases}
-        S(t) + w_{\text{tier}} & \text{if command flagged} \\
-        \max\bigl(0,\; S(t) - r\bigr) & \text{if command is good}
-    \end{cases}
-    \label{eq:suspicion}
-\end{equation}
-where $r = 0.1$ is the recovery rate, set strictly below $w_3 = 0.3$ to
-ensure that a leader alternating good and bad commands cannot wash out
-accumulated suspicion.
+Let $w_t \defeq w(c_t) + w_d(\alpha_t,\, w(c_t))$ denote the total
+evidence weight at cycle~$t$, including the direction-consistency bonus
+(Section~\ref{sec:direction_consistency}).
 
-When $S$ exceeds threshold $\sigma = 1.5$:
-\begin{equation}
-    T_{\text{leader}} \leftarrow \max\bigl(T_{\min},\;
-    T_{\text{leader}} - \Delta_{\text{decay}}\bigr),
-    \quad S \leftarrow S - \sigma
-    \label{eq:trust_step}
-\end{equation}
-The carry-over subtraction ($S \leftarrow S - \sigma$ rather than
-$S \leftarrow 0$) ensures that a persistently bad leader faces
-accelerating trust decay: residual suspicion from one threshold crossing
-carries into the next evaluation window.
+\begin{definition}[Trust State Machine]
+\label{def:trust_sm}
+The per-follower trust state
+$(S_t, T_t)\in\mathbb{R}_{\geq 0}\times[T_{\min},1]$ evolves under the
+transition
+\begin{align}
+S_{t+1} &\;=\; \clip{\,S_t + w_t - r\,\Ind[w_t=0]\,},
+\label{eq:suspicion_compact}\\
+k_{t+1} &\;\defeq\; \left\lfloor S_{t+1}\,/\,\sigma \right\rfloor,
+\label{eq:crossings}\\
+T_{t+1} &\;=\; \max\!\bigl(T_{\min},\;
+         T_t - k_{t+1}\,\Delta_{\text{decay}}\bigr),
+\label{eq:trust_compact}\\
+S_{t+1} &\;\leftarrow\; S_{t+1} - k_{t+1}\,\sigma.
+\label{eq:residual}
+\end{align}
+Impeachment triggers when $T_{t+1} < \tau_{\text{imp}}$.
+\end{definition}
 
-\subsubsection{Worst-Case Detection Bound}
-\label{sec:detection_bound}
-The tiered weighting produces a closed-form worst-case detection bound.
-Under persistent bad commands, suspicion grows by $w_{\text{tier}} - r$
-per command (net of recovery decay on intervening good commands in the
-worst case).  The number of commands to the first trust decay is:
-\begin{equation}
-    n_{\text{detect}} = \left\lceil \frac{\sigma}{w_{\text{tier}} - r}
-    \right\rceil
-    \label{eq:detection_bound}
-\end{equation}
-Under Tier~1 evidence ($w_1 = 1.0$, $r = 0.1$):
-$n_{\text{detect}} = \lceil 1.5 / 0.9 \rceil = 2$ commands.  Under
-Tier~3 evidence only ($w_3 = 0.3$, $r = 0.1$):
-$n_{\text{detect}} = \lceil 1.5 / 0.2 \rceil = 8$ commands.  This
-eight-fold difference directly reflects the epistemological gap between
-ground-truth and peer-reported evidence, and prevents false impeachments
-from stale peer data while maintaining fast detection from
-high-confidence personal knowledge.
-
-Full impeachment requires trust to decay from $T_0 = 1.0$ to
-$\tau_{\text{imp}} = 0.3$.  Each threshold crossing decrements trust by
-$\Delta_{\text{decay}} = 0.2$, so the number of crossings needed is:
-\begin{equation}
-    k_{\text{imp}} = \left\lceil \frac{T_0 - \tau_{\text{imp}}}
-    {\Delta_{\text{decay}}} \right\rceil = \left\lceil \frac{0.7}{0.2}
-    \right\rceil = 4
-    \label{eq:impeach_crossings}
-\end{equation}
-The total worst-case commands to impeachment is $k_{\text{imp}} \times
-n_{\text{detect}}$:
-\begin{equation}
-    n_{\text{imp}} = \left\lceil \frac{T_0 - \tau_{\text{imp}}}
-    {\Delta_{\text{decay}}} \right\rceil \cdot
-    \left\lceil \frac{\sigma}{w_{\text{tier}} - r} \right\rceil
-    \label{eq:impeachment_bound}
-\end{equation}
-yielding 8~commands under Tier~1 evidence ($w_1 = 1.0$) or 32~commands
-under Tier~3 evidence alone ($w_3 = 0.3$).
-
-\subsubsection{Causality-Aware Verification}
-A potential source of false positives is concurrent exploration: a cell
-may be visited by a peer \emph{after} the leader computed its assignment
-but \emph{before} the follower verifies the command.  To prevent this,
-each robot timestamps cells when visited and records the time of each
-leader assignment.  A cell triggers suspicion only if it was known to be
-explored \emph{well before} the leader's assignment was sent, accounting
-for broadcast propagation delay~$\delta_b$:
-\begin{equation}
-    \text{flag}(c) = \mathbb{I}\bigl(c \in \texttt{known\_visited}
-    \;\wedge\; t_{\text{known}}(c) < t_{\text{assign}} - \delta_b\bigr)
-\end{equation}
-where $\delta_b = 0.5\,$s (approximately $2.5\times$ the broadcast
-period at $5\,$Hz).  This grace period reflects the inherent information
-delay in the distributed system: if a cell was explored less than
-$\delta_b$ seconds before the assignment, the leader's merged map may
-not yet contain the update.  The check applies to Tiers~1 and~3
-(stored map evidence); Tier~2 uses instantaneous ToF sensor data
-and does not require stale-data gating.  This eliminates false positives
-from network latency and asynchronous map updates without weakening
-detection of genuinely bad commands---a
-compromised leader sends robots to cells explored \emph{long} before the
-assignment, well outside the grace window.
-
-\subsubsection{Direction Consistency Verification}
-The three-tier model verifies commands against known map state.  A
-complementary check compares the leader's commanded direction against
-the follower's belief about where unexplored territory lies.  The
-follower computes the angular difference between the leader's assigned
-target and \emph{every} unexplored cell in its belief map, retaining
-the best (smallest) alignment:
-\begin{equation}
-    \alpha = \min_{f \in \mathcal{F}} \bigl|\text{atan2}(\Delta y_f,
-    \Delta x_f) - \text{atan2}(\Delta y_{\text{cmd}},
-    \Delta x_{\text{cmd}})\bigr|
-\end{equation}
-where $\mathcal{F}$ is the set of unexplored frontier cells, all
-angles are normalized to $[0, \pi]$, and $\Delta y_f, \Delta x_f$ are
-relative to the follower's current position.  If
-$\alpha > 3\pi/4$ (135$^\circ$), the leader's command points away from
-\emph{every} known frontier, and direction-consistency suspicion is
-added independently.  For $\pi/2 < \alpha \leq 3\pi/4$, direction
-suspicion is added only when the three-tier check has already flagged
-the command, acting as a reinforcing signal rather than a standalone
-trigger.  This prevents false positives when the leader assigns a
-specific distant frontier that diverges from the follower's nearest-cell
-heuristic, while still catching severe directional faults.
-
-The per-command verification pipeline comprises three atomic steps:
-evidence weighting (Algorithm~\ref{alg:evidence}), direction
-consistency (Algorithm~\ref{alg:direction}), and suspicion update
-(Algorithm~\ref{alg:suspicion}).  Algorithms~\ref{alg:election}
-and~\ref{alg:peer_anomaly} formalize leader election and peer
-anomaly detection.
+The state machine is a deterministic recurrence: given the evidence
+stream $(w_0, w_1, \ldots)$, the trajectory of $(S_t, T_t)$ is
+uniquely determined.  This enables the closed-form detection bound
+derived in Theorem~\ref{thm:detection}.  Direct verification was
+chosen over reactive statistical accumulation because at hardware scale
+(192 cells, five robots) every relevant fault mode is caught faster,
+the model runs on a Raspberry Pi Zero~2W without significant overhead,
+and a single explainable mechanism is easier to validate than a layered
+multi-threshold system.
 
 \begin{algorithm}[t]
 \caption{Three-Tier Evidence Weighting}
@@ -575,6 +530,105 @@ anomaly detection.
 \RETURN $w$
 \end{algorithmic}
 \end{algorithm}
+
+\subsubsection{Worst-Case Detection Bound}
+\label{sec:detection_bound}
+
+The deterministic structure of Definition~\ref{def:trust_sm} yields a
+closed-form bound on how quickly a Byzantine leader is detected and
+removed.
+
+\begin{theorem}[Worst-Case Detection Bound]
+\label{thm:detection}
+Under persistent adversarial commands verified with tier-$k$ evidence
+weight~$w_k > r$, the first trust decay occurs within
+\begin{equation}
+    n_{\text{detect}} = \left\lceil \frac{\sigma}{w_k - r}
+    \right\rceil
+    \label{eq:detection_bound}
+\end{equation}
+commands.  Full impeachment occurs within
+\begin{equation}
+    n_{\text{imp}} = \underbrace{\left\lceil
+    \frac{T_0 - \tau_{\text{imp}}}{\Delta_{\text{decay}}}
+    \right\rceil}_{k_{\text{imp}}\text{ crossings}} \;\cdot\;
+    n_{\text{detect}}
+    \label{eq:impeachment_bound}
+\end{equation}
+commands.
+\end{theorem}
+
+\begin{proof}
+Each bad command increases suspicion by at least $w_k - r > 0$
+(since $w_k \geq w_3 = 0.3 > r = 0.1$ by
+Definition~\ref{def:evidence}).  The threshold~$\sigma$ is therefore
+crossed after at most $\lceil\sigma/(w_k - r)\rceil$ commands; each
+crossing decrements trust by~$\Delta_{\text{decay}}$.  The number of
+crossings required to reach~$\tau_{\text{imp}}$ is
+$k_{\text{imp}} = \lceil(T_0 - \tau_{\text{imp}})/
+\Delta_{\text{decay}}\rceil$; the product follows.
+\end{proof}
+
+\noindent\textbf{Instantiation.}\;
+Under Tier~1 evidence ($w_1{=}1.0$, $r{=}0.1$, $\sigma{=}1.5$):
+$n_{\text{detect}} = \lceil 1.5/0.9 \rceil = 2$~commands.
+Under Tier~3 alone ($w_3{=}0.3$):
+$n_{\text{detect}} = \lceil 1.5/0.2 \rceil = 8$~commands.
+With $\Delta_{\text{decay}}{=}0.2$ and
+$\tau_{\text{imp}}{=}0.3$, $k_{\text{imp}} = 4$, yielding
+$n_{\text{imp}} = 8$ (Tier~1) or $32$ (Tier~3) commands to full
+impeachment.  The four-fold gap between tiers directly encodes the
+epistemological difference between ground truth and peer hearsay.
+
+\begin{corollary}[Liveness]
+\label{cor:liveness}
+If a Byzantine leader generates at least one flaggable command every
+$\Delta t$~seconds, impeachment occurs within
+$n_{\text{imp}} \cdot \Delta t$~seconds.  At the 5\,Hz broadcast rate,
+Tier-1 evidence yields impeachment within
+$8 \times 0.2\,\text{s} = 1.6\,$s---consistent with the empirical
+median of 1.21--1.67\,s reported in Section~V.
+\end{corollary}
+
+\subsubsection{Causality-Aware Verification}
+Concurrent exploration can cause false positives: a cell may be visited
+by a peer \emph{after} the leader computed its assignment but
+\emph{before} the follower verifies the command.  A causality gate
+suppresses this by requiring that the evidence predate the assignment by
+at least~$\delta_b$:
+\begin{equation}
+    \text{flag}(c) = \mathbb{I}\bigl(c \in \texttt{known\_visited}
+    \;\wedge\; t_{\text{known}}(c) < t_{\text{assign}} - \delta_b\bigr)
+\end{equation}
+where $\delta_b = 0.5\,$s (${\approx}\,2.5\times$ the 5\,Hz broadcast
+period).  The gate applies to Tiers~1 and~3 (stored map evidence);
+Tier~2 uses instantaneous ToF data and needs no stale-data gating.
+A genuinely compromised leader assigns cells explored well outside this
+window, so detection is unaffected.
+
+\subsubsection{Direction Consistency Verification}
+\label{sec:direction_consistency}
+A complementary geometric check detects faults invisible to the map-based
+tiers---commands that point away from \emph{all} unexplored territory.
+The follower computes
+\begin{equation}
+    \alpha = \min_{f \in \mathcal{F}} \bigl|\text{atan2}(\Delta y_f,
+    \Delta x_f) - \text{atan2}(\Delta y_{\text{cmd}},
+    \Delta x_{\text{cmd}})\bigr|,
+\end{equation}
+the best angular alignment between the command and any frontier cell
+(normalized to $[0,\pi]$).  Two thresholds govern the response:
+$\alpha > 3\pi/4$ triggers standalone suspicion; $\pi/2 < \alpha \leq
+3\pi/4$ reinforces only when the three-tier check has already flagged
+the command.  This catches severe directional faults without penalizing
+legitimate distant assignments (see Algorithm~\ref{alg:direction}).
+
+The per-command verification pipeline comprises three atomic steps:
+evidence weighting (Algorithm~\ref{alg:evidence}), direction
+consistency (Algorithm~\ref{alg:direction}), and suspicion update
+(Algorithm~\ref{alg:suspicion}).  Algorithms~\ref{alg:election}
+and~\ref{alg:peer_anomaly} formalize leader election and peer
+anomaly detection.
 
 \begin{algorithm}[t]
 \caption{Direction Consistency Check}
@@ -600,7 +654,7 @@ anomaly detection.
 \end{algorithmic}
 \end{algorithm}
 
-\begin{algorithm}[t]
+\begin{algorithm}[b]
 \caption{Suspicion Update and Trust Decay}
 \label{alg:suspicion}
 \begin{algorithmic}[1]
@@ -623,28 +677,13 @@ anomaly detection.
 \end{algorithmic}
 \end{algorithm}
 
-\subsubsection{Design Rationale}
-Direct verification was chosen over reactive statistical accumulation
-because (1)~at hardware scale (192 cells, 5 robots) every relevant fault
-mode is caught faster, (2)~the model runs on a Raspberry Pi Zero~2W
-without significant overhead, and (3)~a single explainable mechanism is
-easier to validate than a layered multi-threshold system.
-
 %---------------------------------------------------
 \subsection{Impeachment}
-Impeachment is triggered when a follower's trust in the leader drops
-below the impeachment threshold~$\tau_{\text{imp}} = 0.3$:
-\begin{equation}
-    \text{Impeach} = \mathbb{I}\!\bigl(T_{\text{leader}} <
-    \tau_{\text{imp}}\bigr)
-\end{equation}
-The three-tier suspicion mechanism is the sole trust signal.  A cooldown
-period prevents oscillatory leader churn.  Impeachment requires
-$k_{\text{imp}} = \lceil (T_0 - \tau_{\text{imp}}) /
-\Delta_{\text{decay}} \rceil = 4$ threshold crossings
-(Eq.~\ref{eq:impeach_crossings}), yielding $4 \times 2 = 8$~commands
-under Tier~1 evidence or $4 \times 8 = 32$~commands under Tier~3
-evidence alone.
+Impeachment fires when $T_{\text{leader}} < \tau_{\text{imp}}$
+(Definition~\ref{def:trust_sm}).  By Theorem~\ref{thm:detection},
+this requires at most $n_{\text{imp}}$ adversarial commands---8 under
+Tier-1 evidence, 32 under Tier-3 alone.  A cooldown period after each
+election prevents oscillatory leader churn.
 
 \subsection{Leader Election}
 Upon impeachment, a new leader is elected by democratic vote.  Each
@@ -689,7 +728,7 @@ first three elections occur at 0.5\,s intervals before switching to the
 normal 2.0\,s election interval.  This eliminates the startup latency
 where robots sit idle waiting for the first election to converge.
 
-\begin{algorithm}[t]
+\begin{algorithm}[b]
 \caption{Democratic Leader Election}
 \label{alg:election}
 \begin{algorithmic}[1]
@@ -1677,12 +1716,17 @@ Centre for Research on the Epidemiology of Disasters (CRED),
 ``Human cost of disasters: An overview of the last 20 years
 (2000--2019),'' Geneva, Switzerland, 2020.
 
+
+
 % [4] — Intro, rescue robotics
 \bibitem{murphy2004rescue}
 R.~R. Murphy,
 ``Human--robot interaction in rescue robotics,''
 \emph{IEEE Trans.\ Syst., Man, Cybern.\ C}, vol.~34, no.~2,
 pp.~138--153, 2004.
+
+\bibitem{mcbrayer2022comm}
+K.~McBrayer, P.~Chai, and E.~Judd, ``Communication delays, disruptions, and blackouts for crewed Mars missions,'' in \textit{Proc. AIAA ASCEND}, 2022, doi: 10.2514/6.2022-4384.
 
 % [5] — Intro, DARPA SubT
 \bibitem{chung2023darpa}

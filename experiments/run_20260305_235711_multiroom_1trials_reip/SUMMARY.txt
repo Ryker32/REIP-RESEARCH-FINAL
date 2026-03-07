@@ -1,0 +1,21 @@
+REIP Experiment Run: run_20260305_235711_multiroom_1trials_reip
+Date: 2026-03-05 23:59
+Layouts: ['multiroom']
+Conditions: 3
+Trials per condition: 1
+Total experiments: 3
+Workers: 3
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault        Ablation          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+multiroom  reip           bad_leader   none              1       5.2+/-0.0           N/A           N/A           N/A     0.15+/-0.00     2.35+/-0.00   100%   0.0       5.2
+multiroom  reip           freeze_leader none              1       6.8+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       6.8
+multiroom  reip           none         none              1       7.3+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       7.3
+========================================================================================================================
+
+KEY COMPARISONS:
+    REIP resilience: clean=7.3%, fault=5.2% (only 2.1pp penalty from fault)

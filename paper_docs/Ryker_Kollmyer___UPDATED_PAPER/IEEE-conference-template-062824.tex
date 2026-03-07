@@ -51,13 +51,15 @@ rykerkollmyer@gmail.com}}
 This paper introduces the Resilient Election and Impeachment Policy
 (REIP), a distributed governance framework that enables multi-robot
 teams to detect, impeach, and replace compromised leaders without
-centralized oversight.  Each robot maintains a trust ledger and verifies
-leader commands before execution using a three-tier
-confidence-weighted model: personal visit history (ground truth), sensor
+centralized oversight.  Unlike reactive trust models that measure
+performance after commands are executed, REIP verifies each leader
+assignment \emph{before execution} using local knowledge ranked by
+source reliability: personal visit history (ground truth), sensor
 readings (physically verifiable), and peer-reported coverage (lower
-confidence).  This proactive approach yields a closed-form detection
-bound of two commands under ground-truth evidence and eight under peer
-reports.  In multiroom simulation with dual sequential Byzantine fault
+confidence).  This proactive command verification yields a closed-form
+detection bound of two commands under ground-truth evidence and eight
+under peer reports, enabling sub-second fault detection without
+wasting physical movement on bad commands.  In multiroom simulation with dual sequential Byzantine fault
 injection (100 trials per condition), REIP achieves 100\% median
 coverage under both clean and adversarial conditions, with median
 first suspicion in 0.20--0.21 seconds and impeachment in
@@ -143,13 +145,18 @@ multi-agent systems.  REIP combines per-agent fault detection,
 democratic leader impeachment, and merit-based leader election without
 centralized oversight or ground-truth oracle access.
 
-The core mechanism is a \emph{proactive} trust model: each robot
-verifies leader commands against local knowledge \emph{before
+The core mechanism is \emph{proactive command verification}: each
+robot verifies leader assignments against local knowledge \emph{before
 execution} using three-tier confidence-weighted suspicion accumulation.
-Evidence is ranked by source reliability---personal experience
-outweighs sensor readings, which outweigh peer reports---enabling fast
-detection from strong evidence while preventing false positives from
-stale data.  An earlier reactive model using CUSUM--Bayesian fault
+This differs fundamentally from reactive trust models (which measure
+performance after execution) and from leader liveness checks (which
+only detect heartbeat failures).  REIP verifies \emph{assignment
+quality}---whether a leader's command conflicts with the robot's local
+knowledge---enabling detection of compromised leaders that remain alive
+and maintain heartbeats.  Evidence is ranked by source reliability
+(personal experience $>$ sensor readings $>$ peer reports), enabling
+fast detection from strong evidence while preventing false positives
+from stale data.  An earlier reactive model using CUSUM--Bayesian fault
 detection~\cite{page1954cusum, gelman2013bayesian} was validated across
 2\,000 GridWorld trials (76~pp resilience advantage), but reactive
 detection requires following bad commands before measuring their
@@ -160,27 +167,33 @@ executing bad commands.
 
 \subsection{Contributions}
 \begin{enumerate}[leftmargin=*]
-    \item A trust-based governance framework enabling distributed fault
-    detection, democratic impeachment, and merit-based leader election
-    in multi-agent exploration without ground-truth oracle access.
-    \item A proactive three-tier confidence-weighted trust model that
-    verifies commands \emph{before execution} against local knowledge
-    ranked by source reliability, with a closed-form worst-case
-    detection bound.
-    \item A causality-aware verification mechanism that prevents false
-    positives from concurrent exploration by timestamping visited cells
-    against leader assignment times.
-    \item Rigorous validation with $N{=}100$ trials per condition,
-    comparing REIP against Raft consensus and decentralized
-    baselines under dual sequential Byzantine fault injection, plus
-    a component ablation study quantifying the contribution of each
-    module.
-    \item Hardware validation on a five-robot embedded platform
-    (\$15 Raspberry Pi Zero~2W, 512\,MB RAM per robot; \$514 total
-    system cost) with overhead ArUco-based
-    localization~\cite{garrido2014aruco}, demonstrating that
-    Byzantine-resilient governance is achievable on ultra-low-cost
-    hardware.
+    \item \textbf{Proactive command verification before execution}: Unlike
+    reactive trust models that measure performance after commands are
+    executed, REIP verifies each leader assignment \emph{before} physical
+    movement using local knowledge (visited cells, sensor readings, peer
+    reports). This eliminates the cost of executing bad commands while
+    maintaining sub-second detection latency.
+    \item \textbf{Command-level Byzantine detection with closed-form bounds}:
+    REIP detects compromised leaders by verifying \emph{assignment quality}
+    (not just leader liveness), yielding a worst-case detection bound of
+    $\lceil \sigma / (w_{\text{tier}} - r) \rceil$ commands---2~under
+    ground-truth evidence, 8~under peer reports. This contrasts with
+    Raft, which cannot detect a leader that misbehaves while maintaining
+    heartbeats.
+    \item \textbf{Three-tier confidence-weighted evidence ranking}: Evidence
+    sources are ranked by reliability (personal experience $>$ sensor
+    readings $>$ peer reports), enabling fast detection from strong
+    evidence while preventing false positives from stale peer data. A
+    causality-aware timestamping mechanism prevents false positives from
+    concurrent exploration.
+    \item \textbf{Rigorous validation}: $N{=}100$ trials per condition
+    comparing REIP against Raft consensus and decentralized baselines
+    under dual sequential Byzantine fault injection, plus a component
+    ablation study confirming that removing the trust model collapses
+    coverage to 39.7\%.
+    \item \textbf{Hardware validation}: Five-robot embedded platform
+    (\$15 Raspberry Pi Zero~2W, 512\,MB RAM per robot) demonstrating
+    that Byzantine-resilient governance requires no specialized compute.
 \end{enumerate}
 
 \subsection{Paper Organization}

@@ -121,6 +121,7 @@ class ExperimentResult:
 # ==================== Experiment Runner ====================
 class ExperimentRunner:
     def __init__(self, output_dir: str = "experiments", port_offset: int = 0):
+        self._fixed_positions_for_next_trial = None
         self.output_dir = output_dir
         self.layout = "open"
         self.walls: List[Tuple[int, int, int, int]] = []
@@ -137,7 +138,9 @@ class ExperimentRunner:
         self.fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.state_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.state_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.state_socket.bind(('', self._peer_port))
+        # Sim traffic is explicitly sent to 127.0.0.1. Bind to loopback
+        # directly so localhost peer-state packets are captured reliably.
+        self.state_socket.bind(('127.0.0.1', self._peer_port))
         self.state_socket.setblocking(False)
         self.state_socket.settimeout(0.1)
 
@@ -155,6 +158,7 @@ class ExperimentRunner:
         self.coverage_history: List[Tuple[float, float]] = []
         self.tracked_leaders: Dict[int, Optional[int]] = {}  # rid -> leader they report
         self.last_targets: Dict[int, Optional[list]] = {}  # rid -> last known nav target
+        self.last_states_by_robot: Dict[int, dict] = {}
 
     def set_layout(self, layout: str):
         """Switch arena layout between experiments."""
@@ -287,6 +291,7 @@ class ExperimentRunner:
                     rid = msg.get('robot_id')
                     if rid:
                         states[rid] = msg
+                        self.last_states_by_robot[rid] = msg
                         for cell in msg.get('visited_cells', []):
                             self.visited_cells.add(tuple(cell))
         except (socket.timeout, BlockingIOError, ConnectionResetError, OSError):
@@ -538,14 +543,16 @@ class ExperimentRunner:
 
             # ---- Accept robot's navigation target (unless override is active) ----
             if not self.stuck_overrides.get(rid):
-                if rid in states:
-                    nav = states[rid].get('navigation_target')
+                current_state = states.get(rid) or self.last_states_by_robot.get(rid)
+                if current_state:
+                    nav = current_state.get('navigation_target')
                     if nav:
                         self.last_targets[rid] = nav
 
                 # Fallback: use leader assignments if robot hasn't reported a target yet
                 if rid not in self.last_targets or self.last_targets[rid] is None:
-                    for state in states.values():
+                    state_pool = list(states.values()) or list(self.last_states_by_robot.values())
+                    for state in state_pool:
                         if state.get('state') == 'leader':
                             assignments = state.get('assignments', {})
                             if str(rid) in assignments:
@@ -607,6 +614,11 @@ class ExperimentRunner:
                     dist = math.sqrt(dx*dx + dy*dy)
 
                     if dist <= 20 and len(wps) <= 1:
+                        # Arrived — clear stale target so we pick up the
+                        # robot's next broadcast target instead of looping
+                        # on the same arrived position forever.
+                        self.last_targets[rid] = None
+                        self.path_target_key[rid] = None
                         break  # arrived at final target
 
                     if dist <= 1:
@@ -658,24 +670,11 @@ class ExperimentRunner:
 
             self.sim_positions[rid] = (x, y, theta)
 
-            # Track coverage — mark robot's cell + sensing footprint
+            # Track coverage using the same center-cell semantics as the
+            # robot nodes. The node broadcasts its own visited_cells too, so
+            # this is just a local mirror to keep milestone timing aligned.
             cell = (int(x / CELL_SIZE), int(y / CELL_SIZE))
             self.visited_cells.add(cell)
-            # Also mark adjacent cells within one cell radius as visited
-            # (robot physically occupies ~150mm diameter, sensing > one cell)
-            # Only skip cells on the OTHER side of a wall (can't sense through).
-            cx0, cy0 = cell
-            for ddx in (-1, 0, 1):
-                for ddy in (-1, 0, 1):
-                    nc = (cx0 + ddx, cy0 + ddy)
-                    if (0 <= nc[0] < self.arena_width // CELL_SIZE and
-                            0 <= nc[1] < self.arena_height // CELL_SIZE):
-                        ncx = (nc[0] + 0.5) * CELL_SIZE
-                        ncy = (nc[1] + 0.5) * CELL_SIZE
-                        if math.sqrt((ncx - x)**2 + (ncy - y)**2) < CELL_SIZE * 0.8:
-                            # Only mark if line of sight (no wall between robot and cell)
-                            if not self._path_crosses_wall(x, y, ncx, ncy):
-                                self.visited_cells.add(nc)
 
     def get_coverage(self) -> float:
         """Calculate current coverage percentage"""
@@ -719,6 +718,7 @@ class ExperimentRunner:
         self.stuck_counters = {}
         self.prev_positions = {}
         self.last_targets = {}
+        self.last_states_by_robot = {}
         self.stuck_overrides = {}
         self.motor_faults = {}  # Reset motor faults each trial
         snapshot_frames = []  # Position snapshots for gridworld viz
@@ -751,7 +751,30 @@ class ExperimentRunner:
             extra_args.extend(["--arena-width", str(self.arena_width),
                                "--arena-height", str(self.arena_height)])
 
-        self.start_robots(script, extra_args, seed=seed, experiment_name=name)
+        # Use fixed positions if provided (for hardware validation)
+        fixed_pos = getattr(self, '_fixed_positions_for_next_trial', None)
+        self.start_robots(script, extra_args, seed=seed, experiment_name=name, fixed_positions=fixed_pos)
+        self._fixed_positions_for_next_trial = None  # Clear after use
+
+        # Give nodes a moment to initialize, then send "start" so
+        # trial_started gates open and motors/targets become active.
+        time.sleep(0.5)
+        for rid in range(1, NUM_ROBOTS + 1):
+            start_msg = json.dumps({
+                'type': 'fault_inject', 'robot_id': 0,
+                'fault': 'start', 'timestamp': time.time()
+            }).encode()
+            self.fault_socket.sendto(
+                start_msg, ('127.0.0.1', self._fault_port + rid))
+        time.sleep(0.2)
+        # Send twice to compensate for any startup packet loss
+        for rid in range(1, NUM_ROBOTS + 1):
+            start_msg = json.dumps({
+                'type': 'fault_inject', 'robot_id': 0,
+                'fault': 'start', 'timestamp': time.time()
+            }).encode()
+            self.fault_socket.sendto(
+                start_msg, ('127.0.0.1', self._fault_port + rid))
 
         # ---- Tracking variables ----
         start_time = time.time()
@@ -1253,6 +1276,7 @@ def print_statistics(results: List[ExperimentResult]):
 # ==================== Experiment Conditions ====================
 # (condition_tag, controller, fault_type, fault_robot, ablation)
 EXPERIMENT_CONDITIONS = [
+
     # --- Clean performance ---
     ("NoFault",    "reip",          None,          1, None),
     ("NoFault",    "raft",          None,          1, None),
@@ -1297,9 +1321,17 @@ def _run_worker(args_tuple):
     results = []
     runner = ExperimentRunner(output_dir, port_offset=port_offset)
 
-    for name, layout, controller, fault_type, fault_robot, trial, seed, ablation in job_list:
+    for job in job_list:
+        if len(job) == 9:
+            name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fixed_positions = job
+        else:
+            name, layout, controller, fault_type, fault_robot, trial, seed, ablation = job[:8]
+            fixed_positions = None
+        
         runner.set_layout(layout)
         try:
+            # Pass fixed_positions to start_robots via run_experiment
+            runner._fixed_positions_for_next_trial = fixed_positions
             r = runner.run_experiment(
                 name=name, controller=controller,
                 fault_type=fault_type, fault_robot=fault_robot,
@@ -1316,6 +1348,120 @@ def _run_worker(args_tuple):
     except Exception:
         pass
     return worker_id, results
+
+
+# ==================== Validation: Sim vs Hardware ====================
+def validate_sim_hardware(sim_results: List[ExperimentResult], hardware_json: str):
+    """Compare simulation results to hardware results and report validation status.
+    
+    Returns: (passed: bool, report: str)
+    """
+    # Load hardware results
+    with open(hardware_json) as f:
+        hardware_data = json.load(f)
+    
+    # Convert hardware data to ExperimentResult format if needed
+    hardware_results = []
+    if isinstance(hardware_data, list):
+        for h in hardware_data:
+            # Try to create ExperimentResult from hardware data
+            try:
+                r = ExperimentResult(**{k: v for k, v in h.items() 
+                                      if k in ExperimentResult.__dataclass_fields__})
+                hardware_results.append(r)
+            except Exception:
+                pass
+    
+    if not hardware_results:
+        return False, f"ERROR: Could not parse hardware results from {hardware_json}"
+    
+    # Group by condition
+    sim_groups = defaultdict(list)
+    hw_groups = defaultdict(list)
+    
+    for r in sim_results:
+        key = f"{r.controller}|{r.fault_type or 'none'}"
+        sim_groups[key].append(r)
+    
+    for r in hardware_results:
+        key = f"{r.controller}|{r.fault_type or 'none'}"
+        hw_groups[key].append(r)
+    
+    # Compare each condition
+    report_lines = []
+    report_lines.append("=" * 80)
+    report_lines.append("SIMULATION vs HARDWARE VALIDATION")
+    report_lines.append("=" * 80)
+    report_lines.append("")
+    
+    all_passed = True
+    tolerance = {
+        'coverage': 10.0,      # 10% absolute difference
+        'detection_time': 0.5,  # 0.5s difference
+        'suspicion_time': 0.3,  # 0.3s difference
+    }
+    
+    for key in sorted(set(list(sim_groups.keys()) + list(hw_groups.keys()))):
+        sim_trials = sim_groups.get(key, [])
+        hw_trials = hw_groups.get(key, [])
+        
+        if not sim_trials:
+            report_lines.append(f"  {key}: Hardware only (no sim data)")
+            continue
+        if not hw_trials:
+            report_lines.append(f"  {key}: Sim only (no hardware data)")
+            continue
+        
+        # Compute means
+        sim_cov = sum(t.final_coverage for t in sim_trials) / len(sim_trials)
+        hw_cov = sum(t.final_coverage for t in hw_trials) / len(hw_trials)
+        cov_diff = abs(sim_cov - hw_cov)
+        
+        sim_det = [t.time_to_detection for t in sim_trials if t.time_to_detection is not None]
+        hw_det = [t.time_to_detection for t in hw_trials if t.time_to_detection is not None]
+        sim_det_mean = sum(sim_det) / len(sim_det) if sim_det else None
+        hw_det_mean = sum(hw_det) / len(hw_det) if hw_det else None
+        
+        sim_sus = [t.time_to_first_suspicion for t in sim_trials if t.time_to_first_suspicion is not None]
+        hw_sus = [t.time_to_first_suspicion for t in hw_trials if t.time_to_first_suspicion is not None]
+        sim_sus_mean = sum(sim_sus) / len(sim_sus) if sim_sus else None
+        hw_sus_mean = sum(hw_sus) / len(hw_sus) if hw_sus else None
+        
+        # Check pass/fail
+        passed = True
+        if cov_diff > tolerance['coverage']:
+            passed = False
+            all_passed = False
+        
+        det_diff = abs(sim_det_mean - hw_det_mean) if (sim_det_mean and hw_det_mean) else None
+        if det_diff and det_diff > tolerance['detection_time']:
+            passed = False
+            all_passed = False
+        
+        sus_diff = abs(sim_sus_mean - hw_sus_mean) if (sim_sus_mean and hw_sus_mean) else None
+        if sus_diff and sus_diff > tolerance['suspicion_time']:
+            passed = False
+            all_passed = False
+        
+        status = "✓ PASS" if passed else "✗ FAIL"
+        report_lines.append(f"  {status} {key}:")
+        report_lines.append(f"    Coverage: Sim {sim_cov:.1f}% vs HW {hw_cov:.1f}% (diff: {cov_diff:.1f}%)")
+        if sim_det_mean and hw_det_mean:
+            report_lines.append(f"    Detection: Sim {sim_det_mean:.2f}s vs HW {hw_det_mean:.2f}s (diff: {det_diff:.2f}s)")
+        if sim_sus_mean and hw_sus_mean:
+            report_lines.append(f"    Suspicion: Sim {sim_sus_mean:.2f}s vs HW {hw_sus_mean:.2f}s (diff: {sus_diff:.2f}s)")
+        report_lines.append("")
+    
+    report_lines.append("=" * 80)
+    if all_passed:
+        report_lines.append("VALIDATION PASSED: Simulation matches hardware within tolerances")
+        report_lines.append("  → Safe to use 100-trial sim results for paper")
+    else:
+        report_lines.append("VALIDATION FAILED: Significant differences detected")
+        report_lines.append("  → Fix simulation physics before using results")
+    report_lines.append("=" * 80)
+    
+    return all_passed, "\n".join(report_lines)
 
 
 # ==================== Main ====================
@@ -1338,8 +1484,44 @@ def main():
                         help="Save per-timestep position snapshots for gridworld viz")
     parser.add_argument("--ablation", action="store_true",
                         help="Run ablation study conditions instead of standard conditions")
+    parser.add_argument("--duration", type=float, default=EXPERIMENT_DURATION,
+                        help=f"Per-trial duration in seconds (default: {EXPERIMENT_DURATION})")
+    parser.add_argument("--validate", type=str, metavar="HARDWARE_JSON",
+                        help="Validation mode: compare sim results to hardware results from JSON file")
+    parser.add_argument("--hardware-positions", type=str, metavar="POSITIONS_JSON",
+                        help="Use fixed starting positions from JSON (e.g., from ArUco detection)")
     args = parser.parse_args()
+    globals()["EXPERIMENT_DURATION"] = args.duration
 
+    # Handle validation mode
+    if args.validate:
+        # Load hardware results and compare
+        print(f"\nVALIDATION MODE: Comparing to hardware results from {args.validate}")
+        # Run a quick sim run first (or load existing sim results)
+        # For now, assume user provides both sim and hardware JSON files
+        # TODO: Auto-run sim if not provided
+        print("ERROR: Validation mode requires both sim and hardware results")
+        print("  Usage: Run sim first, then: --validate hardware_results.json")
+        return 1
+    
+    # Load hardware positions if provided
+    fixed_positions = None
+    if args.hardware_positions:
+        with open(args.hardware_positions) as f:
+            data = json.load(f)
+        if 'sim_fixed_positions' in data:
+            fixed_positions = {int(k): tuple(v) for k, v in data['sim_fixed_positions'].items()}
+            print(f"Loaded {len(fixed_positions)} hardware starting positions")
+        elif 'robot_positions' in data:
+            import math
+            fixed_positions = {}
+            for rid, pos in data['robot_positions'].items():
+                x, y, heading_deg = pos
+                fixed_positions[int(rid)] = (float(x), float(y), math.radians(heading_deg))
+            print(f"Loaded {len(fixed_positions)} hardware starting positions (converted)")
+        else:
+            print(f"WARNING: No position data found in {args.hardware_positions}")
+    
     if args.quick:
         n_trials = 3
         layouts = ["open"]
@@ -1364,6 +1546,9 @@ def main():
             seed = trial * 1000
             for cond_tag, controller, fault_type, fault_robot, ablation in conditions:
                 name = f"{layout}_{controller}_{cond_tag}_t{trial}"
+                # Use fixed positions if provided (only for first trial for validation)
+                use_fixed = fixed_positions if (fixed_positions and trial == 1) else None
+                jobs.append((name, layout, controller, fault_type, fault_robot, trial, seed, ablation, use_fixed))
                 jobs.append((name, layout, controller, fault_type,
                              fault_robot, trial, seed, ablation))
 

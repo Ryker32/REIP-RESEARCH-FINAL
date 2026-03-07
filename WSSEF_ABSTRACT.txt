@@ -1,0 +1,9 @@
+Multi-robot exploration teams require resilient governance to detect and replace compromised leaders. This project introduces the Resilient Election and Impeachment Policy (REIP), a distributed trust framework that enables robot teams to verify leader commands before execution and democratically impeach faulty leaders without centralized oversight.
+
+REIP uses a three-tier confidence-weighted trust model: personal visit history (ground truth), sensor readings (physically verifiable), and peer reports (lower confidence). Each robot verifies leader assignments against local knowledge before executing commands, enabling proactive fault detection. When trust falls below a threshold, robots vote to impeach and elect a new leader based on trust scores and leadership history.
+
+The system was validated through simulation (100 trials per condition) and hardware testing on a five-robot platform using Raspberry Pi Zero 2W computers ($15 each). Under dual sequential Byzantine fault injection, REIP achieved 100% median coverage in both clean and adversarial conditions, with median first suspicion in 0.20-0.21 seconds and impeachment in 1.21-1.67 seconds. REIP outperformed the Raft consensus protocol by 24.5-32.2 percentage points in coverage under fault conditions. An ablation study confirmed that removing the trust model reduced coverage to 39.7%, demonstrating trust as the core mechanism.
+
+Results demonstrate that Byzantine-resilient governance is achievable on ultra-low-cost hardware without specialized compute, enabling fault-tolerant multi-robot exploration for applications such as disaster response and space missions where human oversight is impractical.
+
+Word count: 249

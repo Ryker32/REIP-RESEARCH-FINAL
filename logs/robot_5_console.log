@@ -4,7 +4,7 @@ Trust Model: Three-tier confidence-weighted
   Personal: 1.0, ToF: 1.0, Peer: 0.3
   Suspicion threshold: 1.5, Recovery: 0.1
 
-  Logging to: logs/robot_5_20260225_222456.jsonl
+  Logging to: logs/robot_5_20260305_232710.jsonl
 Initializing hardware...
   Hardware: SIMULATED
 [INFO] Position socket listening on port 5105
@@ -15,115 +15,20 @@ Ready!
 === Detection Bounds: T1=2 cmds, T3=8 cmds | Impeachment: T1=8 cmds, T3=32 cmds ===
 Running... Press Ctrl+C to stop
 
+[R5] Waiting for 'start' command...
 [ELECTION] New leader: 5
-[R5] pos=(0,0) state=leader leader=5 trust=1.00 susp=0.00 cov=0.0%/0.0%
-[ELECTION] New leader: 1
-[R5] pos=(1355,510) state=follower leader=1 trust=1.00 susp=0.00 cov=2.6%/10.4%
-[R5] pos=(1438,187) state=follower leader=1 trust=1.00 susp=0.00 cov=5.7%/24.5%
-[R5] pos=(1341,75) state=follower leader=1 trust=1.00 susp=0.00 cov=7.3%/35.4%
-[R5] pos=(1682,140) state=follower leader=1 trust=1.00 susp=0.00 cov=9.4%/41.7%
-[R5] pos=(1925,511) state=follower leader=1 trust=1.00 susp=0.00 cov=13.0%/55.2%
-[R5] pos=(1862,688) state=follower leader=1 trust=1.00 susp=0.00 cov=14.6%/67.7%
-[R5] pos=(1834,1125) state=follower leader=1 trust=1.00 susp=0.00 cov=17.7%/80.2%
-[R5] pos=(1813,1389) state=follower leader=1 trust=1.00 susp=0.00 cov=20.3%/90.1%
-[R5] pos=(1661,1211) state=follower leader=1 trust=1.00 susp=0.00 cov=21.9%/97.9%
-[R5] pos=(1885,392) state=follower leader=1 trust=1.00 susp=0.00 cov=21.9%/98.4%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
-[R5] pos=(1925,75) state=follower leader=1 trust=1.00 susp=0.00 cov=22.9%/100.0%
+Stopped.
+Traceback (most recent call last):
+  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2510, in <module>
+    node.run()
+    ~~~~~~~~^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2420, in run
+    self.control_loop()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2386, in control_loop
+    self.log_state()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 521, in log_state
+    'in_pivot': self._in_pivot,
+                ^^^^^^^^^^^^^^
+AttributeError: 'REIPNode' object has no attribute '_in_pivot'

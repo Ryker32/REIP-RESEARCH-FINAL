@@ -191,12 +191,17 @@ class PeerInfo:
     assigned_target: Optional[Tuple[float, float]] = None  # Leader's assignment for them
     last_seen: float = 0
     last_peer_seq: int = -1
+    last_x: float = 0.0  # Previous position for velocity estimation
+    last_y: float = 0.0
+    last_update_time: float = 0.0
 
 # ============== Hardware Interface ==============
 class Hardware:
     def __init__(self):
         self._uart_lock = threading.Lock()
         self.hw_ok = False
+        self._uart_error_count = 0
+        self._last_uart_error_time = 0.0
         if not HARDWARE_AVAILABLE:
             print("  Hardware: SIMULATED")
             return
@@ -255,7 +260,7 @@ class Hardware:
             return
         try:
             self.bus.write_byte(self.MUX_ADDR, 1 << ch)
-            time.sleep(0.001)  # 1ms, tca9548a switches in <1us
+            time.sleep(0.005)  # 5ms for I2C to settle (was 1ms, too fast for some I2C buses)
         except:
             pass
     
@@ -269,9 +274,9 @@ class Hardware:
                 if name in self.tof_sensors:
                     distances[name] = self.tof_sensors[name].range
                 else:
-                    distances[name] = -1
+                    distances[name] = 9999
             except:
-                distances[name] = -1
+                distances[name] = 9999
         return distances
     
     def read_encoders(self) -> tuple:
@@ -285,9 +290,14 @@ class Hardware:
                 resp = self.uart.readline().decode().strip()
                 if ',' in resp:
                     l, r = resp.split(',')
+                    self._uart_error_count = 0  # Reset on success
                     return (int(l), int(r))
-            except:
-                pass
+            except Exception as e:
+                self._uart_error_count += 1
+                now = time.time()
+                if self._uart_error_count > 10 and now - self._last_uart_error_time > 5.0:
+                    print(f"  WARNING: UART encoder read failed {self._uart_error_count} times: {e}")
+                    self._last_uart_error_time = now
         return (0, 0)
     
     def set_motors(self, left: float, right: float):
@@ -297,8 +307,13 @@ class Hardware:
             try:
                 self.uart.reset_input_buffer()
                 self.uart.write(f"MOT,{left:.1f},{right:.1f}\n".encode())
-            except:
-                pass
+                self._uart_error_count = 0  # Reset on success
+            except Exception as e:
+                self._uart_error_count += 1
+                now = time.time()
+                if self._uart_error_count > 10 and now - self._last_uart_error_time > 5.0:
+                    print(f"  CRITICAL: UART motor command failed {self._uart_error_count} times: {e}")
+                    self._last_uart_error_time = now
     
     def stop(self):
         if not HARDWARE_AVAILABLE:
@@ -307,7 +322,8 @@ class Hardware:
             try:
                 self.uart.reset_input_buffer()
                 self.uart.write(b'STOP\n')
-            except:
+            except Exception:
+                # Stop command failure is less critical, but still log if persistent
                 pass
 
 # ============== REIP Node ==============
@@ -330,6 +346,10 @@ class REIPNode:
         self.position_timestamp = 0.0
         self.position_rx_mono = 0.0
         self._pos_initialized = False
+        self._position_timeout_warned = False
+        self._last_encoder_values = (0, 0)
+        self._last_encoder_time = 0.0
+        self._election_start_time = 0.0
         
         # Sensor data
         self.tof = {}
@@ -518,7 +538,7 @@ class REIPNode:
             'leader_assignment_rx_age': time.monotonic() - self.leader_assignment_rx_mono if self.leader_assignment_rx_mono > 0 else None,
             'target_angle': self._last_target_angle,
             'heading_error': self._last_heading_error,
-            'in_pivot': self._in_pivot,
+            'in_pivot': getattr(self, '_in_pivot', False),
             'stuck_count': getattr(self, '_stuck_count', 0),
             'escape_active': time.monotonic() < getattr(self, '_escape_until', 0.0),
             'stop_reason': self._last_stop_reason,
@@ -554,9 +574,19 @@ class REIPNode:
                         else:
                             self.x += POS_EMA * (raw_x - self.x)
                             self.y += POS_EMA * (raw_y - self.y)
-                        self.theta = msg['theta']
+                        # Filter heading to reduce ArUco jitter
+                        raw_theta = msg['theta']
+                        if self._pos_initialized:
+                            # EMA filter for heading (normalize angle difference)
+                            theta_diff = raw_theta - self.theta
+                            while theta_diff > math.pi: theta_diff -= 2 * math.pi
+                            while theta_diff < -math.pi: theta_diff += 2 * math.pi
+                            self.theta += POS_EMA * theta_diff
+                        else:
+                            self.theta = raw_theta
                         self.position_timestamp = msg.get('timestamp', time.time())
                         self.position_rx_mono = time.monotonic()
+                        self._position_timeout_warned = False  # Reset warning on fresh position
                         
                         # Mark only the center cell to keep hardware coverage
                         # accounting aligned with the trust story.
@@ -710,6 +740,11 @@ class REIPNode:
             return
         if peer_seq is not None:
             peer.last_peer_seq = peer_seq
+        # Store previous position for velocity estimation
+        peer.last_x = peer.x
+        peer.last_y = peer.y
+        peer.last_update_time = peer.last_seen
+        
         peer.x = msg.get('x', 0)
         peer.y = msg.get('y', 0)
         peer.theta = msg.get('theta', 0)
@@ -1653,7 +1688,11 @@ class REIPNode:
     def _finalize_motor_command(self, left: float, right: float,
                                 stop_reason: Optional[str] = None) -> Tuple[float, float]:
         """Rate-limit PWM changes so the hardware doesn't twitch between steps."""
-        MAX_PWM_STEP = 20.0
+        # Use larger step size for emergency modes (faster response)
+        if stop_reason in ["peer_emergency", "tof_emergency", "escape_reverse", "escape_pivot"]:
+            MAX_PWM_STEP = 50.0
+        else:
+            MAX_PWM_STEP = 20.0
         prev_left, prev_right = self._last_motor_cmd
         left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
         right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
@@ -1666,6 +1705,20 @@ class REIPNode:
             self._last_stop_reason = stop_reason
         return (left, right)
 
+    def _set_motion_override_target(self, angle: float, distance: float = 250.0):
+        """Expose reactive motion intent to the sim harness.
+
+        The hardware controller can temporarily ignore the nominal frontier
+        target (peer emergency, escape, pivot timeout).  The ISEF sim harness
+        only sees `navigation_target`, so publish a short synthetic waypoint
+        in the commanded direction whenever the low-level controller takes over.
+        """
+        tx = self.x + distance * math.cos(angle)
+        ty = self.y + distance * math.sin(angle)
+        tx = max(75, min(ARENA_WIDTH - 75, tx))
+        ty = max(75, min(ARENA_HEIGHT - 75, ty))
+        self.current_navigation_target = (tx, ty)
+
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
         Skips during pivot turns — the robot intentionally stays in place."""
@@ -1675,19 +1728,38 @@ class REIPNode:
 
         now = time.monotonic()
 
+        # Primary: position-based stuck detection (requires fresh position)
+        if self.position_rx_mono > 0.0 and now - self.position_rx_mono <= 1.0:
+            self._nav_history.append((now, self.x, self.y))
+            self._nav_history = [(t, x, y) for t, x, y in self._nav_history
+                                 if now - t < 3.0]
+            if len(self._nav_history) >= 2:
+                oldest_t, oldest_x, oldest_y = self._nav_history[0]
+                elapsed = now - oldest_t
+                moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
+                if elapsed > 1.5 and moved < 20:
+                    return True
+        
+        # Fallback: encoder-based stuck detection (works even with stale position)
+        if HARDWARE_AVAILABLE and self.hw.hw_ok:
+            enc_l, enc_r = self.hw.read_encoders()
+            if self._last_encoder_time > 0:
+                dt = now - self._last_encoder_time
+                if dt > 0.1:  # At least 100ms elapsed
+                    enc_delta_l = abs(enc_l - self._last_encoder_values[0])
+                    enc_delta_r = abs(enc_r - self._last_encoder_values[1])
+                    # If encoders haven't changed in 1.5s and motors are on, we're stuck
+                    if dt > 1.5 and (enc_delta_l == 0 and enc_delta_r == 0):
+                        if abs(self._last_motor_cmd[0]) > 5 or abs(self._last_motor_cmd[1]) > 5:
+                            return True
+            self._last_encoder_values = (enc_l, enc_r)
+            self._last_encoder_time = now
+        
+        # Clear history if position is stale (but keep encoder fallback active)
         if self.position_rx_mono == 0.0 or now - self.position_rx_mono > 1.0:
             self._nav_history.clear()
-            return False
-
-        self._nav_history.append((now, self.x, self.y))
-        self._nav_history = [(t, x, y) for t, x, y in self._nav_history
-                             if now - t < 3.0]
-        if len(self._nav_history) < 2:
-            return False
-        oldest_t, oldest_x, oldest_y = self._nav_history[0]
-        elapsed = now - oldest_t
-        moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 1.5 and moved < 20
+        
+        return False
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -1931,6 +2003,7 @@ class REIPNode:
             self._last_command_source = "escape_mode"
             phase_elapsed = time.monotonic() - self._escape_start
             escape_angle = self._escape_angle
+            self._set_motion_override_target(escape_angle, 300.0)
             if phase_elapsed < 0.30:
                 return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
             if phase_elapsed < 0.80:
@@ -1970,8 +2043,23 @@ class REIPNode:
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > PEER_TIMEOUT:
                 continue
-            pdx = self.x - peer.x
-            pdy = self.y - peer.y
+            # Extrapolate peer position to account for 200ms broadcast delay
+            # Estimate velocity from last two positions
+            dt = time.time() - peer.last_seen
+            if peer.last_update_time > 0 and dt < 0.5:  # Only extrapolate if recent
+                dt_vel = peer.last_seen - peer.last_update_time
+                if dt_vel > 0.01:  # At least 10ms between updates
+                    vx = (peer.x - peer.last_x) / dt_vel
+                    vy = (peer.y - peer.last_y) / dt_vel
+                    est_x = peer.x + vx * dt
+                    est_y = peer.y + vy * dt
+                else:
+                    est_x, est_y = peer.x, peer.y
+            else:
+                est_x, est_y = peer.x, peer.y
+            
+            pdx = self.x - est_x
+            pdy = self.y - est_y
             pdist = math.sqrt(pdx * pdx + pdy * pdy)
             if pdist < _closest_peer_dist:
                 _closest_peer_dist = pdist
@@ -1981,6 +2069,7 @@ class REIPNode:
         if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
+            self._set_motion_override_target(flee_angle, 220.0)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
@@ -2087,6 +2176,7 @@ class REIPNode:
                 flee_y = math.sin(self.robot_id * 1.2566)
             self._escape_angle = math.atan2(flee_y, flee_x)
             self._last_command_source = "stuck_escape"
+            self._set_motion_override_target(self._escape_angle, 300.0)
             return self._finalize_motor_command(-BASE_SPEED * 0.5, -BASE_SPEED * 0.5, "stuck_escape")
 
         # --- Navigate to target ---
@@ -2195,10 +2285,12 @@ class REIPNode:
             self._escape_start = time.monotonic()
             self._escape_until = self._escape_start + 0.8
             self._escape_angle = target_angle
+            self._set_motion_override_target(target_angle, 250.0)
             return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
             pivot_fast = BASE_SPEED
             pivot_slow = 0.0
+            self._set_motion_override_target(target_angle, 200.0)
             if diff > 0:
                 left_speed, right_speed = pivot_slow, pivot_fast
             else:
@@ -2213,6 +2305,15 @@ class REIPNode:
                 left_speed = math.copysign(MIN_MOTOR_PWM, left_speed)
             if abs(right_speed) > 0 and abs(right_speed) < MIN_MOTOR_PWM:
                 right_speed = math.copysign(MIN_MOTOR_PWM, right_speed)
+        
+        # If both motors are below minimum, scale both up proportionally
+        # (prevents robot from being "on" but not moving due to dead zone)
+        if abs(left_speed) < MIN_MOTOR_PWM and abs(right_speed) < MIN_MOTOR_PWM:
+            if abs(left_speed) > 0 or abs(right_speed) > 0:
+                max_speed = max(abs(left_speed), abs(right_speed), 1.0)
+                scale = MIN_MOTOR_PWM / max_speed
+                left_speed *= scale
+                right_speed *= scale
 
         self._last_turn = turn
         return self._finalize_motor_command(left_speed, right_speed, "tracking")
@@ -2252,7 +2353,8 @@ class REIPNode:
                         self._last_stop_reason = "trial_started"
                         self._last_command_source = "trial_started"
                         self._last_motor_cmd = (0.0, 0.0)
-                        self._nav_history.clear()
+                        if hasattr(self, '_nav_history'):
+                            self._nav_history.clear()
                         for p in self.peers.values():
                             p.visited_cells.clear()
                         print(f"[START] Trial started — coverage reset, motors engaged")
@@ -2360,15 +2462,32 @@ class REIPNode:
                               if election_count < ELECTION_FAST_COUNT
                               else ELECTION_INTERVAL)
             if not self.decentralized_mode and time.time() - last_election > elect_interval:
+                # Track election start time for timeout detection
+                if self._election_start_time == 0.0:
+                    self._election_start_time = time.time()
+                
                 self.check_impeachment()
                 self.run_election()
                 last_election = time.time()
                 election_count += 1
+                
+                # Reset election timeout on successful election
+                if self.current_leader is not None:
+                    self._election_start_time = 0.0
+                # Check for election timeout (no leader elected after 5s)
+                elif time.time() - self._election_start_time > 5.0:
+                    print(f"[Robot {self.robot_id}] WARNING: Election timeout, restarting election")
+                    self._election_start_time = time.time()
+                    # Force self-election as fallback
+                    if self.current_leader is None:
+                        self.current_leader = self.robot_id
+                        self.my_vote = self.robot_id
+                        print(f"[Robot {self.robot_id}] Fallback: Self-elected as leader")
             
             # Motors only engage when: trial started + fresh position data.
             left, right = 0.0, 0.0
             pos_age = time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else float('inf')
-            if self.trial_started and self.position_rx_mono > 0 and pos_age < 1.5:
+            if self.trial_started and self.position_rx_mono > 0 and pos_age < 2.0:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:

@@ -126,12 +126,12 @@ def group_timelines(timelines: dict) -> dict:
 def graph_convergence(timelines: dict, output_dir: str):
     """Coverage-over-time with individual trial traces and mean.
 
-    Three panels: Clean, Bad Leader, Spin.
+    Three panels: Clean, Bad Leader, Freeze Leader.
     """
     fault_panels = [
         ('none',        'Clean (No Fault)'),
         ('bad_leader',  'Bad Leader Fault'),
-        ('spin',        'Motor Spin Fault'),
+        ('freeze_leader', 'Freeze Leader Fault'),
     ]
     controllers = ['reip', 'raft', 'decentralized']
 
@@ -169,12 +169,25 @@ def graph_convergence(timelines: dict, output_dir: str):
                     ax.plot(t_grid, mean_c, color=color, linewidth=2.5,
                             label=label, zorder=5)
 
-        # Fault injection line
+        # Fault injection line(s) - read from timeline data if available
         if fault_key != 'none':
-            ax.axvline(x=30, color=COLORS['fault_line'], linestyle='--',
+            # Get fault time from timeline metadata (first experiment with this fault)
+            fault_time_1 = 10.0  # default
+            fault_time_2 = None
+            for exp_name, exp_data in timelines.items():
+                if (exp_data.get('controller') == controllers[0] and 
+                    (exp_data.get('fault_type') or 'none') == fault_key):
+                    fault_time_1 = exp_data.get('fault_time_1', 10.0)
+                    fault_time_2 = exp_data.get('fault_time_2')
+                    break
+            
+            ax.axvline(x=fault_time_1, color=COLORS['fault_line'], linestyle='--',
                        linewidth=1.5, alpha=0.7, zorder=6)
-            ax.annotate('Fault', xy=(31, 5), fontsize=9,
+            ax.annotate('Fault', xy=(fault_time_1 + 1, 5), fontsize=9,
                         color=COLORS['fault_line'], fontweight='bold')
+            if fault_time_2:
+                ax.axvline(x=fault_time_2, color=COLORS['fault_line'], linestyle=':',
+                           linewidth=1.0, alpha=0.5, zorder=6)
 
         ax.set_title(panel_title, fontweight='bold')
         ax.set_xlabel('Time (s)')
@@ -203,7 +216,7 @@ def graph_time_to_50(results: list, output_dir: str):
     groups = group_results(results)
 
     fig, axes = plt.subplots(1, 3, figsize=(14, 5), sharey=True)
-    faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('spin', 'Spin')]
+    faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
     controllers = ['reip', 'raft', 'decentralized']
 
     for ax, (fkey, flabel) in zip(axes, faults):
@@ -315,7 +328,7 @@ def graph_coverage_bars(results: list, output_dir: str):
     """Grouped bar chart: final coverage by controller and fault."""
     groups = group_results(results)
     controllers = ['reip', 'raft', 'decentralized']
-    faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('spin', 'Spin')]
+    faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
 
     fig, ax = plt.subplots(figsize=(12, 6))
     x = np.arange(len(faults))

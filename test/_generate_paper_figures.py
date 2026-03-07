@@ -4,7 +4,7 @@ Generate all IEEE-quality figures for the REIP paper.
 
 IEEE formatting rules (IEEEtran compliance):
   - Column width:  3.5 in (single), 7.16 in (double)
-  - Font:          Serif (Times), 8–10 pt at print size
+  - Font:          Serif (Times), 8 or mayb like 10 pt at print size, Depends on the figure and the aesthetics bro
   - Axes:          Thin (0.5 pt), ticks inward
   - Grid:          Horizontal only, very faint
   - Colors:        Muted, B&W-distinguishable (hatching required)

@@ -945,6 +945,14 @@ class RAFTNode:
             self._last_stop_reason = stop_reason
         return (left, right)
 
+    def _set_motion_override_target(self, angle: float, distance: float = 250.0):
+        """Expose reactive motion intent to the sim harness."""
+        tx = self.x + distance * math.cos(angle)
+        ty = self.y + distance * math.sin(angle)
+        tx = max(75, min(ARENA_WIDTH - 75, tx))
+        ty = max(75, min(ARENA_HEIGHT - 75, ty))
+        self.current_navigation_target = (tx, ty)
+
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
         Skips during pivot turns — the robot intentionally stays in place."""
@@ -1188,6 +1196,7 @@ class RAFTNode:
             phase_elapsed = time.monotonic() - self._escape_start
             escape_angle = getattr(self, '_escape_angle', math.atan2(
                 ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x))
+            self._set_motion_override_target(escape_angle, 300.0)
 
             in_wall_zone = (
                 self.x < OUTER_WALL_MARGIN + 50 or
@@ -1285,6 +1294,7 @@ class RAFTNode:
         if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
+            self._set_motion_override_target(flee_angle, 220.0)
             diff = flee_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
@@ -1393,6 +1403,7 @@ class RAFTNode:
 
             self._escape_angle = math.atan2(flee_y, flee_x)
             self._last_command_source = "stuck_escape"
+            self._set_motion_override_target(self._escape_angle, 300.0)
             return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "stuck_escape")
 
         # Navigate to target
@@ -1504,10 +1515,12 @@ class RAFTNode:
             self._escape_start = time.monotonic()
             self._escape_until = self._escape_start + 0.8
             self._escape_angle = target_angle
+            self._set_motion_override_target(target_angle, 250.0)
             return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
             pivot_fast = BASE_SPEED
             pivot_slow = 0.0
+            self._set_motion_override_target(target_angle, 200.0)
             if diff > 0:
                 left_speed, right_speed = pivot_slow, pivot_fast
             else:
@@ -1548,7 +1561,8 @@ class RAFTNode:
                         self._last_stop_reason = "trial_started"
                         self._last_command_source = "trial_started"
                         self._last_motor_cmd = (0.0, 0.0)
-                        self._nav_history.clear()
+                        if hasattr(self, '_nav_history'):
+                            self._nav_history.clear()
                         for p in self.peers.values():
                             p['visited_cells'] = set()
                         print(f"[START] Trial started — coverage reset, motors engaged")

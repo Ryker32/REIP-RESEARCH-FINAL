@@ -29,12 +29,32 @@ import socket
 import json
 import time
 import math
+import hashlib
 import threading
 import random
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
 from enum import Enum
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if PROJECT_ROOT not in os.sys.path:
+    os.sys.path.insert(0, PROJECT_ROOT)
+
+from hardware_fidelity import (
+    BROADCAST_RATE_HZ,
+    CONTROL_RATE_HZ,
+    DEFAULT_ARENA,
+    LEADER_ACK_STALE_S,
+    PEER_TIMEOUT_S,
+    POSITION_FRESHNESS_S,
+    POSITION_STOP_TIMEOUT_S,
+    SIM_MOTOR_PORT,
+    SIM_PEER_RELAY_PORT,
+    SIM_SENSOR_PORT,
+)
+
+MAX_RX_MESSAGES_PER_TICK = 32
 
 # Hardware imports
 try:
@@ -53,43 +73,47 @@ except ImportError:
 UDP_POSITION_PORT = 5100
 UDP_PEER_PORT = 5200
 UDP_FAULT_PORT = 5300
+UDP_SIM_MOTOR_PORT = SIM_MOTOR_PORT
+UDP_SIM_PEER_RELAY_PORT = SIM_PEER_RELAY_PORT
+UDP_SIM_SENSOR_PORT = SIM_SENSOR_PORT
 BROADCAST_IP = "192.168.20.255"
 NUM_ROBOTS = 5
 
-ARENA_WIDTH = 2000
-ARENA_HEIGHT = 1500
-CELL_SIZE = 125
+ARENA_WIDTH = DEFAULT_ARENA.width_mm
+ARENA_HEIGHT = DEFAULT_ARENA.height_mm
+CELL_SIZE = DEFAULT_ARENA.cell_size_mm
 
-ROBOT_RADIUS = 110   # mm, bounding diagonal from ArUco to rear wheel corner
-BODY_RADIUS = 77     # mm, max body extent behind ArUco (rear edge)
-BODY_HALF_WIDTH = 64 # mm, half width (128mm / 2)
-BODY_FRONT = 70      # mm, body extent ahead of ArUco (front bumper with ToF)
-SWEPT_RADIUS = 100   # mm, sqrt(77² + 64²) — rear corner during rotation
-TOF_SENSOR_OFFSET = 70  # mm, ToF sensors are this far ahead of ArUco center
-AVOID_DISTANCE = 200
-CRITICAL_DISTANCE = 100
+ROBOT_RADIUS = DEFAULT_ARENA.robot_radius_mm   # mm, bounding diagonal from ArUco to rear wheel corner
+BODY_RADIUS = DEFAULT_ARENA.body_radius_mm     # mm, max body extent behind ArUco (rear edge)
+BODY_HALF_WIDTH = DEFAULT_ARENA.body_half_width_mm # mm, half width (128mm / 2)
+BODY_FRONT = DEFAULT_ARENA.body_front_mm      # mm, body extent ahead of ArUco (front bumper with ToF)
+SWEPT_RADIUS = DEFAULT_ARENA.swept_radius_mm   # mm, sqrt(77² + 64²) — rear corner during rotation
+TOF_SENSOR_OFFSET = DEFAULT_ARENA.tof_sensor_offset_mm  # mm, ToF sensors are this far ahead of ArUco center
+AVOID_DISTANCE = DEFAULT_ARENA.avoid_distance_mm
+CRITICAL_DISTANCE = DEFAULT_ARENA.critical_distance_mm
 
 # Interior wall: 35.7mm thick foam board, left face at x=1000
-INTERIOR_WALL_X_LEFT = 1000
-INTERIOR_WALL_X_RIGHT = 1036
-INTERIOR_WALL_X = 1018        # center (for legacy/tip)
-INTERIOR_WALL_Y_END = 1200
+INTERIOR_WALL_X_LEFT = DEFAULT_ARENA.interior_wall_x_left_mm
+INTERIOR_WALL_X_RIGHT = DEFAULT_ARENA.interior_wall_x_right_mm
+INTERIOR_WALL_X = DEFAULT_ARENA.interior_wall_x_mm        # center (for legacy/tip)
+INTERIOR_WALL_Y_END = DEFAULT_ARENA.interior_wall_y_end_mm
 
 # Outer wall margin: at least ROBOT_RADIUS so frontier assignment never
 # sends robots to cells they can't physically reach without hitting the wall.
-OUTER_WALL_MARGIN = ROBOT_RADIUS      # ~110mm — excludes perimeter cells
-DIVIDER_MARGIN = BODY_HALF_WIDTH       # 64mm — robot body extends this far from center
+OUTER_WALL_MARGIN = DEFAULT_ARENA.outer_wall_margin_mm      # ~110mm — excludes perimeter cells
+DIVIDER_MARGIN = DEFAULT_ARENA.divider_margin_mm       # 64mm — robot body extends this far from center
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = 220                  # mm — soft repulsion, wide enough to steer clear
+REPULSION_ZONE = DEFAULT_ARENA.repulsion_zone_mm                  # mm — soft repulsion, wide enough to steer clear
 
 # RAFT parameters - NO TRUST, only heartbeats
 HEARTBEAT_INTERVAL = 0.5   # Leader sends heartbeat this often
 HEARTBEAT_TIMEOUT = 2.0    # Assume leader dead after this silence
 ELECTION_TIMEOUT_MIN = 1.0
 ELECTION_TIMEOUT_MAX = 2.0
+LEADER_ACK_STALE = LEADER_ACK_STALE_S
 
-CONTROL_RATE = 10
-BROADCAST_RATE = 5
+CONTROL_RATE = CONTROL_RATE_HZ
+BROADCAST_RATE = BROADCAST_RATE_HZ
 BASE_SPEED = 80              # must match reip_node.py for fair comparison
 
 TOF_CHANNELS = {0: "right", 1: "front_right", 2: "front", 3: "front_left", 4: "left"}
@@ -105,6 +129,9 @@ class Hardware:
     def __init__(self):
         self._uart_lock = threading.Lock()
         self.hw_ok = False
+        self._sim_tof = {name: 9999 for name in TOF_CHANNELS.values()}
+        self._sim_encoders = (0, 0)
+        self._last_sim_motor_cmd = (0.0, 0.0)
         if not HARDWARE_AVAILABLE:
             print("  Hardware: SIMULATED")
             return
@@ -163,7 +190,7 @@ class Hardware:
     
     def read_tof_all(self) -> Dict[str, int]:
         if not HARDWARE_AVAILABLE:
-            return {name: 500 for name in TOF_CHANNELS.values()}
+            return dict(self._sim_tof)
         distances = {}
         for ch, name in TOF_CHANNELS.items():
             try:
@@ -177,7 +204,7 @@ class Hardware:
         return distances
     
     def read_encoders(self) -> tuple:
-        if not HARDWARE_AVAILABLE: return (0, 0)
+        if not HARDWARE_AVAILABLE: return self._sim_encoders
         with self._uart_lock:
             try:
                 self.uart.reset_input_buffer()
@@ -191,7 +218,9 @@ class Hardware:
         return (0, 0)
     
     def set_motors(self, left: float, right: float):
-        if not HARDWARE_AVAILABLE: return
+        if not HARDWARE_AVAILABLE:
+            self._last_sim_motor_cmd = (left, right)
+            return
         with self._uart_lock:
             try:
                 self.uart.reset_input_buffer()
@@ -199,12 +228,22 @@ class Hardware:
             except: pass
     
     def stop(self):
-        if not HARDWARE_AVAILABLE: return
+        if not HARDWARE_AVAILABLE:
+            self._last_sim_motor_cmd = (0.0, 0.0)
+            return
         with self._uart_lock:
             try:
                 self.uart.reset_input_buffer()
                 self.uart.write(b'STOP\n')
             except: pass
+
+    def update_sim_feedback(self, tof: Optional[Dict[str, int]] = None,
+                            encoders: Optional[Tuple[int, int]] = None):
+        if tof is not None:
+            for name in TOF_CHANNELS.values():
+                self._sim_tof[name] = int(tof.get(name, self._sim_tof.get(name, 9999)))
+        if encoders is not None:
+            self._sim_encoders = (int(encoders[0]), int(encoders[1]))
 
 # ============== RAFT Node ==============
 class RAFTNode:
@@ -245,6 +284,15 @@ class RAFTNode:
         self.current_leader: Optional[int] = None
         self.last_heartbeat = time.time()
         self.election_timeout = self._random_election_timeout()
+        self.leader_mission_complete = False
+        self.active_robot_ids: Set[int] = set(range(1, NUM_ROBOTS + 1))
+        self.active_robot_count: int = NUM_ROBOTS
+        self._heartbeat_seq = 0
+        self._heartbeat_digest: Optional[str] = None
+        self._heartbeat_ack_sets: Dict[str, Set[int]] = {}
+        self._leader_quorum_mono = 0.0
+        self._leader_claim_mono = 0.0
+        self._last_acked_heartbeat_key: Optional[Tuple[int, int, str]] = None
         
         # Peers
         self.peers: Dict[int, dict] = {}
@@ -261,6 +309,8 @@ class RAFTNode:
         self.assigned_target: Optional[Tuple[float, float]] = None
         self._prev_assignments: Dict[str, Tuple[float, float]] = {}  # Assignment persistence
         self.current_navigation_target: Optional[Tuple[float, float]] = None
+        self._nav_waypoint_cell: Optional[Tuple[int, int]] = None
+        self._nav_waypoint_set_mono = 0.0
         self._raw_navigation_target: Optional[Tuple[float, float]] = None
         self.assigned_target_rx_mono = 0.0
         self._last_command_source = "startup"
@@ -285,6 +335,7 @@ class RAFTNode:
         # Fault injection
         self.injected_fault = None
         self.bad_leader_mode = False
+        self.self_injure_leader_mode = False
         self.oscillate_leader_mode = False
         self._oscillate_phase = 0
         self.freeze_leader_mode = False
@@ -295,6 +346,68 @@ class RAFTNode:
     
     def _random_election_timeout(self) -> float:
         return random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
+
+    def _quorum_size(self) -> int:
+        return max(1, self.active_robot_count // 2 + 1)
+
+    def _leader_quorum_ok(self) -> bool:
+        if self.state != RaftState.LEADER:
+            return False
+        return (time.monotonic() - self._leader_quorum_mono) <= LEADER_ACK_STALE
+
+    def _trusted_leader_reports_complete(self) -> bool:
+        if self.current_leader is None or self.state == RaftState.LEADER:
+            return False
+        peer = self.peers.get(self.current_leader)
+        if peer is None:
+            return False
+        if time.time() - peer.get('last_seen', 0) >= self.peer_timeout:
+            return False
+        return bool(peer.get('leader_established', False) and peer.get('mission_complete', False))
+
+    def _heartbeat_digest_for(self, leader_id: int, term: int, heartbeat_seq: int,
+                              assignments: Dict[str, Tuple[float, float]]) -> str:
+        payload = {
+            'leader_id': leader_id,
+            'term': term,
+            'heartbeat_seq': heartbeat_seq,
+            'assignments': assignments,
+        }
+        raw = json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()
+        return hashlib.sha256(raw).hexdigest()[:16]
+
+    def _send_heartbeat_ack(self, leader_id: int, term: int, heartbeat_seq: int, heartbeat_digest: str):
+        ack_key = (leader_id, heartbeat_seq, heartbeat_digest)
+        if self._last_acked_heartbeat_key == ack_key:
+            return
+        msg = {
+            'type': 'heartbeat_ack',
+            'robot_id': self.robot_id,
+            'leader_id': leader_id,
+            'term': term,
+            'heartbeat_seq': heartbeat_seq,
+            'heartbeat_digest': heartbeat_digest,
+            'timestamp': time.time(),
+        }
+        self.broadcast_message(msg)
+        self._last_acked_heartbeat_key = ack_key
+
+    def _handle_heartbeat_ack(self, msg: dict):
+        if self.state != RaftState.LEADER or msg.get('leader_id') != self.robot_id:
+            return
+        if msg.get('term') != self.current_term:
+            return
+        if msg.get('heartbeat_digest') != self._heartbeat_digest:
+            return
+        if msg.get('heartbeat_seq') != self._heartbeat_seq:
+            return
+        ack_robot = msg.get('robot_id')
+        if ack_robot == self.robot_id or ack_robot not in self.active_robot_ids:
+            return
+        ackers = self._heartbeat_ack_sets.setdefault(self._heartbeat_digest, set())
+        ackers.add(ack_robot)
+        if 1 + len(ackers) >= self._quorum_size():
+            self._leader_quorum_mono = time.monotonic()
     
     def _init_sockets(self):
         if self.sim_mode:
@@ -324,6 +437,18 @@ class RAFTNode:
         self.fault_socket.bind(('', fault_port))
         self.fault_socket.setblocking(False)
         print(f"[INFO] Fault socket listening on port {fault_port}")
+
+        self.sim_motor_socket = None
+        self.sim_sensor_socket = None
+        if self.sim_mode:
+            sensor_port = UDP_SIM_SENSOR_PORT + self.robot_id
+            self.sim_sensor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sim_sensor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sim_sensor_socket.bind(('', sensor_port))
+            self.sim_sensor_socket.setblocking(False)
+            self.sim_motor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sim_motor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            print(f"[INFO] Sim sensor socket listening on port {sensor_port}")
     
     def init_logging(self):
         os.makedirs("logs", exist_ok=True)
@@ -365,7 +490,7 @@ class RAFTNode:
     # ==================== POSITION ====================
     def receive_position(self):
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, _ = self.pos_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
                 if msg.get('type') == 'position' and msg.get('robot_id') == self.robot_id:
@@ -394,6 +519,41 @@ class RAFTNode:
             pass
         except OSError:
             pass
+
+    def receive_sim_feedback(self):
+        if not self.sim_mode or self.sim_sensor_socket is None:
+            return
+        try:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
+                data, _ = self.sim_sensor_socket.recvfrom(8192)
+                msg = json.loads(data.decode())
+                if msg.get('type') != 'sim_sensor' or msg.get('robot_id') != self.robot_id:
+                    continue
+                self.hw.update_sim_feedback(
+                    tof=msg.get('tof') or {},
+                    encoders=tuple(msg.get('encoders', (0, 0))),
+                )
+        except (BlockingIOError, ConnectionResetError):
+            pass
+        except OSError:
+            pass
+
+    def _publish_motor_intent(self, left: float, right: float):
+        if not self.sim_mode or self.sim_motor_socket is None:
+            return
+        msg = {
+            'type': 'motor_intent',
+            'robot_id': self.robot_id,
+            'left': float(left),
+            'right': float(right),
+            'stop_reason': self._last_stop_reason,
+            'command_source': self._last_command_source,
+            'timestamp': time.time(),
+        }
+        try:
+            self.sim_motor_socket.sendto(json.dumps(msg).encode(), ('127.0.0.1', UDP_SIM_MOTOR_PORT))
+        except OSError:
+            pass
     
     def get_cell(self, x: float, y: float) -> Optional[tuple]:
         cx = int(x / CELL_SIZE)
@@ -412,15 +572,7 @@ class RAFTNode:
         """True if the cell center is physically unreachable (inside the robot body
         when pressed against a wall).  Keep this tight — the repulsion system
         handles safe navigation; this only excludes truly impossible cells."""
-        x, y = self.cell_to_pos((cx, cy))
-        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH - OUTER_WALL_MARGIN:
-            return True
-        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT - OUTER_WALL_MARGIN:
-            return True
-        if y < INTERIOR_WALL_Y_END and (
-            INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
-            return True
-        return False
+        return DEFAULT_ARENA.is_wall_cell(cx, cy)
 
     def distance(self, p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
         return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
@@ -429,7 +581,9 @@ class RAFTNode:
         """Distance accounting for the interior wall."""
         different_sides = (p1[0] < INTERIOR_WALL_X_LEFT) != (p2[0] < INTERIOR_WALL_X_LEFT)
         if different_sides and (p1[1] < INTERIOR_WALL_Y_END or p2[1] < INTERIOR_WALL_Y_END):
-            passage_y = INTERIOR_WALL_Y_END + 70
+            passage_y = (
+                int((INTERIOR_WALL_Y_END + DEFAULT_ARENA.divider_tip_clearance_mm) / CELL_SIZE) + 0.5
+            ) * CELL_SIZE
             d1_to_passage = math.sqrt((p1[0] - INTERIOR_WALL_X)**2 + (p1[1] - passage_y)**2)
             d2_to_passage = math.sqrt((p2[0] - INTERIOR_WALL_X)**2 + (p2[1] - passage_y)**2)
             return d1_to_passage + d2_to_passage
@@ -440,13 +594,7 @@ class RAFTNode:
         data = json.dumps(msg).encode()
         try:
             if self.sim_mode:
-                # Sim mode: send to each peer's unique port on localhost
-                for peer_id in range(1, NUM_ROBOTS + 1):
-                    if peer_id != self.robot_id:
-                        self.peer_socket.sendto(
-                            data, ('127.0.0.1', UDP_PEER_PORT + peer_id))
-                # Send to base port for simulator/experiment harness
-                self.peer_socket.sendto(data, ('127.0.0.1', UDP_PEER_PORT))
+                self.peer_socket.sendto(data, ('127.0.0.1', UDP_SIM_PEER_RELAY_PORT))
             else:
                 # Hardware mode: single broadcast, all robots on same port
                 self.peer_socket.sendto(data, (BROADCAST_IP, UDP_PEER_PORT))
@@ -459,11 +607,21 @@ class RAFTNode:
             return
         
         assignments = self.compute_task_assignments()
+        mission_complete = not assignments and self.assigned_target is None
+        self._heartbeat_seq += 1
+        heartbeat_digest = self._heartbeat_digest_for(
+            self.robot_id, self.current_term, self._heartbeat_seq, assignments
+        )
+        self._heartbeat_digest = heartbeat_digest
+        self._heartbeat_ack_sets = {heartbeat_digest: self._heartbeat_ack_sets.get(heartbeat_digest, set())}
         
         msg = {
             'type': 'heartbeat',
             'leader_id': self.robot_id,
             'term': self.current_term,
+            'heartbeat_seq': self._heartbeat_seq,
+            'heartbeat_digest': heartbeat_digest,
+            'mission_complete': mission_complete,
             'assignments': assignments,
             'timestamp': time.time()
         }
@@ -473,9 +631,15 @@ class RAFTNode:
         """Broadcast state to peers"""
         # If we're leader, include assignments in peer_state for experiment harness
         assignments = {}
+        mission_complete = False
         if self.state == RaftState.LEADER:
             assignments = self.compute_task_assignments()
+            mission_complete = not assignments and self.assigned_target is None
         self._peer_seq += 1
+        has_fresh_position = (
+            self.position_rx_mono > 0.0 and
+            time.monotonic() - self.position_rx_mono < 1.0
+        )
         
         msg = {
             'type': 'peer_state',
@@ -485,6 +649,9 @@ class RAFTNode:
             'state': self.state.value,
             'term': self.current_term,
             'leader_id': self.current_leader,
+            'leader_established': self._leader_quorum_ok(),
+            'mission_complete': mission_complete,
+            'has_fresh_position': has_fresh_position,
             'coverage_count': len(self.my_visited),
             'visited_cells': list(self.my_visited)[-100:],
             'navigation_target': list(self.current_navigation_target) if self.current_navigation_target else None,
@@ -519,7 +686,7 @@ class RAFTNode:
     def receive_messages(self):
         """Process incoming messages"""
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, _ = self.peer_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
                 self.handle_message(msg)
@@ -537,6 +704,8 @@ class RAFTNode:
             self.handle_vote_response(msg)
         elif msg_type == 'peer_state':
             self.handle_peer_state(msg)
+        elif msg_type == 'heartbeat_ack':
+            self._handle_heartbeat_ack(msg)
     
     def handle_heartbeat(self, msg: dict):
         """Receive heartbeat from leader - reset election timeout"""
@@ -549,12 +718,20 @@ class RAFTNode:
             self.state = RaftState.FOLLOWER
             self.last_heartbeat = time.time()
             self.election_timeout = self._random_election_timeout()
+            self.leader_mission_complete = bool(msg.get('mission_complete', False))
+            heartbeat_digest = msg.get('heartbeat_digest')
+            heartbeat_seq = msg.get('heartbeat_seq')
+            if heartbeat_digest and heartbeat_seq is not None:
+                self._send_heartbeat_ack(leader_id, term, heartbeat_seq, heartbeat_digest)
             
             # Get my assignment (NO TRUST CHECK - just follow)
             assignments = msg.get('assignments', {})
             if str(self.robot_id) in assignments:
                 self.assigned_target = tuple(assignments[str(self.robot_id)])
                 self.assigned_target_rx_mono = time.monotonic()
+            elif self.leader_mission_complete:
+                self.assigned_target = None
+                self.assigned_target_rx_mono = 0.0
     
     def handle_vote_request(self, msg: dict):
         """Handle vote request from candidate"""
@@ -582,14 +759,15 @@ class RAFTNode:
                 self._votes_received.add(voter)
             
             # Check majority
-            total_nodes = len(self.peers) + 1
-            if len(self._votes_received) > total_nodes / 2:
+            if len(self._votes_received) >= self._quorum_size():
                 self.become_leader()
     
     def handle_peer_state(self, msg: dict):
         """Update peer info"""
         peer_id = msg.get('robot_id')
         if peer_id and peer_id != self.robot_id:
+            if peer_id not in self.active_robot_ids:
+                return
             existing = self.peers.get(peer_id, {})
             peer_seq = msg.get('peer_seq')
             if peer_seq is not None:
@@ -603,6 +781,11 @@ class RAFTNode:
                 'x': msg.get('x', 0),
                 'y': msg.get('y', 0),
                 'theta': msg.get('theta', 0),
+                'state': msg.get('state', 'follower'),
+                'leader_id': msg.get('leader_id'),
+                'leader_established': bool(msg.get('leader_established', False)),
+                'mission_complete': bool(msg.get('mission_complete', False)),
+                'has_fresh_position': bool(msg.get('has_fresh_position', False)),
                 'last_seen': time.time(),
                 'last_peer_seq': peer_seq if peer_seq is not None else existing.get('last_peer_seq', -1),
                 'visited_cells': existing.get('visited_cells', set())
@@ -644,21 +827,130 @@ class RAFTNode:
                 return
         self.state = RaftState.LEADER
         self.current_leader = self.robot_id
+        self._leader_quorum_mono = 0.0
+        self._leader_claim_mono = time.monotonic()
+        self._heartbeat_seq = 0
+        self._heartbeat_digest = None
+        self._heartbeat_ack_sets.clear()
         self._prev_assignments.clear()
         print(f"[RAFT] Became leader, term {self.current_term}")
     
     # ==================== TASK ASSIGNMENT ====================
+    def _side_of_divider(self, pos: Tuple[float, float]) -> int:
+        """Classify a position as left/right of the divider, or 0 in the throat."""
+        x, y = pos
+        if y >= INTERIOR_WALL_Y_END:
+            return 0
+        if x < INTERIOR_WALL_X_LEFT:
+            return -1
+        if x > INTERIOR_WALL_X_RIGHT:
+            return 1
+        return 0
+
+    def _is_in_bottleneck_zone(self, pos: Tuple[float, float]) -> bool:
+        """True when the robot is in or immediately approaching the narrow passage."""
+        x, y = pos
+        throat_half_width = ROBOT_RADIUS + CELL_SIZE * 0.5
+        return (INTERIOR_WALL_Y_END - CELL_SIZE <= y <= INTERIOR_WALL_Y_END + CELL_SIZE and
+                INTERIOR_WALL_X - throat_half_width <= x <= INTERIOR_WALL_X + throat_half_width)
+
+    def _assignment_requires_bottleneck_crossing(self,
+                                                 pos: Tuple[float, float],
+                                                 target_pos: Tuple[float, float]) -> bool:
+        """Return True when reaching the target requires traversing the divider passage."""
+        start_side = self._side_of_divider(pos)
+        goal_side = self._side_of_divider(target_pos)
+        if start_side == 0 or goal_side == 0 or start_side == goal_side:
+            return False
+        return pos[1] < INTERIOR_WALL_Y_END or target_pos[1] < INTERIOR_WALL_Y_END
+
+    def _active_bottleneck_crossers(self,
+                                    robots: Dict[int, Tuple[float, float]],
+                                    assignments: Dict[str, Tuple[float, float]]) -> Set[int]:
+        """Robots currently occupying or reserving the passage."""
+        active = {rid for rid, pos in robots.items() if self._is_in_bottleneck_zone(pos)}
+        for rid_str, tgt in assignments.items():
+            rid = int(rid_str)
+            pos = robots.get(rid)
+            if pos and self._assignment_requires_bottleneck_crossing(pos, tgt):
+                active.add(rid)
+        return active
+
+    def _best_frontier_for_robot(self, pos, theta, robot_cell, available_frontiers,
+                                  assigned_frontiers, still_valid, passage_blocked,
+                                  crossing_locked, wall_cx):
+        """Pick one frontier for this robot: prefer forward, else nearest. Returns (cx,cy) or None."""
+        MIN_TARGET_SPACING = CELL_SIZE * 3
+        forward_dir = (math.cos(theta), math.sin(theta))
+        best_frontier = None
+        best_dist = float('inf')
+
+        def score(frontier, require_forward):
+            if frontier in assigned_frontiers or (robot_cell and frontier == robot_cell):
+                return None
+            fp = self.cell_to_pos(frontier)
+            if passage_blocked and (frontier[0] < wall_cx) != (pos[0] < INTERIOR_WALL_X_LEFT):
+                return None
+            if crossing_locked and self._assignment_requires_bottleneck_crossing(pos, fp):
+                return None
+            for _, existing_tgt in still_valid.items():
+                if self.distance(fp, existing_tgt) < MIN_TARGET_SPACING:
+                    return None
+            dx, dy = fp[0] - pos[0], fp[1] - pos[1]
+            if require_forward and (dx * forward_dir[0] + dy * forward_dir[1]) <= 0:
+                return None
+            return self.path_distance(pos, fp)
+
+        for f in available_frontiers:
+            d = score(f, require_forward=True)
+            if d is not None and d < best_dist:
+                best_dist = d
+                best_frontier = f
+        if best_frontier is not None:
+            return best_frontier
+        for f in available_frontiers:
+            d = score(f, require_forward=False)
+            if d is not None and d < best_dist:
+                best_dist = d
+                best_frontier = f
+        return best_frontier
+
+    def _ensure_room_has_assignee(self, room_frontiers, room_assigned_count,
+                                  still_valid, robots):
+        """If this room has no assignee, reassign the robot farthest from its target to this room."""
+        if room_assigned_count != 0 or not room_frontiers or len(still_valid) < 2:
+            return
+        worst_rid = None
+        worst_dist = -1
+        for rid_str, tgt in still_valid.items():
+            rid = int(rid_str)
+            if rid == self.robot_id:
+                continue
+            if rid in robots:
+                d = self.path_distance(robots[rid], tgt)
+                if d > worst_dist:
+                    worst_dist = d
+                    worst_rid = rid_str
+        if worst_rid is not None:
+            pos = robots[int(worst_rid)]
+            best_f = min(room_frontiers,
+                         key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
+            still_valid[worst_rid] = self.cell_to_pos(best_f)
+
     def compute_task_assignments(self) -> Dict[str, Tuple[float, float]]:
         """Leader assigns frontiers to robots.
-        If bad_leader_mode is active, deliberately sends robots to
-        already-explored cells.  Raft has NO trust model so followers
-        obey blindly - this is the whole point of the baseline."""
+        Algorithm: keep previous assignments if target still unexplored; else
+        pick nearest frontier (prefer forward); ensure each room has an assignee when passage clear.
+        If bad_leader_mode is active, deliberately sends robots to explored cells."""
         if self.state != RaftState.LEADER:
             return {}
         
         # --- Bad-leader fault: send robots to explored cells ---
         if self.bad_leader_mode:
             return self._compute_bad_assignments()
+
+        if self.self_injure_leader_mode:
+            return self._compute_self_injure_assignments()
         
         # --- Oscillate-leader fault: flip-flop targets between corners ---
         if self.oscillate_leader_mode:
@@ -681,17 +973,13 @@ class RAFTNode:
             return {}
         
         robots = {self.robot_id: (self.x, self.y)}
+        robot_thetas = {self.robot_id: self.theta}
         for pid, peer in self.peers.items():
             if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
                 robots[pid] = (peer['x'], peer['y'])
+                robot_thetas[pid] = peer.get('theta', 0.0)
 
-        PASSAGE_Y_START = INTERIOR_WALL_Y_END
-        PASSAGE_X_MIN = INTERIOR_WALL_X_LEFT - ROBOT_RADIUS
-        PASSAGE_X_MAX = INTERIOR_WALL_X_RIGHT + ROBOT_RADIUS
-        robots_in_passage = set()
-        for rid, pos in robots.items():
-            if pos[1] > PASSAGE_Y_START and PASSAGE_X_MIN < pos[0] < PASSAGE_X_MAX:
-                robots_in_passage.add(rid)
+        MAX_BOTTLENECK_CROSSERS = 1
 
         still_valid = {}
         assigned = set()
@@ -709,6 +997,8 @@ class RAFTNode:
                     still_valid[rid_str] = prev_target
                     assigned.add(cell)
 
+        active_crossers = self._active_bottleneck_crossers(robots, still_valid)
+
         need_assignment = [rid for rid in robots if str(rid) not in still_valid]
         available_frontiers = [f for f in frontiers if f not in assigned]
         wall_cx = int(INTERIOR_WALL_X_LEFT / CELL_SIZE)
@@ -722,51 +1012,30 @@ class RAFTNode:
 
             for rid in sorted_robots:
                 pos = robots[rid]
-                robot_on_left = pos[0] < INTERIOR_WALL_X_LEFT
-                passage_blocked = (len(robots_in_passage) > 0 and
-                                   rid not in robots_in_passage)
-                best = None
-                best_dist = float('inf')
-                for f in available_frontiers:
-                    if f in assigned:
-                        continue
-                    frontier_on_left = f[0] < wall_cx
-                    if passage_blocked and frontier_on_left != robot_on_left:
-                        continue
-                    fp = self.cell_to_pos(f)
-                    d = self.path_distance(pos, fp)
-                    if d < best_dist:
-                        best_dist = d
-                        best = f
+                theta = robot_thetas.get(rid, 0.0)
+                robot_cell = self.get_cell(pos[0], pos[1])
+                already_crossing = rid in active_crossers
+                crossing_locked = (len(active_crossers) >= MAX_BOTTLENECK_CROSSERS and
+                                   not already_crossing)
+                passage_blocked = crossing_locked
+                best = self._best_frontier_for_robot(
+                    pos, theta, robot_cell, available_frontiers,
+                    assigned, still_valid, passage_blocked, crossing_locked, wall_cx)
                 if best:
                     assigned.add(best)
-                    still_valid[str(rid)] = self.cell_to_pos(best)
-        
+                    target_pos = self.cell_to_pos(best)
+                    still_valid[str(rid)] = target_pos
+                    if self._assignment_requires_bottleneck_crossing(pos, target_pos):
+                        active_crossers.add(rid)
+
         room_a_n = sum(1 for t in still_valid.values() if int(t[0] / CELL_SIZE) < wall_cx)
         room_b_n = len(still_valid) - room_a_n
-        room_b_frontiers = [f for f in available_frontiers if f not in assigned and f[0] >= wall_cx]
         room_a_frontiers = [f for f in available_frontiers if f not in assigned and f[0] < wall_cx]
+        room_b_frontiers = [f for f in available_frontiers if f not in assigned and f[0] >= wall_cx]
 
-        if len(robots_in_passage) == 0:
-            if room_b_n == 0 and room_b_frontiers and len(still_valid) >= 2:
-                worst_rid = max(
-                    (r for r in still_valid if int(r) != self.robot_id and int(r) in robots),
-                    key=lambda r: self.path_distance(robots[int(r)], still_valid[r]),
-                    default=None)
-                if worst_rid is not None:
-                    pos = robots[int(worst_rid)]
-                    best_b = min(room_b_frontiers, key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
-                    still_valid[worst_rid] = self.cell_to_pos(best_b)
-
-            if room_a_n == 0 and room_a_frontiers and len(still_valid) >= 2:
-                worst_rid = max(
-                    (r for r in still_valid if int(r) != self.robot_id and int(r) in robots),
-                    key=lambda r: self.path_distance(robots[int(r)], still_valid[r]),
-                    default=None)
-                if worst_rid is not None:
-                    pos = robots[int(worst_rid)]
-                    best_a = min(room_a_frontiers, key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
-                    still_valid[worst_rid] = self.cell_to_pos(best_a)
+        if len(active_crossers) == 0:
+            self._ensure_room_has_assignee(room_b_frontiers, room_b_n, still_valid, robots)
+            self._ensure_room_has_assignee(room_a_frontiers, room_a_n, still_valid, robots)
 
         self._prev_assignments = dict(still_valid)
         return still_valid
@@ -804,6 +1073,26 @@ class RAFTNode:
         
         print(f"[BAD_LEADER] Raft leader sending {len(assignments)} robots "
               f"to EXPLORED cells (persistent, no detection possible)")
+        return assignments
+
+    def _compute_self_injure_assignments(self) -> Dict[str, Tuple[float, float]]:
+        """Raft leader commands followers into its occupied zone."""
+        robots = {self.robot_id: (self.x, self.y)}
+        for pid, peer in self.peers.items():
+            if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
+                robots[pid] = (peer['x'], peer['y'])
+
+        leader_target = self.get_my_frontier() or (self.x, self.y)
+        attack_target = (self.x, self.y)
+        assignments = {}
+        for rid in robots:
+            target = leader_target if rid == self.robot_id else attack_target
+            assignments[str(rid)] = target
+            if rid == self.robot_id:
+                self.assigned_target = target
+
+        print(f"[SELF_INJURE] Raft leader attracting {max(0, len(assignments) - 1)} follower(s) "
+              f"into occupied zone at ({attack_target[0]:.0f}, {attack_target[1]:.0f})")
         return assignments
     
     def _compute_oscillate_assignments(self) -> Dict[str, Tuple[float, float]]:
@@ -886,13 +1175,17 @@ class RAFTNode:
                     peer_in_passage = True
                     break
 
+        forward = (math.cos(self.theta), math.sin(self.theta))
         best_dist = float('inf')
         best_cell = None
+        best_forward = False
 
         for cx in range(self.coverage_width):
             for cy in range(self.coverage_height):
                 cell = (cx, cy)
                 if cell in self.known_visited or self._is_wall_cell(cx, cy):
+                    continue
+                if cell == my_cell:
                     continue
 
                 cell_on_left = cx < wall_cell_x_left
@@ -900,15 +1193,19 @@ class RAFTNode:
                     continue
 
                 dist = abs(cx - my_cell[0]) + abs(cy - my_cell[1])
-
                 if robot_on_left != cell_on_left and cy < wall_cell_y_end:
                     detour_up = max(0, wall_cell_y_end + 2 - my_cell[1])
                     detour_down = max(0, wall_cell_y_end + 2 - cy)
                     dist += detour_up + detour_down + 3
 
-                if dist < best_dist:
+                cell_pos = self.cell_to_pos(cell)
+                dx = cell_pos[0] - self.x
+                dy = cell_pos[1] - self.y
+                is_forward = (dx * forward[0] + dy * forward[1]) > 0
+                if (is_forward, -dist) > (best_forward, -best_dist) or best_cell is None:
                     best_dist = dist
                     best_cell = cell
+                    best_forward = is_forward
 
         if best_cell:
             return self.cell_to_pos(best_cell)
@@ -951,6 +1248,8 @@ class RAFTNode:
         ty = self.y + distance * math.sin(angle)
         tx = max(75, min(ARENA_WIDTH - 75, tx))
         ty = max(75, min(ARENA_HEIGHT - 75, ty))
+        self._nav_waypoint_cell = None
+        self._nav_waypoint_set_mono = 0.0
         self.current_navigation_target = (tx, ty)
 
     def _check_stuck(self):
@@ -993,8 +1292,48 @@ class RAFTNode:
                     q.append((nx, ny))
         return None
 
+    def _segment_is_clear(self, p1, p2):
+        """Check whether a straight segment stays in free space."""
+        dist = self.distance(p1, p2)
+        steps = max(2, int(dist / max(35.0, CELL_SIZE / 3)))
+        for i in range(1, steps + 1):
+            t = i / steps
+            sx = p1[0] + (p2[0] - p1[0]) * t
+            sy = p1[1] + (p2[1] - p1[1]) * t
+            cell = self.get_cell(sx, sy)
+            if cell is None or self._is_wall_cell(*cell):
+                return False
+        return True
+
+    def _select_path_waypoint(self, path_cells):
+        """Choose a stable, farther-ahead waypoint from an A* path."""
+        LOOKAHEAD_CELLS = 5
+        COMMIT_DIST = CELL_SIZE * 0.55
+        COMMIT_TIME = 0.8
+
+        if self.current_navigation_target and self._nav_waypoint_cell in path_cells:
+            dist_to_commit = self.distance((self.x, self.y), self.current_navigation_target)
+            recently_set = (time.monotonic() - self._nav_waypoint_set_mono) < COMMIT_TIME
+            if dist_to_commit > COMMIT_DIST and recently_set:
+                return self.current_navigation_target
+
+        best_cell = path_cells[1] if len(path_cells) > 1 else path_cells[0]
+        max_idx = min(len(path_cells) - 1, LOOKAHEAD_CELLS)
+        origin = (self.x, self.y)
+        for idx in range(1, max_idx + 1):
+            candidate = path_cells[idx]
+            candidate_pos = self.cell_to_pos(candidate)
+            if self._segment_is_clear(origin, candidate_pos):
+                best_cell = candidate
+            else:
+                break
+
+        self._nav_waypoint_cell = best_cell
+        self._nav_waypoint_set_mono = time.monotonic()
+        return self.cell_to_pos(best_cell)
+
     def _route_around_wall(self, target):
-        """A* pathfinding on the cell grid — mirrors sim's GridWorld pathfinder."""
+        """A* pathfinding on the cell grid with visible-path lookahead."""
         import heapq
 
         my_cell = self.get_cell(self.x, self.y)
@@ -1035,10 +1374,13 @@ class RAFTNode:
         while open_set:
             _, g, cur = heapq.heappop(open_set)
             if cur == goal:
-                path_cell = goal
-                while came_from.get(path_cell) is not None and came_from[path_cell] != start:
-                    path_cell = came_from[path_cell]
-                return self.cell_to_pos(path_cell)
+                path_cells = []
+                node = goal
+                while node is not None:
+                    path_cells.append(node)
+                    node = came_from.get(node)
+                path_cells.reverse()
+                return self._select_path_waypoint(path_cells)
             if g > g_score.get(cur, float('inf')):
                 continue
             for nb in neighbors(*cur):
@@ -1218,10 +1560,11 @@ class RAFTNode:
                 while diff < -math.pi: diff += 2 * math.pi
                 if abs(diff) < 0.25:
                     return self._finalize_motor_command(BASE_SPEED * 0.6, BASE_SPEED * 0.6, "escape_drive")
-                elif diff > 0:
-                    return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "escape_pivot")
-                else:
-                    return self._finalize_motor_command(-BASE_SPEED, BASE_SPEED, "escape_pivot")
+                # Sharp arc (both wheels same sign): actual rotation. L,-R causes teetering on hardware.
+                pivot_slow = max(35, BASE_SPEED * 0.28)
+                if diff > 0:
+                    return self._finalize_motor_command(pivot_slow, BASE_SPEED, "escape_pivot")
+                return self._finalize_motor_command(BASE_SPEED, pivot_slow, "escape_pivot")
             else:
                 safe_angle = self._wall_slide_heading(escape_angle)
                 diff = safe_angle - self.theta
@@ -1233,10 +1576,8 @@ class RAFTNode:
                 self._stuck_count = max(0, self._stuck_count - 1)
                 return self._finalize_motor_command(left, right, "escape_drive")
 
-        # ToF emergency: FRONT-FACING sensors only.
-        # Side sensors read close when driving parallel to walls — that's normal.
-        TOF_EMERGENCY_DIST = 120
-
+        # ToF: front-facing sensors. When critically close, pivot in place away (sharp arc).
+        # Immediate pivot prevents wall-grinding; no waiting for 3 frames.
         front_d = self.tof.get('front', 9999)
         fl_d = self.tof.get('front_left', 9999)
         fr_d = self.tof.get('front_right', 9999)
@@ -1249,6 +1590,15 @@ class RAFTNode:
         if right_d <= 0: right_d = 9999
         min_front = min(front_d, fl_d, fr_d)
 
+        if 20 < min_front < CRITICAL_DISTANCE:
+            turn_away = 1 if (left_d > right_d) else -1
+            pivot_slow = max(35, BASE_SPEED * 0.28)
+            self._last_command_source = "tof_emergency"
+            if turn_away > 0:
+                return self._finalize_motor_command(pivot_slow, BASE_SPEED, "tof_emergency")
+            return self._finalize_motor_command(BASE_SPEED, pivot_slow, "tof_emergency")
+
+        TOF_EMERGENCY_DIST = 120
         if min_front > 20 and min_front < TOF_EMERGENCY_DIST:
             self._tof_emergency_count += 1
             if self._tof_emergency_count >= 3:
@@ -1277,9 +1627,13 @@ class RAFTNode:
         else:
             self._tof_emergency_count = 0
 
-        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
+        PEER_HARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 20
+        PEER_FORWARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 50
         _closest_peer_dist = 9999.0
         _flee_px, _flee_py = 0.0, 0.0
+        _emergency_peer_count = 0
+        heading_x = math.cos(self.theta)
+        heading_y = math.sin(self.theta)
         for pid, peer in self.peers.items():
             if time.time() - peer.get('last_seen', 0) > self.peer_timeout:
                 continue
@@ -1288,10 +1642,19 @@ class RAFTNode:
             pdist = math.sqrt(pdx * pdx + pdy * pdy)
             if pdist < _closest_peer_dist:
                 _closest_peer_dist = pdist
-            if pdist < PEER_CONTACT_DIST and pdist > 5:
+            if pdist <= 5:
+                continue
+            peer_ahead_proj = ((peer['x'] - self.x) * heading_x + (peer['y'] - self.y) * heading_y) / pdist
+            in_forward_corridor = peer_ahead_proj > 0.45
+            should_emergency = (
+                pdist < PEER_HARD_CONTACT_DIST or
+                (pdist < PEER_FORWARD_CONTACT_DIST and in_forward_corridor)
+            )
+            if should_emergency:
+                _emergency_peer_count += 1
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
-        if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+        if _emergency_peer_count > 0 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
             self._set_motion_override_target(flee_angle, 220.0)
@@ -1299,10 +1662,11 @@ class RAFTNode:
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
+                pivot_slow = max(35, BASE_SPEED * 0.28)
                 if diff > 0:
-                    return self._finalize_motor_command(0.0, BASE_SPEED, "peer_emergency")
+                    return self._finalize_motor_command(pivot_slow, BASE_SPEED, "peer_emergency")
                 else:
-                    return self._finalize_motor_command(BASE_SPEED, 0.0, "peer_emergency")
+                    return self._finalize_motor_command(BASE_SPEED, pivot_slow, "peer_emergency")
             else:
                 return self._finalize_motor_command(BASE_SPEED * 0.5, BASE_SPEED * 0.5, "peer_emergency")
 
@@ -1316,12 +1680,17 @@ class RAFTNode:
         elif self.assigned_target:
             target = self.assigned_target  # Follow blindly!
             self._last_command_source = "leader_assigned"
+        elif self._trusted_leader_reports_complete():
+            target = None
+            self._last_command_source = "leader_complete"
         else:
             target = self.get_my_frontier()
             self._last_command_source = "predicted_frontier"
 
         if not target:
             self.current_navigation_target = None
+            self._nav_waypoint_cell = None
+            self._nav_waypoint_set_mono = 0.0
             self._raw_navigation_target = None
             return self._finalize_motor_command(0.0, 0.0, "no_target")
 
@@ -1483,12 +1852,32 @@ class RAFTNode:
         if 20 < min_front_tof < 250:
             sf_tof = max(0.5, min_front_tof / 250)
 
+        in_tight_space = (
+            self._is_in_bottleneck_zone((self.x, self.y)) or
+            self.x < 260 or self.x > ARENA_WIDTH - 260 or
+            self.y < 260 or self.y > ARENA_HEIGHT - 260
+        )
+        if (20 < min_front_tof < (CRITICAL_DISTANCE + 18) and in_tight_space) or (
+            min(fl, fr) < (CRITICAL_DISTANCE + 15) and min(left_tof, right_tof) < 260
+        ):
+            sf_tof = min(sf_tof, max(0.22, min_front_tof / 250))
+
         min_peer_dist = 9999.0
+        min_peer_ahead_dist = 9999.0
+        heading_x = math.cos(self._smooth_theta)
+        heading_y = math.sin(self._smooth_theta)
         for pid, peer in self.peers.items():
             if time.time() - peer.get('last_seen', 0) > self.peer_timeout:
                 continue
-            d = math.sqrt((self.x - peer['x'])**2 + (self.y - peer['y'])**2)
+            rel_x = peer['x'] - self.x
+            rel_y = peer['y'] - self.y
+            d = math.sqrt(rel_x**2 + rel_y**2)
             min_peer_dist = min(min_peer_dist, d)
+            if d > 5:
+                forward_proj = (rel_x * heading_x + rel_y * heading_y) / d
+                lateral_sep = abs(-rel_x * heading_y + rel_y * heading_x)
+                if forward_proj > 0.35 and lateral_sep < CELL_SIZE * 1.35:
+                    min_peer_ahead_dist = min(min_peer_ahead_dist, d)
 
         PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         sf_peer = 1.0
@@ -1497,14 +1886,21 @@ class RAFTNode:
         elif min_peer_dist < 400:
             sf_peer = 0.3 + 0.7 * (min_peer_dist / 400)
 
+        sf_peer_yield = 1.0
+        if min_peer_ahead_dist < 420:
+            sf_peer_yield = max(0.05, (min_peer_ahead_dist - PEER_CONTACT_DIST) / (420 - PEER_CONTACT_DIST))
+
         MIN_MOTOR_PWM = 25
-        effective_speed = BASE_SPEED * min(sf_wall, sf_tof, sf_peer)
-        effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
+        hazard_scale = min(sf_wall, sf_tof, sf_peer, sf_peer_yield)
+        effective_speed = BASE_SPEED * hazard_scale
+        if hazard_scale >= 0.22:
+            effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
 
         turn_mix = 0.55
 
-        PIVOT_ENTER = math.pi * 0.61   # ~110°
-        PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
+        # Pivot (sharp arc) for turns > ~63° so we don't command one wheel near zero (teetering).
+        PIVOT_ENTER = math.pi * 0.35
+        PIVOT_EXIT  = math.pi * 0.19   # ~35°
         if abs(diff) > PIVOT_ENTER and not self._in_pivot:
             self._in_pivot = True
             self._pivot_start_mono = time.monotonic()
@@ -1519,7 +1915,7 @@ class RAFTNode:
             return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
             pivot_fast = BASE_SPEED
-            pivot_slow = 0.0
+            pivot_slow = max(MIN_MOTOR_PWM + 10, BASE_SPEED * 0.28)
             self._set_motion_override_target(target_angle, 200.0)
             if diff > 0:
                 left_speed, right_speed = pivot_slow, pivot_fast
@@ -1542,18 +1938,33 @@ class RAFTNode:
     # ==================== FAULT INJECTION ====================
     def receive_fault_injection(self):
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, _ = self.fault_socket.recvfrom(1024)
                 msg = json.loads(data.decode())
                 target = msg.get('robot_id')
                 if target == self.robot_id or target == 'all' or target == 0:
                     fault = msg.get('fault', msg.get('cmd', 'none'))
+                    if fault in ('set_trial_robots', 'start'):
+                        active_robot_ids = msg.get('active_robot_ids')
+                        if active_robot_ids:
+                            try:
+                                parsed_ids = {int(rid) for rid in active_robot_ids}
+                            except (TypeError, ValueError):
+                                parsed_ids = set()
+                            if parsed_ids:
+                                parsed_ids.add(self.robot_id)
+                                self.active_robot_ids = parsed_ids
+                                self.active_robot_count = len(parsed_ids)
                     if fault == 'start':
+                        if self.trial_started:
+                            continue
                         self.trial_started = True
                         self.my_visited.clear()
                         self.known_visited.clear()
                         self.assigned_target_rx_mono = 0.0
                         self.current_navigation_target = None
+                        self._nav_waypoint_cell = None
+                        self._nav_waypoint_set_mono = 0.0
                         self._raw_navigation_target = None
                         self._escape_until = 0.0
                         self._escape_start = 0.0
@@ -1570,6 +1981,7 @@ class RAFTNode:
                     elif fault in ('none', 'clear'):
                         self.injected_fault = None
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         self._frozen_assignments.clear()
@@ -1580,15 +1992,24 @@ class RAFTNode:
                         # Leadership fault: send robots to explored cells.
                         # Raft has NO trust model, so it will follow blindly.
                         self.bad_leader_mode = True
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         self.injected_fault = None
                         print(f"[FAULT] BAD_LEADER mode - will send bad assignments (Raft CANNOT detect this)")
+                    elif fault in ('self_injure_leader', 'peer_collision_leader', 'ram_peer'):
+                        self.self_injure_leader_mode = True
+                        self.bad_leader_mode = False
+                        self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
+                        self.injected_fault = None
+                        print(f"[FAULT] SELF_INJURE_LEADER mode - will command followers into occupied peer zone (Raft CANNOT detect this)")
                     elif fault == 'oscillate_leader':
                         # Oscillation fault: flip-flop targets.
                         # Raft has NO trust model, so followers oscillate forever.
                         self.oscillate_leader_mode = True
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.freeze_leader_mode = False
                         self.injected_fault = None
                         self._oscillate_phase = 0
@@ -1598,6 +2019,7 @@ class RAFTNode:
                         # Raft has NO trust model, so followers stall indefinitely.
                         self.freeze_leader_mode = True
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.injected_fault = None
                         self._frozen_assignments.clear()  # Will be populated on first call
@@ -1605,6 +2027,7 @@ class RAFTNode:
                     else:
                         self.injected_fault = fault
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         print(f"[FAULT] Injected: {fault}")
@@ -1625,8 +2048,9 @@ class RAFTNode:
         
         while self.running:
             self.receive_position()
-            self.receive_messages()
+            self.receive_sim_feedback()
             self.receive_fault_injection()
+            self.receive_messages()
             
             now = time.time()
             
@@ -1639,6 +2063,15 @@ class RAFTNode:
             if self.state == RaftState.LEADER and now - last_heartbeat > HEARTBEAT_INTERVAL:
                 self.send_heartbeat()
                 last_heartbeat = now
+
+            if (self.state == RaftState.LEADER and
+                now - self._leader_claim_mono > HEARTBEAT_TIMEOUT and
+                not self._leader_quorum_ok()):
+                print("[RAFT] Lost heartbeat quorum, stepping down")
+                self.state = RaftState.FOLLOWER
+                self.current_leader = None
+                self.last_heartbeat = now
+                self.election_timeout = self._random_election_timeout()
             
             # Check election timeout
             self.check_election_timeout()
@@ -1680,6 +2113,7 @@ class RAFTNode:
                     self._last_stop_reason = "stale_position"
                 self._last_motor_cmd = (0.0, 0.0)
                 self.hw.stop()
+            self._publish_motor_intent(left, right)
             
             if time.time() - last_log > 0.2:
                 self.log_state()

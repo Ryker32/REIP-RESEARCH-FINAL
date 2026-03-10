@@ -32,6 +32,7 @@ import socket
 import json
 import time
 import math
+import hashlib
 import threading
 import random
 import os
@@ -39,6 +40,27 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
 from enum import Enum
 from collections import deque
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in os.sys.path:
+    os.sys.path.insert(0, PROJECT_ROOT)
+
+from hardware_fidelity import (
+    ASSIGNMENT_STALE_S,
+    BROADCAST_RATE_HZ,
+    CAUSALITY_GRACE_S,
+    CONTROL_RATE_HZ,
+    DEFAULT_ARENA,
+    LEADER_ACK_STALE_S,
+    PEER_TIMEOUT_S,
+    POSITION_FRESHNESS_S,
+    POSITION_STOP_TIMEOUT_S,
+    SIM_MOTOR_PORT,
+    SIM_PEER_RELAY_PORT,
+    SIM_SENSOR_PORT,
+)
+
+MAX_RX_MESSAGES_PER_TICK = 32
 
 # Hardware imports (will fail gracefully on PC for testing)
 try:
@@ -60,13 +82,16 @@ except ImportError:
 UDP_POSITION_PORT = 5100
 UDP_PEER_PORT = 5200
 UDP_FAULT_PORT = 5300
+UDP_SIM_MOTOR_PORT = SIM_MOTOR_PORT
+UDP_SIM_PEER_RELAY_PORT = SIM_PEER_RELAY_PORT
+UDP_SIM_SENSOR_PORT = SIM_SENSOR_PORT
 BROADCAST_IP = "192.168.20.255"
 NUM_ROBOTS = 5             # Number of robots in swarm
 
 # Arena
-ARENA_WIDTH = 2000   # mm
-ARENA_HEIGHT = 1500  # mm
-CELL_SIZE = 125      # mm - gives 16×12 = 192 cells, ~38 per robot with 5 bots
+ARENA_WIDTH = DEFAULT_ARENA.width_mm   # mm
+ARENA_HEIGHT = DEFAULT_ARENA.height_mm  # mm
+CELL_SIZE = DEFAULT_ARENA.cell_size_mm      # mm - gives 16×12 = 192 cells, ~38 per robot with 5 bots
 
 # Robot physical geometry (from CAD: 147mm x 128mm body)
 #   ArUco center: 70mm from front bumper, 77mm from rear, centered in width
@@ -75,29 +100,34 @@ CELL_SIZE = 125      # mm - gives 16×12 = 192 cells, ~38 per robot with 5 bots
 #     0° (front), ±37.5° (front-left/right), ±75° (left/right)
 #     Sensor height: 13mm above ground (walls are ~150mm tall)
 #   ArUco tag: 80mm above ground
-ROBOT_RADIUS = 110   # mm, bounding diagonal from ArUco to rear wheel corner
-BODY_RADIUS = 77     # mm, max body extent behind ArUco (rear edge)
-BODY_HALF_WIDTH = 64 # mm, half width (128mm / 2)
-BODY_FRONT = 70      # mm, body extent ahead of ArUco (front bumper with ToF)
-SWEPT_RADIUS = 100   # mm, sqrt(77² + 64²) — rear corner during in-place rotation
-TOF_SENSOR_OFFSET = 70  # mm, ToF sensors are this far ahead of ArUco center
-TOF_RANGE = 200      # mm - high-res verification zone
-AVOID_DISTANCE = 200 # mm
-CRITICAL_DISTANCE = 100  # mm
+ROBOT_RADIUS = DEFAULT_ARENA.robot_radius_mm   # mm, bounding diagonal from ArUco to rear wheel corner
+BODY_RADIUS = DEFAULT_ARENA.body_radius_mm     # mm, max body extent behind ArUco (rear edge)
+BODY_HALF_WIDTH = DEFAULT_ARENA.body_half_width_mm # mm, half width (128mm / 2)
+BODY_FRONT = DEFAULT_ARENA.body_front_mm      # mm, body extent ahead of ArUco (front bumper with ToF)
+SWEPT_RADIUS = DEFAULT_ARENA.swept_radius_mm   # mm, sqrt(77² + 64²) — rear corner during in-place rotation
+TOF_SENSOR_OFFSET = DEFAULT_ARENA.tof_sensor_offset_mm  # mm, ToF sensors are this far ahead of ArUco center
+TOF_RANGE = DEFAULT_ARENA.tof_range_mm      # mm - high-res verification zone
+AVOID_DISTANCE = DEFAULT_ARENA.avoid_distance_mm # mm
+CRITICAL_DISTANCE = DEFAULT_ARENA.critical_distance_mm  # mm
 
 # Interior wall: 35.7mm thick foam board, left face at x=1000
 # Runs from y=0 to y=1200, passage at y=1200-1500
-INTERIOR_WALL_X_LEFT = 1000   # left face of the divider
-INTERIOR_WALL_X_RIGHT = 1036  # right face (1000 + 35.7 ≈ 1036)
-INTERIOR_WALL_X = 1018        # center of wall (for legacy/tip calculations)
-INTERIOR_WALL_Y_END = 1200    # wall runs y=0 to this value
+INTERIOR_WALL_X_LEFT = DEFAULT_ARENA.interior_wall_x_left_mm   # left face of the divider
+INTERIOR_WALL_X_RIGHT = DEFAULT_ARENA.interior_wall_x_right_mm  # right face (1000 + 35.7 ≈ 1036)
+INTERIOR_WALL_X = DEFAULT_ARENA.interior_wall_x_mm        # center of wall (for legacy/tip calculations)
+INTERIOR_WALL_Y_END = DEFAULT_ARENA.interior_wall_y_end_mm    # wall runs y=0 to this value
 
 # Outer wall margin: at least ROBOT_RADIUS so frontier assignment never
 # sends robots to cells they can't physically reach without hitting the wall.
-OUTER_WALL_MARGIN = ROBOT_RADIUS      # ~110mm — excludes perimeter cells
-DIVIDER_MARGIN = BODY_HALF_WIDTH       # 64mm — robot body extends this far from center
+OUTER_WALL_MARGIN = DEFAULT_ARENA.outer_wall_margin_mm      # ~110mm — excludes perimeter cells
+DIVIDER_MARGIN = DEFAULT_ARENA.divider_margin_mm       # 64mm — robot body extends this far from center
 WALL_MARGIN = OUTER_WALL_MARGIN       # default used by most code
-REPULSION_ZONE = 220                  # mm — soft repulsion, wide enough to steer clear
+REPULSION_ZONE = DEFAULT_ARENA.repulsion_zone_mm                  # mm — soft repulsion, wide enough to steer clear
+# The divider tips are the hardest geometry in the arena. Treat them in
+# configuration space using the robot's swept radius so path planning does not
+# aim for centerline waypoints that a point robot could clear but the real body
+# cannot.
+DIVIDER_TIP_CLEARANCE = DEFAULT_ARENA.divider_tip_clearance_mm
 
 # ============== REIP Trust Parameters ==============
 # Three-tier confidence weights
@@ -108,6 +138,7 @@ REPULSION_ZONE = 220                  # mm — soft repulsion, wide enough to st
 WEIGHT_PERSONAL = 1.0    # Cells I personally visited - ground truth
 WEIGHT_TOF = 1.0         # Obstacles within ToF range - I can see it
 WEIGHT_PEER = 0.3        # Peer-reported only - might be stale
+WEIGHT_PEER_SAFETY = 0.9 # Fresh peer occupancy conflict - safety-critical
 
 # Suspicion and trust
 # Causality-aware checking handles sync delays correctly, so we can use
@@ -146,15 +177,16 @@ WORST_CASE_IMPEACH_T3 = THRESHOLD_CROSSINGS_TO_IMPEACH * WORST_CASE_DETECT_T3
 # A cell visited less than this many seconds before the assignment was sent
 # should NOT trigger suspicion, because the leader's map was stale.
 # At BROADCAST_RATE=5Hz, worst-case broadcast delay is ~0.2s per hop.
-CAUSALITY_GRACE_PERIOD = 0.5  # seconds
+CAUSALITY_GRACE_PERIOD = CAUSALITY_GRACE_S  # seconds
 
 # Timing
 ELECTION_INTERVAL = 2.0      # seconds (steady-state)
 ELECTION_FAST_INTERVAL = 0.5 # seconds (startup: first 3 elections)
 ELECTION_FAST_COUNT = 3      # number of fast elections before switching to normal
-PEER_TIMEOUT = 3.0           # seconds before peer considered dead
-CONTROL_RATE = 10            # Hz
-BROADCAST_RATE = 5           # Hz
+PEER_TIMEOUT = PEER_TIMEOUT_S           # seconds before peer considered dead
+LEADER_ACK_STALE = LEADER_ACK_STALE_S       # seconds before a leader loses quorum freshness
+CONTROL_RATE = CONTROL_RATE_HZ            # Hz
+BROADCAST_RATE = BROADCAST_RATE_HZ           # Hz
 BASE_SPEED = 80              # pwm %, n20 100:1 motors need high duty for 217g robot
 
 # ToF channels (hardware wiring)
@@ -189,6 +221,13 @@ class PeerInfo:
     coverage_count: int = 0
     visited_cells: Set[tuple] = field(default_factory=set)
     assigned_target: Optional[Tuple[float, float]] = None  # Leader's assignment for them
+    reported_leader_id: Optional[int] = None
+    reported_term: int = 0
+    reported_leader_seq: int = 0
+    reported_leader_digest: Optional[str] = None
+    leader_established: bool = False
+    mission_complete: bool = False
+    has_fresh_position: bool = False
     last_seen: float = 0
     last_peer_seq: int = -1
     last_x: float = 0.0  # Previous position for velocity estimation
@@ -202,6 +241,9 @@ class Hardware:
         self.hw_ok = False
         self._uart_error_count = 0
         self._last_uart_error_time = 0.0
+        self._sim_tof = {name: 9999 for name in TOF_CHANNELS.values()}
+        self._sim_encoders = (0, 0)
+        self._last_sim_motor_cmd = (0.0, 0.0)
         if not HARDWARE_AVAILABLE:
             print("  Hardware: SIMULATED")
             return
@@ -266,7 +308,7 @@ class Hardware:
     
     def read_tof_all(self) -> Dict[str, int]:
         if not HARDWARE_AVAILABLE:
-            return {name: 500 for name in TOF_CHANNELS.values()}
+            return dict(self._sim_tof)
         distances = {}
         for ch, name in TOF_CHANNELS.items():
             try:
@@ -281,7 +323,7 @@ class Hardware:
     
     def read_encoders(self) -> tuple:
         if not HARDWARE_AVAILABLE:
-            return (0, 0)
+            return self._sim_encoders
         with self._uart_lock:
             try:
                 self.uart.reset_input_buffer()
@@ -302,6 +344,7 @@ class Hardware:
     
     def set_motors(self, left: float, right: float):
         if not HARDWARE_AVAILABLE:
+            self._last_sim_motor_cmd = (left, right)
             return
         with self._uart_lock:
             try:
@@ -317,6 +360,7 @@ class Hardware:
     
     def stop(self):
         if not HARDWARE_AVAILABLE:
+            self._last_sim_motor_cmd = (0.0, 0.0)
             return
         with self._uart_lock:
             try:
@@ -325,6 +369,14 @@ class Hardware:
             except Exception:
                 # Stop command failure is less critical, but still log if persistent
                 pass
+
+    def update_sim_feedback(self, tof: Optional[Dict[str, int]] = None,
+                            encoders: Optional[Tuple[int, int]] = None):
+        if tof is not None:
+            for name in TOF_CHANNELS.values():
+                self._sim_tof[name] = int(tof.get(name, self._sim_tof.get(name, 9999)))
+        if encoders is not None:
+            self._sim_encoders = (int(encoders[0]), int(encoders[1]))
 
 # ============== REIP Node ==============
 class REIPNode:
@@ -354,6 +406,7 @@ class REIPNode:
         # Sensor data
         self.tof = {}
         self.tof_obstacles = set()  # Cells with obstacles detected by ToF
+        self._tof_obstacle_memory = {}  # cell -> expiry mono time
         self.encoders = (0, 0)
         
         # Peer tracking
@@ -361,12 +414,21 @@ class REIPNode:
         
         # Leadership
         self.current_leader: Optional[int] = None
+        self.current_term: int = 0
         self.my_vote: Optional[int] = None
         self.trust_in_leader = 1.0
         self.leader_failures: Dict[int, int] = {}  # Track impeachment history
         self._election_settled = False  # Becomes True after initial convergence
         self.suspicion_of_leader = 0.0
         self.last_election = 0
+        self.active_robot_ids: Set[int] = set(range(1, NUM_ROBOTS + 1))
+        self.active_robot_count: int = NUM_ROBOTS
+        self._leader_broadcast_seq = 0
+        self._leader_last_digest: Optional[str] = None
+        self._leader_ack_sets: Dict[str, Set[int]] = {}
+        self._leader_quorum_mono: float = 0.0
+        self._leader_claim_mono: float = 0.0
+        self._last_acked_leader_key: Optional[Tuple[int, int, int, str]] = None
         
         # Detection timing metrics (for convergence bound validation)
         self.bad_commands_received = 0       # Count of bad commands since fault started
@@ -385,6 +447,8 @@ class REIPNode:
         self._prev_assignments: Dict[str, Tuple[float, float]] = {}   # Assignment persistence cache
         self.my_predicted_target: Optional[Tuple[float, float]] = None
         self.current_navigation_target: Optional[Tuple[float, float]] = None  # What I'm ACTUALLY navigating to
+        self._nav_waypoint_cell: Optional[Tuple[int, int]] = None
+        self._nav_waypoint_set_mono: float = 0.0
         self._peer_seq = 0
         self._raw_navigation_target: Optional[Tuple[float, float]] = None
         self._last_command_source = "startup"
@@ -392,9 +456,10 @@ class REIPNode:
         self._last_target_angle = 0.0
         self._last_heading_error = 0.0
         self._last_motor_cmd = (0.0, 0.0)
+        self._last_motor_publish = 0.0
         
         # Assignment staleness
-        self.ASSIGNMENT_STALE_TIME = 5.0  # seconds — must survive WiFi drops (leader broadcasts at 5Hz)
+        self.ASSIGNMENT_STALE_TIME = ASSIGNMENT_STALE_S  # seconds — must survive WiFi drops (leader broadcasts at 5Hz)
         
         # Coverage - with timestamps for causality-aware trust
         self.coverage_width = int(ARENA_WIDTH / CELL_SIZE)
@@ -420,6 +485,7 @@ class REIPNode:
         # Fault injection state
         self.injected_fault = None  # Motor faults: 'spin', 'stop', 'erratic'
         self.bad_leader_mode = False  # Leadership fault: send bad assignments
+        self.self_injure_leader_mode = False  # Leadership fault: send followers into occupied peer bubble
         self.oscillate_leader_mode = False  # Oscillation fault: flip-flop targets
         self._oscillate_phase = 0  # Alternates 0/1 each broadcast cycle
         self.freeze_leader_mode = False  # Freeze fault: leader stops assigning new targets
@@ -491,6 +557,18 @@ class REIPNode:
         self.fault_socket.bind(('', fault_port))
         self.fault_socket.setblocking(False)
         print(f"[INFO] Fault socket listening on port {fault_port}")
+
+        self.sim_motor_socket = None
+        self.sim_sensor_socket = None
+        if self.sim_mode:
+            sensor_port = UDP_SIM_SENSOR_PORT + self.robot_id
+            self.sim_sensor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sim_sensor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sim_sensor_socket.bind(('', sensor_port))
+            self.sim_sensor_socket.setblocking(False)
+            self.sim_motor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sim_motor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            print(f"[INFO] Sim sensor socket listening on port {sensor_port}")
     
     def init_logging(self):
         """Initialize logging for vector overlay visualization"""
@@ -557,7 +635,7 @@ class REIPNode:
         Hardware mode should treat the position server as localization-only.
         """
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, addr = self.pos_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
                 
@@ -610,6 +688,45 @@ class REIPNode:
             pass
         except OSError:
             pass
+
+    def receive_sim_feedback(self):
+        """Receive simulated local-sensor feedback when running on localhost."""
+        if not self.sim_mode or self.sim_sensor_socket is None:
+            return
+        try:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
+                data, _ = self.sim_sensor_socket.recvfrom(8192)
+                msg = json.loads(data.decode())
+                if msg.get('type') != 'sim_sensor' or msg.get('robot_id') != self.robot_id:
+                    continue
+                tof = msg.get('tof') or {}
+                encoders = tuple(msg.get('encoders', (0, 0)))
+                self.hw.update_sim_feedback(tof=tof, encoders=encoders)
+        except (BlockingIOError, ConnectionResetError):
+            pass
+        except OSError:
+            pass
+
+    def _publish_motor_intent(self, left: float, right: float):
+        if not self.sim_mode or self.sim_motor_socket is None:
+            return
+        msg = {
+            'type': 'motor_intent',
+            'robot_id': self.robot_id,
+            'left': float(left),
+            'right': float(right),
+            'stop_reason': self._last_stop_reason,
+            'command_source': self._last_command_source,
+            'timestamp': time.time(),
+        }
+        try:
+            self.sim_motor_socket.sendto(
+                json.dumps(msg).encode(),
+                ('127.0.0.1', UDP_SIM_MOTOR_PORT)
+            )
+            self._last_motor_publish = time.monotonic()
+        except OSError:
+            pass
     
     def get_cell(self, x: float, y: float) -> Optional[tuple]:
         """Convert position to cell index"""
@@ -631,15 +748,7 @@ class REIPNode:
         """True if the cell center is physically unreachable (inside the robot body
         when pressed against a wall).  Keep this tight — the repulsion system
         handles safe navigation; this only excludes truly impossible cells."""
-        x, y = self.cell_to_pos((cx, cy))
-        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH - OUTER_WALL_MARGIN:
-            return True
-        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT - OUTER_WALL_MARGIN:
-            return True
-        if y < INTERIOR_WALL_Y_END and (
-            INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
-            return True
-        return False
+        return DEFAULT_ARENA.is_wall_cell(cx, cy)
 
     def distance(self, p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
         """Euclidean distance between two points"""
@@ -653,20 +762,109 @@ class REIPNode:
         p2_left = p2[0] > INTERIOR_WALL_X_RIGHT
         different_sides = (p1[0] < INTERIOR_WALL_X_LEFT) != (p2[0] < INTERIOR_WALL_X_LEFT)
         if different_sides and (p1[1] < INTERIOR_WALL_Y_END or p2[1] < INTERIOR_WALL_Y_END):
-            passage_y = INTERIOR_WALL_Y_END + 70
+            # Route through the first safe row above the divider-tip clearance.
+            passage_y = (int((INTERIOR_WALL_Y_END + DIVIDER_TIP_CLEARANCE) / CELL_SIZE) + 0.5) * CELL_SIZE
             d1_to_passage = math.sqrt((p1[0] - INTERIOR_WALL_X)**2 + (p1[1] - passage_y)**2)
             d2_to_passage = math.sqrt((p2[0] - INTERIOR_WALL_X)**2 + (p2[1] - passage_y)**2)
             return d1_to_passage + d2_to_passage
         return self.distance(p1, p2)
+
+    def _quorum_size(self) -> int:
+        return max(1, self.active_robot_count // 2 + 1)
+
+    def _leader_quorum_ok(self) -> bool:
+        if self.current_leader != self.robot_id:
+            return False
+        return (time.monotonic() - self._leader_quorum_mono) <= LEADER_ACK_STALE
+
+    def _leader_reports_mission_complete(self) -> bool:
+        if self.current_leader in (None, self.robot_id):
+            return False
+        peer = self.peers.get(self.current_leader)
+        if peer is None:
+            return False
+        if time.time() - peer.last_seen >= PEER_TIMEOUT:
+            return False
+        return peer.leader_established and peer.mission_complete
+
+    def _leader_digest(self, leader_id: int, term: int, leader_seq: int,
+                       assignments: Dict[str, Tuple[float, float]]) -> str:
+        payload = {
+            'leader_id': leader_id,
+            'term': term,
+            'leader_seq': leader_seq,
+            'assignments': assignments,
+        }
+        raw = json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()
+        return hashlib.sha256(raw).hexdigest()[:16]
+
+    def _send_leader_ack(self, leader_id: int, leader_term: int,
+                         leader_seq: int, leader_digest: str):
+        ack_key = (leader_id, leader_term, leader_seq, leader_digest)
+        if self._last_acked_leader_key == ack_key:
+            return
+        msg = {
+            'type': 'leader_ack',
+            'robot_id': self.robot_id,
+            'leader_id': leader_id,
+            'term': leader_term,
+            'leader_seq': leader_seq,
+            'leader_digest': leader_digest,
+            'timestamp': time.time(),
+        }
+        data = json.dumps(msg).encode()
+        try:
+            if self.sim_mode:
+                self.peer_socket.sendto(data, ('127.0.0.1', UDP_SIM_PEER_RELAY_PORT))
+            else:
+                self.peer_socket.sendto(data, (BROADCAST_IP, UDP_PEER_PORT))
+            self._last_acked_leader_key = ack_key
+        except Exception:
+            pass
+
+    def _handle_leader_ack(self, msg: dict):
+        if msg.get('leader_id') != self.robot_id or self.current_leader != self.robot_id:
+            return
+        if msg.get('term') != self.current_term:
+            return
+        if msg.get('leader_digest') != self._leader_last_digest:
+            return
+        if msg.get('leader_seq') != self._leader_broadcast_seq:
+            return
+        ack_robot = msg.get('robot_id')
+        if ack_robot == self.robot_id or ack_robot not in self.active_robot_ids:
+            return
+        ackers = self._leader_ack_sets.setdefault(self._leader_last_digest, set())
+        ackers.add(ack_robot)
+        if 1 + len(ackers) >= self._quorum_size():
+            self._leader_quorum_mono = time.monotonic()
     
     # ==================== PEER COMMUNICATION ====================
     def broadcast_state(self):
         """Broadcast our state to all peers"""
-        # If I'm leader, include task assignments
+        leader_claim = self.current_leader == self.robot_id
+        leader_established = self._leader_quorum_ok()
         assignments = {}
-        if self.state == RobotState.LEADER:
-            assignments = self.compute_task_assignments()
+        leader_seq = 0
+        leader_digest = None
+        mission_complete = False
+        if leader_claim:
+            self._leader_broadcast_seq += 1
+            leader_seq = self._leader_broadcast_seq
+            if leader_established:
+                assignments = self.compute_task_assignments()
+                mission_complete = not assignments and self.my_assigned_target is None
+            leader_digest = self._leader_digest(self.robot_id, self.current_term, leader_seq, assignments)
+            self._leader_last_digest = leader_digest
+            self._leader_ack_sets = {leader_digest: self._leader_ack_sets.get(leader_digest, set())}
         self._peer_seq += 1
+        has_fresh_position = (
+            self.position_rx_mono > 0.0 and
+            time.monotonic() - self.position_rx_mono < POSITION_FRESHNESS_S
+        )
+        advertised_state = self.state.value
+        if leader_claim and not leader_established:
+            advertised_state = RobotState.FOLLOWER.value
         
         msg = {
             'type': 'peer_state',
@@ -675,12 +873,18 @@ class REIPNode:
             'x': self.x,
             'y': self.y,
             'theta': self.theta,
-            'state': self.state.value,
+            'state': advertised_state,
             'trust_in_leader': self.trust_in_leader,
             'vote': self.my_vote,
+            'term': self.current_term,
             'coverage_count': len(self.my_visited),
             'visited_cells': list(self.my_visited.keys())[-100:],  # Last 100 cells
             'leader_id': self.current_leader,
+            'leader_seq': leader_seq,
+            'leader_digest': leader_digest,
+            'leader_established': leader_established,
+            'mission_complete': mission_complete,
+            'has_fresh_position': has_fresh_position,
             'suspicion': self.suspicion_of_leader,
             'navigation_target': list(self.current_navigation_target) if self.current_navigation_target else None,
             'predicted_target': list(self.my_predicted_target) if self.my_predicted_target else None,
@@ -691,13 +895,7 @@ class REIPNode:
         data = json.dumps(msg).encode()
         try:
             if self.sim_mode:
-                # Sim mode: send to each peer's unique port on localhost
-                for peer_id in range(1, NUM_ROBOTS + 1):
-                    if peer_id != self.robot_id:
-                        self.peer_socket.sendto(
-                            data, ('127.0.0.1', UDP_PEER_PORT + peer_id))
-                # Send to base port for simulator/logger listener
-                self.peer_socket.sendto(data, ('127.0.0.1', UDP_PEER_PORT))
+                self.peer_socket.sendto(data, ('127.0.0.1', UDP_SIM_PEER_RELAY_PORT))
             else:
                 # Hardware mode: single broadcast, all robots on same port
                 self.peer_socket.sendto(data, (BROADCAST_IP, UDP_PEER_PORT))
@@ -707,7 +905,7 @@ class REIPNode:
     def receive_peer_states(self):
         """Receive state broadcasts from peers"""
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, _ = self.peer_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
                 
@@ -715,6 +913,8 @@ class REIPNode:
                     peer_id = msg.get('robot_id')
                     if peer_id and peer_id != self.robot_id:
                         self.update_peer(peer_id, msg)
+                elif msg.get('type') == 'leader_ack':
+                    self._handle_leader_ack(msg)
         except (BlockingIOError, ConnectionResetError):
             pass
         except ConnectionResetError:
@@ -726,6 +926,8 @@ class REIPNode:
     
     def update_peer(self, peer_id: int, msg: dict):
         """Update peer info"""
+        if peer_id not in self.active_robot_ids:
+            return
         if peer_id not in self.peers:
             self.peers[peer_id] = PeerInfo(robot_id=peer_id)
         
@@ -751,7 +953,14 @@ class REIPNode:
         peer.state = msg.get('state', 'idle')
         peer.trust_score = msg.get('trust_in_leader', 1.0)
         peer.vote = msg.get('vote')
+        peer.reported_term = int(msg.get('term', 0) or 0)
         peer.coverage_count = msg.get('coverage_count', 0)
+        peer.reported_leader_id = msg.get('leader_id')
+        peer.reported_leader_seq = int(msg.get('leader_seq', 0) or 0)
+        peer.reported_leader_digest = msg.get('leader_digest')
+        peer.leader_established = bool(msg.get('leader_established', False))
+        peer.mission_complete = bool(msg.get('mission_complete', False))
+        peer.has_fresh_position = bool(msg.get('has_fresh_position', False))
         peer.last_seen = time.time()
         
         # Merge their visited cells (with timestamps for causality)
@@ -763,8 +972,17 @@ class REIPNode:
                 self.known_visited.add(cell_tuple)
                 self.known_visited_time[cell_tuple] = now_mono  # When WE learned about it
         
-        # If this peer is the leader, get my assignment
-        if msg.get('leader_id') == peer_id and peer_id == self.current_leader:
+        if (msg.get('leader_id') == peer_id and
+            peer.reported_leader_digest and
+            (peer_id == self.current_leader or peer_id == self.my_vote)):
+            self.current_term = max(self.current_term, peer.reported_term)
+            self._send_leader_ack(peer_id, peer.reported_term,
+                                  peer.reported_leader_seq,
+                                  peer.reported_leader_digest)
+
+        # If this peer is the established leader, get my assignment
+        if (msg.get('leader_id') == peer_id and peer_id == self.current_leader and
+            peer.leader_established):
             assignments = msg.get('assignments', {})
             if str(self.robot_id) in assignments:
                 target = assignments[str(self.robot_id)]
@@ -935,6 +1153,17 @@ class REIPNode:
             if known_time < causality_cutoff:
                 suspicion_added += WEIGHT_PEER
                 reasons.append("peer_reported")
+
+        # Safety check: targeting another robot's currently occupied bubble is
+        # a locally verifiable coordination hazard, not a mere efficiency loss.
+        PEER_TARGET_CLEARANCE = ROBOT_RADIUS + 70
+        for pid, peer in self.peers.items():
+            if time.time() - peer.last_seen > 0.6:
+                continue
+            if self.distance(target, (peer.x, peer.y)) < PEER_TARGET_CLEARANCE:
+                suspicion_added += WEIGHT_PEER_SAFETY
+                reasons.append(f"peer_conflict_r{pid}")
+                break
         
         # ===== MPC DIRECTION CHECK =====
         # Two modes:
@@ -1106,12 +1335,15 @@ class REIPNode:
     def update_tof_obstacles(self):
         """
         Update obstacle map from ToF readings.
-        INSTANTANEOUS - clears and rebuilds each cycle to avoid stale data
-        (e.g., another robot temporarily blocking a cell).
+        Keep a short decay memory so a real obstacle does not disappear from the
+        planner during one noisy frame or while the robot pivots away.
         """
-        # Clear previous - obstacles are instantaneous, not accumulated
-        self.tof_obstacles.clear()
-        
+        now = time.monotonic()
+        self._tof_obstacle_memory = {
+            cell: expiry for cell, expiry in self._tof_obstacle_memory.items()
+            if expiry > now
+        }
+        self.tof_obstacles = set(self._tof_obstacle_memory.keys())
         if not self.tof:
             return
         
@@ -1134,18 +1366,121 @@ class REIPNode:
             
             cell = self.get_cell(obs_x, obs_y)
             if cell:
-                self.tof_obstacles.add(cell)
+                ttl = 1.0 if name.startswith('front') else 0.6
+                self._tof_obstacle_memory[cell] = max(
+                    self._tof_obstacle_memory.get(cell, 0.0),
+                    now + ttl
+                )
+        self.tof_obstacles = set(self._tof_obstacle_memory.keys())
     
     # ==================== LEADER TASK ASSIGNMENT ====================
+    def _side_of_divider(self, pos: Tuple[float, float]) -> int:
+        """Classify a position as left/right of the divider, or 0 in the throat."""
+        x, y = pos
+        if y >= INTERIOR_WALL_Y_END:
+            return 0
+        if x < INTERIOR_WALL_X_LEFT:
+            return -1
+        if x > INTERIOR_WALL_X_RIGHT:
+            return 1
+        return 0
+
+    def _is_in_bottleneck_zone(self, pos: Tuple[float, float]) -> bool:
+        """True when the robot is in or immediately approaching the narrow passage."""
+        x, y = pos
+        throat_half_width = ROBOT_RADIUS + CELL_SIZE * 0.5
+        return (INTERIOR_WALL_Y_END - CELL_SIZE <= y <= INTERIOR_WALL_Y_END + CELL_SIZE and
+                INTERIOR_WALL_X - throat_half_width <= x <= INTERIOR_WALL_X + throat_half_width)
+
+    def _assignment_requires_bottleneck_crossing(self,
+                                                 pos: Tuple[float, float],
+                                                 target_pos: Tuple[float, float]) -> bool:
+        """Return True when reaching the target requires traversing the divider passage."""
+        start_side = self._side_of_divider(pos)
+        goal_side = self._side_of_divider(target_pos)
+        if start_side == 0 or goal_side == 0 or start_side == goal_side:
+            return False
+        return pos[1] < INTERIOR_WALL_Y_END or target_pos[1] < INTERIOR_WALL_Y_END
+
+    def _active_bottleneck_crossers(self,
+                                    robots: Dict[int, Tuple[float, float]],
+                                    assignments: Dict[str, Tuple[float, float]]) -> Set[int]:
+        """Robots currently occupying or reserving the passage."""
+        active = {rid for rid, pos in robots.items() if self._is_in_bottleneck_zone(pos)}
+        for rid_str, tgt in assignments.items():
+            rid = int(rid_str)
+            pos = robots.get(rid)
+            if pos and self._assignment_requires_bottleneck_crossing(pos, tgt):
+                active.add(rid)
+        return active
+
+    def _best_frontier_for_robot(self, pos, theta, robot_cell, available_frontiers,
+                                  assigned_frontiers, still_valid, passage_blocked,
+                                  crossing_locked, wall_cx):
+        """Pick one frontier for this robot: prefer forward, else nearest. Returns (cx,cy) or None."""
+        MIN_TARGET_SPACING = CELL_SIZE * 3
+        forward_dir = (math.cos(theta), math.sin(theta))
+        best_frontier = None
+        best_dist = float('inf')
+
+        def score(frontier, require_forward):
+            if frontier in assigned_frontiers or (robot_cell and frontier == robot_cell):
+                return None
+            fp = self.cell_to_pos(frontier)
+            if passage_blocked and (frontier[0] < wall_cx) != (pos[0] < INTERIOR_WALL_X_LEFT):
+                return None
+            if crossing_locked and self._assignment_requires_bottleneck_crossing(pos, fp):
+                return None
+            for _, existing_tgt in still_valid.items():
+                if self.distance(fp, existing_tgt) < MIN_TARGET_SPACING:
+                    return None
+            dx, dy = fp[0] - pos[0], fp[1] - pos[1]
+            if require_forward and (dx * forward_dir[0] + dy * forward_dir[1]) <= 0:
+                return None
+            return self.path_distance(pos, fp)
+
+        for f in available_frontiers:
+            d = score(f, require_forward=True)
+            if d is not None and d < best_dist:
+                best_dist = d
+                best_frontier = f
+        if best_frontier is not None:
+            return best_frontier
+        for f in available_frontiers:
+            d = score(f, require_forward=False)
+            if d is not None and d < best_dist:
+                best_dist = d
+                best_frontier = f
+        return best_frontier
+
+    def _ensure_room_has_assignee(self, room_frontiers, room_assigned_count,
+                                  still_valid, robots):
+        """If this room has no assignee, reassign the robot farthest from its target to this room."""
+        if room_assigned_count != 0 or not room_frontiers or len(still_valid) < 2:
+            return
+        worst_rid = None
+        worst_dist = -1
+        for rid_str, tgt in still_valid.items():
+            rid = int(rid_str)
+            if rid == self.robot_id:
+                continue
+            if rid in robots:
+                d = self.path_distance(robots[rid], tgt)
+                if d > worst_dist:
+                    worst_dist = d
+                    worst_rid = rid_str
+        if worst_rid is not None:
+            pos = robots[int(worst_rid)]
+            best_f = min(room_frontiers,
+                         key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
+            still_valid[worst_rid] = self.cell_to_pos(best_f)
+
     def compute_task_assignments(self) -> Dict[str, Tuple[float, float]]:
         """
         Greedy nearest-frontier assignment (Burgard et al. 2000).
-        Leader computes frontier assignments for all robots including self.
-        Sorts robots by distance to nearest frontier (not by ID) to avoid
-        systematic bias toward low-ID robots.
-        
-        If bad_leader_mode is active, deliberately assigns already-explored cells
-        to trigger three-tier trust detection in followers.
+        Algorithm: (1) Keep previous assignments if target still unexplored and not reached.
+        (2) For robots needing a target, pick nearest frontier; prefer forward, else any.
+        (3) If one room has no assignee, reassign the robot farthest from its target to that room.
         """
         if self.state != RobotState.LEADER:
             return {}
@@ -1154,6 +1489,11 @@ class REIPNode:
         # This triggers the three-tier trust model (the main REIP feature)
         if self.bad_leader_mode:
             return self._compute_bad_assignments()
+
+        # SELF-INJURE LEADER MODE: command followers into the leader's occupied
+        # zone. This is a coordination attack, not a motor fault.
+        if self.self_injure_leader_mode:
+            return self._compute_self_injure_assignments()
         
         # OSCILLATE LEADER MODE: rapidly flip-flop targets between far corners
         # Tests Tier 3 direction consistency (high Ω in fault classifier)
@@ -1180,23 +1520,18 @@ class REIPNode:
             self._prev_assignments.clear()
             return {}
         
-        # Collect all robot positions (me + peers)
+        # Collect all robot positions and headings (me + peers)
         robots = {self.robot_id: (self.x, self.y)}
+        robot_thetas = {self.robot_id: self.theta}
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen < PEER_TIMEOUT:
                 robots[pid] = (peer.x, peer.y)
+                robot_thetas[pid] = getattr(peer, 'theta', 0.0)
 
-        # Passage yielding: the passage (y>1200, x near divider) is ~190mm
-        # after margins — one robot fits, two jam.  Count how many robots
-        # are currently in the passage zone so the assignment logic can
-        # avoid sending more than one through at a time.
-        PASSAGE_Y_START = INTERIOR_WALL_Y_END          # 1200mm
-        PASSAGE_X_MIN = INTERIOR_WALL_X_LEFT - ROBOT_RADIUS   # ~890mm
-        PASSAGE_X_MAX = INTERIOR_WALL_X_RIGHT + ROBOT_RADIUS  # ~1146mm
-        robots_in_passage = set()
-        for rid, pos in robots.items():
-            if pos[1] > PASSAGE_Y_START and PASSAGE_X_MIN < pos[0] < PASSAGE_X_MAX:
-                robots_in_passage.add(rid)
+        # The divider throat is effectively single-file on hardware, so reserve it
+        # as a capacity-1 resource.  We count both robots already in/near the throat
+        # and robots whose current assignments still require a cross-room traversal.
+        MAX_BOTTLENECK_CROSSERS = 1
 
         # === ASSIGNMENT PERSISTENCE (Hysteresis) ===
         # Keep previous assignments if their target frontier is still unexplored
@@ -1220,6 +1555,8 @@ class REIPNode:
                         continue
                     still_valid[rid_str] = prev_target
                     assigned_frontiers.add(cell)
+
+        active_crossers = self._active_bottleneck_crossers(robots, still_valid)
         
         # Robots that need new assignments
         need_assignment = [rid for rid in robots if str(rid) not in still_valid]
@@ -1234,120 +1571,43 @@ class REIPNode:
                 return min(self.path_distance(pos, self.cell_to_pos(f))
                            for f in available_frontiers)
             sorted_robots = sorted(need_assignment, key=nearest_frontier_dist)
-            
-            MIN_TARGET_SPACING = CELL_SIZE * 3
             wall_cx = int(INTERIOR_WALL_X_LEFT / CELL_SIZE)
 
             for rid in sorted_robots:
                 pos = robots[rid]
-                robot_on_left = pos[0] < INTERIOR_WALL_X_LEFT
-                best_frontier = None
-                best_dist = float('inf')
-
-                # Passage yielding: if someone else is already in the
-                # passage, don't send this robot cross-room (it would
-                # jam the passage).  The robot already IN the passage
-                # keeps its assignment.
-                passage_blocked = (len(robots_in_passage) > 0 and
-                                   rid not in robots_in_passage)
-
-                for frontier in available_frontiers:
-                    if frontier in assigned_frontiers:
-                        continue
-                    frontier_pos = self.cell_to_pos(frontier)
-
-                    # Skip cross-room frontiers if passage is blocked
-                    frontier_on_left = frontier[0] < wall_cx
-                    if passage_blocked and frontier_on_left != robot_on_left:
-                        continue
-
-                    too_close = False
-                    for _, existing_tgt in still_valid.items():
-                        if self.distance(frontier_pos, existing_tgt) < MIN_TARGET_SPACING:
-                            too_close = True
-                            break
-                    if too_close:
-                        continue
-
-                    dist = self.path_distance(pos, frontier_pos)
-                    if dist < best_dist:
-                        best_dist = dist
-                        best_frontier = frontier
-
-                if not best_frontier:
-                    for frontier in available_frontiers:
-                        if frontier in assigned_frontiers:
-                            continue
-                        frontier_pos = self.cell_to_pos(frontier)
-                        dist = self.path_distance(pos, frontier_pos)
-                        if dist < best_dist:
-                            best_dist = dist
-                            best_frontier = frontier
-
+                theta = robot_thetas.get(rid, 0.0)
+                robot_cell = self.get_cell(pos[0], pos[1])
+                already_crossing = rid in active_crossers
+                crossing_locked = (len(active_crossers) >= MAX_BOTTLENECK_CROSSERS and
+                                   not already_crossing)
+                passage_blocked = crossing_locked
+                best_frontier = self._best_frontier_for_robot(
+                    pos, theta, robot_cell, available_frontiers,
+                    assigned_frontiers, still_valid, passage_blocked,
+                    crossing_locked, wall_cx)
                 if best_frontier:
                     assigned_frontiers.add(best_frontier)
-                    target = self.cell_to_pos(best_frontier)
-                    still_valid[str(rid)] = target
+                    target_pos = self.cell_to_pos(best_frontier)
+                    still_valid[str(rid)] = target_pos
+                    if self._assignment_requires_bottleneck_crossing(pos, target_pos):
+                        active_crossers.add(rid)
         
-        # Spatial diversity: ensure at least one robot is assigned to
-        # the other room if it has unexplored cells.  Without this, the
-        # greedy algorithm keeps all robots in whichever room they started.
+        # Spatial diversity: ensure at least one robot targets each room
+        # (only when passage is clear to avoid pile-up).
         wall_cx = int(INTERIOR_WALL_X_LEFT / CELL_SIZE)
-        room_a_assigned = 0
-        room_b_assigned = 0
-        for _, tgt in still_valid.items():
-            tcx = int(tgt[0] / CELL_SIZE)
-            if tcx < wall_cx:
-                room_a_assigned += 1
-            else:
-                room_b_assigned += 1
-
-        room_b_frontiers = [f for f in available_frontiers
-                            if f not in assigned_frontiers and f[0] >= wall_cx]
+        room_a_assigned = sum(1 for _, tgt in still_valid.items()
+                              if int(tgt[0] / CELL_SIZE) < wall_cx)
+        room_b_assigned = len(still_valid) - room_a_assigned
         room_a_frontiers = [f for f in available_frontiers
                             if f not in assigned_frontiers and f[0] < wall_cx]
+        room_b_frontiers = [f for f in available_frontiers
+                            if f not in assigned_frontiers and f[0] >= wall_cx]
 
-        # Spatial diversity: ensure at least one robot targets each room —
-        # BUT only if the passage is clear.  Forcing a cross-room assignment
-        # while someone is already in the passage causes the pile-up.
-        if len(robots_in_passage) == 0:
-            if room_b_assigned == 0 and room_b_frontiers and len(still_valid) >= 2:
-                worst_rid = None
-                worst_dist = -1
-                for rid_str, tgt in still_valid.items():
-                    rid = int(rid_str)
-                    if rid == self.robot_id:
-                        continue
-                    if rid in robots:
-                        d = self.path_distance(robots[rid], tgt)
-                        if d > worst_dist:
-                            worst_dist = d
-                            worst_rid = rid_str
-                if worst_rid is not None:
-                    rid = int(worst_rid)
-                    pos = robots[rid]
-                    best_b = min(room_b_frontiers,
-                                 key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
-                    still_valid[worst_rid] = self.cell_to_pos(best_b)
-
-            if room_a_assigned == 0 and room_a_frontiers and len(still_valid) >= 2:
-                worst_rid = None
-                worst_dist = -1
-                for rid_str, tgt in still_valid.items():
-                    rid = int(rid_str)
-                    if rid == self.robot_id:
-                        continue
-                    if rid in robots:
-                        d = self.path_distance(robots[rid], tgt)
-                        if d > worst_dist:
-                            worst_dist = d
-                            worst_rid = rid_str
-                if worst_rid is not None:
-                    rid = int(worst_rid)
-                    pos = robots[rid]
-                    best_a = min(room_a_frontiers,
-                                 key=lambda f: self.path_distance(pos, self.cell_to_pos(f)))
-                    still_valid[worst_rid] = self.cell_to_pos(best_a)
+        if len(active_crossers) == 0:
+            self._ensure_room_has_assignee(room_b_frontiers, room_b_assigned,
+                                           still_valid, robots)
+            self._ensure_room_has_assignee(room_a_frontiers, room_a_assigned,
+                                           still_valid, robots)
 
         # Build final assignments
         assignments = dict(still_valid)
@@ -1399,6 +1659,26 @@ class REIPNode:
         
         if assignments:
             print(f"[BAD_LEADER] Sending {len(assignments)} robots to EXPLORED cells (persistent): {list(assignments.values())[:3]}...")
+        return assignments
+
+    def _compute_self_injure_assignments(self) -> Dict[str, Tuple[float, float]]:
+        """Compromised leader commands followers into its occupied zone."""
+        robots = {self.robot_id: (self.x, self.y)}
+        for pid, peer in self.peers.items():
+            if time.time() - peer.last_seen < PEER_TIMEOUT:
+                robots[pid] = (peer.x, peer.y)
+
+        leader_target = self.get_my_frontier() or (self.x, self.y)
+        attack_target = (self.x, self.y)
+        assignments = {}
+        for rid in robots:
+            target = leader_target if rid == self.robot_id else attack_target
+            assignments[str(rid)] = target
+            if rid == self.robot_id:
+                self.my_assigned_target = target
+
+        print(f"[SELF_INJURE] Leader attracting {max(0, len(assignments) - 1)} follower(s) "
+              f"into occupied zone at ({attack_target[0]:.0f}, {attack_target[1]:.0f})")
         return assignments
     
     def _compute_oscillate_assignments(self) -> Dict[str, Tuple[float, float]]:
@@ -1516,30 +1796,40 @@ class REIPNode:
                     peer_in_passage = True
                     break
 
+        # Prefer unexplored cells in front of the robot (avoid 180° turns)
+        forward = (math.cos(self.theta), math.sin(self.theta))
         best_dist = float('inf')
         best_cell = None
+        best_forward = False
 
         for cx in range(self.coverage_width):
             for cy in range(self.coverage_height):
                 cell = (cx, cy)
                 if cell in self.known_visited or self._is_wall_cell(cx, cy):
                     continue
+                if cell == my_cell:
+                    continue
 
                 cell_on_left = cx < wall_cell_x_left
-                # Hard-skip cross-room if passage is occupied by a peer
                 if peer_in_passage and cell_on_left != robot_on_left:
                     continue
 
                 dist = abs(cx - my_cell[0]) + abs(cy - my_cell[1])
-
                 if robot_on_left != cell_on_left and cy < wall_cell_y_end:
                     detour_up = max(0, wall_cell_y_end + 2 - my_cell[1])
                     detour_down = max(0, wall_cell_y_end + 2 - cy)
                     dist += detour_up + detour_down + 3
 
-                if dist < best_dist:
+                cell_pos = self.cell_to_pos(cell)
+                dx = cell_pos[0] - self.x
+                dy = cell_pos[1] - self.y
+                is_forward = (dx * forward[0] + dy * forward[1]) > 0
+
+                # Prefer forward; among same forward-ness, prefer nearer
+                if (is_forward, -dist) > (best_forward, -best_dist) or best_cell is None:
                     best_dist = dist
                     best_cell = cell
+                    best_forward = is_forward
 
         if best_cell:
             return self.cell_to_pos(best_cell)
@@ -1557,14 +1847,19 @@ class REIPNode:
                 self.peers[self.current_leader].my_trust_for_them = self.trust_in_leader
         
         # Build candidates: myself + all peers with sufficient trust
+        now = time.time()
+        fresh_trusted_peers = {}
+        for pid, peer in self.peers.items():
+            if (pid in self.active_robot_ids and
+                now - peer.last_seen < PEER_TIMEOUT and
+                peer.my_trust_for_them > TRUST_THRESHOLD):
+                fresh_trusted_peers[pid] = peer
+
         candidates = [(self.robot_id, 1.0, self.leader_failures.get(self.robot_id, 0))]
         
-        for pid, peer in self.peers.items():
-            if time.time() - peer.last_seen < PEER_TIMEOUT:
-                # Use UPDATED trust values (including leader's decayed trust)
-                if peer.my_trust_for_them > TRUST_THRESHOLD:
-                    failures = self.leader_failures.get(pid, 0)
-                    candidates.append((pid, peer.my_trust_for_them, failures))
+        for pid, peer in fresh_trusted_peers.items():
+            failures = self.leader_failures.get(pid, 0)
+            candidates.append((pid, peer.my_trust_for_them, failures))
         
         # Sort by: highest trust, then fewest failures, then lowest ID
         # (trust desc, failures asc, id asc)
@@ -1579,10 +1874,9 @@ class REIPNode:
             # itself.  Each node enforces its own trust assessment.
             eligible_ids = set(c[0] for c in candidates)
             votes = {self.my_vote: 1}  # my_vote is always eligible
-            for pid, peer in self.peers.items():
-                if peer.vote is not None and time.time() - peer.last_seen < PEER_TIMEOUT:
-                    if peer.vote in eligible_ids:
-                        votes[peer.vote] = votes.get(peer.vote, 0) + 1
+            for pid, peer in fresh_trusted_peers.items():
+                if peer.vote in eligible_ids:
+                    votes[peer.vote] = votes.get(peer.vote, 0) + 1
             
             # Winner by: most votes -> fewest failures -> lowest ID
             old_leader = self.current_leader
@@ -1590,9 +1884,59 @@ class REIPNode:
             sorted_candidates = sorted(votes.items(), 
                 key=lambda x: (-x[1], self.leader_failures.get(x[0], 0), x[0]))
             
-            self.current_leader = sorted_candidates[0][0]
+            tentative_leader = sorted_candidates[0][0]
+            tentative_votes = votes[tentative_leader]
+            quorum_size = self._quorum_size()
+
+            # Split-brain guard: if I lose direct contact with the leader, but
+            # fresh peers still report a coherent external leader, follow that
+            # consensus instead of self-promoting. If I have zero external
+            # support after convergence, hold the previous leader rather than
+            # creating a one-robot split brain.
+            reported_leader_support = {}
+            for pid, peer in fresh_trusted_peers.items():
+                reported_leader = peer.reported_leader_id
+                if reported_leader in (None, self.robot_id):
+                    continue
+                if not peer.has_fresh_position:
+                    continue
+                reported_leader_support[reported_leader] = (
+                    reported_leader_support.get(reported_leader, 0) + 1
+                )
+
+            supported_external_leader = None
+            if reported_leader_support:
+                supported_external_leader = sorted(
+                    reported_leader_support.items(),
+                    key=lambda item: (-item[1], item[0])
+                )[0][0]
+
+            self.current_leader = tentative_leader
+            if tentative_leader != self.robot_id and tentative_votes < quorum_size and old_leader is not None:
+                self.current_leader = old_leader
+            if tentative_leader == self.robot_id and old_leader not in (None, self.robot_id):
+                if supported_external_leader is not None:
+                    self.current_leader = supported_external_leader
+                    self.my_vote = supported_external_leader
+                    print(f"[ELECTION] Following peer-reported leader R{supported_external_leader}")
+                elif self._election_settled and tentative_votes < quorum_size:
+                    self.current_leader = old_leader
+                    self.state = RobotState.FOLLOWER
+                    self.my_vote = old_leader
+                    print(f"[ELECTION] Holding leader R{old_leader} during isolation")
+            elif tentative_leader == self.robot_id and tentative_votes < quorum_size:
+                self.current_leader = old_leader
+                self.state = RobotState.FOLLOWER
             
             if self.current_leader != old_leader:
+                self.current_term += 1
+                self._leader_quorum_mono = 0.0
+                self._leader_claim_mono = (
+                    time.monotonic() if self.current_leader == self.robot_id else 0.0
+                )
+                self._leader_ack_sets.clear()
+                self._leader_last_digest = None
+                self._leader_broadcast_seq = 0
                 # Track failure for old leader (they got impeached)
                 # don't count the initial startup convergence - when robots first
                 # discover peers, their self-election gets overridden.  This is normal
@@ -1623,6 +1967,7 @@ class REIPNode:
                 # Clear fault modes if we were the bad leader
                 if old_leader == self.robot_id:
                     self.bad_leader_mode = False
+                    self.self_injure_leader_mode = False
                     self.oscillate_leader_mode = False
                     self.freeze_leader_mode = False
                     self._oscillate_phase = 0
@@ -1717,7 +2062,18 @@ class REIPNode:
         ty = self.y + distance * math.sin(angle)
         tx = max(75, min(ARENA_WIDTH - 75, tx))
         ty = max(75, min(ARENA_HEIGHT - 75, ty))
+        self._nav_waypoint_cell = None
+        self._nav_waypoint_set_mono = 0.0
         self.current_navigation_target = (tx, ty)
+
+    def _start_escape(self, escape_angle: float, duration: float = 1.4):
+        """Start a short escape maneuver and expose it as the current waypoint."""
+        self._stuck_count += 1
+        self._escape_start = time.monotonic()
+        self._escape_until = self._escape_start + duration
+        self._escape_angle = escape_angle
+        self._nav_history.clear()
+        self._set_motion_override_target(escape_angle, 300.0)
 
     def _check_stuck(self):
         """Detect if robot is physically stuck (wall-grinding, spinning wheels).
@@ -1729,7 +2085,7 @@ class REIPNode:
         now = time.monotonic()
 
         # Primary: position-based stuck detection (requires fresh position)
-        if self.position_rx_mono > 0.0 and now - self.position_rx_mono <= 1.0:
+        if self.position_rx_mono > 0.0 and now - self.position_rx_mono <= POSITION_FRESHNESS_S:
             self._nav_history.append((now, self.x, self.y))
             self._nav_history = [(t, x, y) for t, x, y in self._nav_history
                                  if now - t < 3.0]
@@ -1756,7 +2112,7 @@ class REIPNode:
             self._last_encoder_time = now
         
         # Clear history if position is stale (but keep encoder fallback active)
-        if self.position_rx_mono == 0.0 or now - self.position_rx_mono > 1.0:
+        if self.position_rx_mono == 0.0 or now - self.position_rx_mono > POSITION_FRESHNESS_S:
             self._nav_history.clear()
         
         return False
@@ -1778,10 +2134,61 @@ class REIPNode:
                     q.append((nx, ny))
         return None
 
+    def _segment_is_clear(self, p1, p2, goal_cell=None):
+        """Check whether a straight segment stays in free space.
+
+        Used for path lookahead: if multiple A* cells are visible, drive toward
+        the farthest one instead of re-aiming at every adjacent cell center.
+        """
+        dist = self.distance(p1, p2)
+        steps = max(2, int(dist / max(35.0, CELL_SIZE / 3)))
+        for i in range(1, steps + 1):
+            t = i / steps
+            sx = p1[0] + (p2[0] - p1[0]) * t
+            sy = p1[1] + (p2[1] - p1[1]) * t
+            cell = self.get_cell(sx, sy)
+            if cell is None:
+                return False
+            if self._is_wall_cell(*cell):
+                return False
+            if cell in self.tof_obstacles and cell != goal_cell:
+                return False
+        return True
+
+    def _select_path_waypoint(self, path_cells, goal_cell):
+        """Choose a stable, farther-ahead waypoint from an A* path."""
+        LOOKAHEAD_CELLS = 5
+        COMMIT_DIST = CELL_SIZE * 0.55
+        COMMIT_TIME = 0.8
+
+        if self.current_navigation_target and self._nav_waypoint_cell in path_cells:
+            dist_to_commit = self.distance((self.x, self.y), self.current_navigation_target)
+            recently_set = (time.monotonic() - self._nav_waypoint_set_mono) < COMMIT_TIME
+            if dist_to_commit > COMMIT_DIST and recently_set:
+                return self.current_navigation_target
+
+        best_cell = path_cells[1] if len(path_cells) > 1 else path_cells[0]
+        max_idx = min(len(path_cells) - 1, LOOKAHEAD_CELLS)
+        origin = (self.x, self.y)
+        for idx in range(1, max_idx + 1):
+            candidate = path_cells[idx]
+            candidate_pos = self.cell_to_pos(candidate)
+            if self._segment_is_clear(origin, candidate_pos, goal_cell):
+                best_cell = candidate
+            else:
+                break
+
+        self._nav_waypoint_cell = best_cell
+        self._nav_waypoint_set_mono = time.monotonic()
+        return self.cell_to_pos(best_cell)
+
     def _route_around_wall(self, target):
-        """A* pathfinding on the cell grid — mirrors sim's GridWorld pathfinder.
-        Returns the next waypoint (center of the second cell on the path)
-        so the reactive heading controller drives toward it."""
+        """A* pathfinding on the cell grid with visible-path lookahead.
+
+        Instead of chasing one adjacent cell at a time, drive toward the farthest
+        near-term path cell that is still clear in a straight line. This matches
+        differential-drive hardware much better and avoids turn-move-turn zig-zags.
+        """
         import heapq
 
         my_cell = self.get_cell(self.x, self.y)
@@ -1831,10 +2238,13 @@ class REIPNode:
         while open_set:
             _, g, cur = heapq.heappop(open_set)
             if cur == goal:
-                path_cell = goal
-                while came_from.get(path_cell) is not None and came_from[path_cell] != start:
-                    path_cell = came_from[path_cell]
-                return self.cell_to_pos(path_cell)
+                path_cells = []
+                node = goal
+                while node is not None:
+                    path_cells.append(node)
+                    node = came_from.get(node)
+                path_cells.reverse()
+                return self._select_path_waypoint(path_cells, goal)
             if g > g_score.get(cur, float('inf')):
                 continue
             for nb in neighbors(*cur):
@@ -1886,8 +2296,8 @@ class REIPNode:
             tip_dx = self.x - tip_x
             tip_dy = self.y - INTERIOR_WALL_Y_END
             tip_dist = math.sqrt(tip_dx * tip_dx + tip_dy * tip_dy)
-            TIP_ZONE = DIV_SLIDE_DIST
-            if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + 50:
+            TIP_ZONE = DIVIDER_TIP_CLEARANCE
+            if tip_dist < TIP_ZONE and tip_dist > 5 and self.y < INTERIOR_WALL_Y_END + DIVIDER_TIP_CLEARANCE:
                 tip_strength = _repel(tip_dist, TIP_ZONE)
                 repel_x += (tip_dx / tip_dist) * tip_strength
                 repel_y += (tip_dy / tip_dist) * tip_strength
@@ -2007,12 +2417,15 @@ class REIPNode:
             if phase_elapsed < 0.30:
                 return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
             if phase_elapsed < 0.80:
+                # Sharp arc (both wheels same sign): actual rotation in place. One wheel fwd, one back
+                # causes teetering/grinding on hardware instead of a clean spin.
                 diff = escape_angle - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
                 while diff < -math.pi: diff += 2 * math.pi
+                pivot_slow = max(35, BASE_SPEED * 0.28)
                 if diff > 0:
-                    return self._finalize_motor_command(BASE_SPEED, -BASE_SPEED, "escape_pivot")
-                return self._finalize_motor_command(-BASE_SPEED, BASE_SPEED, "escape_pivot")
+                    return self._finalize_motor_command(pivot_slow, BASE_SPEED, "escape_pivot")
+                return self._finalize_motor_command(BASE_SPEED, pivot_slow, "escape_pivot")
             safe_angle = self._wall_slide_heading(escape_angle)
             diff = safe_angle - self.theta
             while diff > math.pi: diff -= 2 * math.pi
@@ -2034,12 +2447,60 @@ class REIPNode:
         if left_d <= 0: left_d = 9999
         if right_d <= 0: right_d = 9999
 
-        # Peer collision: pivot away BEFORE physical contact.
-        # Contact = 2*ROBOT_RADIUS = 220mm center-to-center.
-        # Trigger at 280mm: 60mm clearance + margin for 200ms position staleness.
-        PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
+        # ToF emergency: obstacle critically close in front → pivot in place away from it.
+        # Without this we only bias turn and taper speed, so the robot keeps grinding one wheel
+        # and teetering instead of doing a clean 0-point spin.
+        min_front_tof = min(front_d, fl_d, fr_d)
+        in_tight_space = (
+            self._is_in_bottleneck_zone((self.x, self.y)) or
+            self.x < 260 or self.x > ARENA_WIDTH - 260 or
+            self.y < 260 or self.y > ARENA_HEIGHT - 260
+        )
+        near_critical_tof = 20 < min_front_tof < (CRITICAL_DISTANCE + 18)
+        side_pinched = min(fl_d, fr_d) < (CRITICAL_DISTANCE + 15) and min(left_d, right_d) < 260
+        if 20 < min_front_tof < CRITICAL_DISTANCE or (near_critical_tof and in_tight_space) or side_pinched:
+            self._tof_emergency_count += 1
+            left_clearance = min(fl_d, left_d)
+            right_clearance = min(fr_d, right_d)
+            turn_left = left_clearance >= right_clearance
+            pivot_slow = max(35, BASE_SPEED * 0.28)
+            self._last_command_source = "tof_emergency"
+
+            if self._tof_emergency_count >= 5:
+                nearest_sensor = min(
+                    (('front_left', fl_d), ('front', front_d), ('front_right', fr_d)),
+                    key=lambda item: item[1]
+                )[0]
+                sensor_angle = {
+                    'front_left': math.pi / 4.8,
+                    'front': 0.0,
+                    'front_right': -math.pi / 4.8,
+                }[nearest_sensor]
+                # Escape opposite the observed obstacle vector.
+                escape_angle = self.theta + sensor_angle + math.pi
+                while escape_angle > math.pi:
+                    escape_angle -= 2 * math.pi
+                while escape_angle < -math.pi:
+                    escape_angle += 2 * math.pi
+                self._start_escape(escape_angle, duration=min(1.2 + 0.3 * self._stuck_count, 2.2))
+                return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "tof_emergency")
+
+            if turn_left:
+                return self._finalize_motor_command(pivot_slow, BASE_SPEED, "tof_emergency")
+            return self._finalize_motor_command(BASE_SPEED, pivot_slow, "tof_emergency")
+        self._tof_emergency_count = 0
+
+        # Peer collision: reserve the hard override for true near-contact.
+        # Side-by-side neighbors were previously triggering full emergency
+        # maneuvers in the passage even when the softer avoidance field was
+        # sufficient, causing unnecessary spins and wall grazes.
+        PEER_HARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 20
+        PEER_FORWARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 50
         _closest_peer_dist = 9999.0
         _flee_px, _flee_py = 0.0, 0.0
+        _emergency_peer_count = 0
+        heading_x = math.cos(self.theta)
+        heading_y = math.sin(self.theta)
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > PEER_TIMEOUT:
                 continue
@@ -2063,10 +2524,20 @@ class REIPNode:
             pdist = math.sqrt(pdx * pdx + pdy * pdy)
             if pdist < _closest_peer_dist:
                 _closest_peer_dist = pdist
-            if pdist < PEER_CONTACT_DIST and pdist > 5:
+            if pdist <= 5:
+                continue
+
+            peer_ahead_proj = ((est_x - self.x) * heading_x + (est_y - self.y) * heading_y) / pdist
+            in_forward_corridor = peer_ahead_proj > 0.45
+            should_emergency = (
+                pdist < PEER_HARD_CONTACT_DIST or
+                (pdist < PEER_FORWARD_CONTACT_DIST and in_forward_corridor)
+            )
+            if should_emergency:
+                _emergency_peer_count += 1
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
-        if _closest_peer_dist < PEER_CONTACT_DIST and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
+        if _emergency_peer_count > 0 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)
             self._set_motion_override_target(flee_angle, 220.0)
@@ -2074,10 +2545,12 @@ class REIPNode:
             while diff > math.pi: diff -= 2 * math.pi
             while diff < -math.pi: diff += 2 * math.pi
             if abs(diff) > math.pi * 0.3:
+                # Sharp arc (both wheels same sign) so we actually rotate
+                pivot_slow = max(35, BASE_SPEED * 0.28)
                 if diff > 0:
-                    return self._finalize_motor_command(0.0, BASE_SPEED, "peer_emergency")
+                    return self._finalize_motor_command(pivot_slow, BASE_SPEED, "peer_emergency")
                 else:
-                    return self._finalize_motor_command(BASE_SPEED, 0.0, "peer_emergency")
+                    return self._finalize_motor_command(BASE_SPEED, pivot_slow, "peer_emergency")
             else:
                 return self._finalize_motor_command(BASE_SPEED * 0.5, BASE_SPEED * 0.5, "peer_emergency")
 
@@ -2099,7 +2572,11 @@ class REIPNode:
                 assignment_age < self.ASSIGNMENT_STALE_TIME
             )
 
-            if self.trust_in_leader > TRUST_THRESHOLD and assignment_valid:
+            if self.trust_in_leader > TRUST_THRESHOLD and self._leader_reports_mission_complete():
+                target = None
+                self.leader_assigned_target = None
+                self._last_command_source = "leader_complete"
+            elif self.trust_in_leader > TRUST_THRESHOLD and assignment_valid:
                 target = self.leader_assigned_target
                 self._last_command_source = "leader_assigned"
             else:
@@ -2110,6 +2587,8 @@ class REIPNode:
 
         if not target:
             self.current_navigation_target = None
+            self._nav_waypoint_cell = None
+            self._nav_waypoint_set_mono = 0.0
             self._raw_navigation_target = None
             return self._finalize_motor_command(0.0, 0.0, "no_target")
 
@@ -2254,11 +2733,21 @@ class REIPNode:
             sf_tof = max(0.5, min_front_tof / 250)
 
         min_peer_dist = 9999.0
+        min_peer_ahead_dist = 9999.0
+        heading_x = math.cos(self._smooth_theta)
+        heading_y = math.sin(self._smooth_theta)
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > PEER_TIMEOUT:
                 continue
-            d = math.sqrt((self.x - peer.x)**2 + (self.y - peer.y)**2)
+            rel_x = peer.x - self.x
+            rel_y = peer.y - self.y
+            d = math.sqrt(rel_x**2 + rel_y**2)
             min_peer_dist = min(min_peer_dist, d)
+            if d > 5:
+                forward_proj = (rel_x * heading_x + rel_y * heading_y) / d
+                lateral_sep = abs(-rel_x * heading_y + rel_y * heading_x)
+                if forward_proj > 0.35 and lateral_sep < CELL_SIZE * 1.35:
+                    min_peer_ahead_dist = min(min_peer_ahead_dist, d)
 
         PEER_CONTACT_DIST = 2 * ROBOT_RADIUS + 60
         sf_peer = 1.0
@@ -2267,13 +2756,21 @@ class REIPNode:
         elif min_peer_dist < 400:
             sf_peer = 0.3 + 0.7 * (min_peer_dist / 400)
 
+        sf_peer_yield = 1.0
+        if min_peer_ahead_dist < 420:
+            sf_peer_yield = max(0.05, (min_peer_ahead_dist - PEER_CONTACT_DIST) / (420 - PEER_CONTACT_DIST))
+
         MIN_MOTOR_PWM = 25
-        effective_speed = BASE_SPEED * min(sf_wall, sf_tof, sf_peer)
-        effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
+        hazard_scale = min(sf_wall, sf_tof, sf_peer, sf_peer_yield)
+        effective_speed = BASE_SPEED * hazard_scale
+        if hazard_scale >= 0.22:
+            effective_speed = max(MIN_MOTOR_PWM + 5, effective_speed)
 
         turn_mix = 0.55
 
-        PIVOT_ENTER = math.pi * 0.61   # ~110°
+        # Use pivot (sharp arc, both wheels same sign) for turns > ~60°. Below that, arc can
+        # command one wheel near zero → teetering on hardware instead of turning.
+        PIVOT_ENTER = math.pi * 0.35   # ~63°
         PIVOT_EXIT  = math.pi * 0.19   # ~35°  — finish pivot, resume arcing
         if abs(diff) > PIVOT_ENTER and not self._in_pivot:
             self._in_pivot = True
@@ -2288,8 +2785,10 @@ class REIPNode:
             self._set_motion_override_target(target_angle, 250.0)
             return self._finalize_motor_command(-BASE_SPEED * 0.4, -BASE_SPEED * 0.4, "pivot_timeout_escape")
         if self._in_pivot:
+            # Sharp arc: both wheels same direction (no reverse). One wheel slow, one fast,
+            # so the robot actually rotates on hardware instead of teetering with one wheel at 0.
             pivot_fast = BASE_SPEED
-            pivot_slow = 0.0
+            pivot_slow = max(MIN_MOTOR_PWM + 10, BASE_SPEED * 0.28)
             self._set_motion_override_target(target_angle, 200.0)
             if diff > 0:
                 left_speed, right_speed = pivot_slow, pivot_fast
@@ -2331,7 +2830,7 @@ class REIPNode:
           - Caught by three-tier trust model (the main REIP feature)
         """
         try:
-            while True:
+            for _ in range(MAX_RX_MESSAGES_PER_TICK):
                 data, _ = self.fault_socket.recvfrom(1024)
                 msg = json.loads(data.decode())
                 
@@ -2339,13 +2838,29 @@ class REIPNode:
                 if target == self.robot_id or target == 'all' or target == 0:
                     fault = msg.get('fault', msg.get('cmd', 'none'))
 
+                    if fault in ('set_trial_robots', 'start'):
+                        active_robot_ids = msg.get('active_robot_ids')
+                        if active_robot_ids:
+                            try:
+                                parsed_ids = {int(rid) for rid in active_robot_ids}
+                            except (TypeError, ValueError):
+                                parsed_ids = set()
+                            if parsed_ids:
+                                parsed_ids.add(self.robot_id)
+                                self.active_robot_ids = parsed_ids
+                                self.active_robot_count = len(parsed_ids)
+
                     if fault == 'start':
+                        if self.trial_started:
+                            continue
                         self.trial_started = True
                         self.my_visited.clear()
                         self.known_visited.clear()
                         self.known_visited_time.clear()
                         self.leader_assignment_rx_mono = 0.0
                         self.current_navigation_target = None
+                        self._nav_waypoint_cell = None
+                        self._nav_waypoint_set_mono = 0.0
                         self._raw_navigation_target = None
                         self._escape_until = 0.0
                         self._escape_start = 0.0
@@ -2362,6 +2877,7 @@ class REIPNode:
                     elif fault in ('none', 'clear'):
                         self.injected_fault = None
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         self._frozen_assignments.clear()
@@ -2371,14 +2887,23 @@ class REIPNode:
                     elif fault == 'bad_leader':
                         # Leadership fault - triggers three-tier trust
                         self.bad_leader_mode = True
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         self.injected_fault = None  # Don't also do motor fault
                         print(f"[FAULT] BAD_LEADER mode activated - will send bad assignments")
+                    elif fault in ('self_injure_leader', 'peer_collision_leader', 'ram_peer'):
+                        self.self_injure_leader_mode = True
+                        self.bad_leader_mode = False
+                        self.oscillate_leader_mode = False
+                        self.freeze_leader_mode = False
+                        self.injected_fault = None
+                        print(f"[FAULT] SELF_INJURE_LEADER mode activated - will command followers into occupied peer zone")
                     elif fault == 'oscillate_leader':
                         # Oscillation fault - triggers Tier 3 direction consistency
                         self.oscillate_leader_mode = True
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.freeze_leader_mode = False
                         self.injected_fault = None
                         self._oscillate_phase = 0
@@ -2387,6 +2912,7 @@ class REIPNode:
                         # Freeze fault - leader stops updating assignments
                         self.freeze_leader_mode = True
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.injected_fault = None
                         self._frozen_assignments.clear()  # Will be populated on first call
@@ -2395,6 +2921,7 @@ class REIPNode:
                         # Motor fault - triggers anomaly detection
                         self.injected_fault = fault
                         self.bad_leader_mode = False
+                        self.self_injure_leader_mode = False
                         self.oscillate_leader_mode = False
                         self.freeze_leader_mode = False
                         print(f"[FAULT] Motor fault injected: {fault}")
@@ -2422,23 +2949,27 @@ class REIPNode:
     def network_loop(self):
         """Handle network communication"""
         last_broadcast = 0
-        
-        while self.running:
-            self.receive_position()
-            self.receive_peer_states()
-            self.receive_fault_injection()
-            
-            if time.time() - last_broadcast > 1.0 / BROADCAST_RATE:
-                self.broadcast_state()
-                last_broadcast = time.time()
-            
-            # Prune dead peers
-            now = time.time()
-            dead = [pid for pid, p in self.peers.items() if now - p.last_seen > PEER_TIMEOUT]
-            for pid in dead:
-                del self.peers[pid]
-            
-            time.sleep(0.01)
+        try:
+            while self.running:
+                self.receive_position()
+                self.receive_sim_feedback()
+                self.receive_fault_injection()
+                self.receive_peer_states()
+                
+                if time.time() - last_broadcast > 1.0 / BROADCAST_RATE:
+                    self.broadcast_state()
+                    last_broadcast = time.time()
+                
+                # Prune dead peers
+                now = time.time()
+                dead = [pid for pid, p in self.peers.items() if now - p.last_seen > PEER_TIMEOUT]
+                for pid in dead:
+                    del self.peers[pid]
+                
+                time.sleep(0.01)
+        except Exception as exc:
+            print(f"[NETWORK] Fatal error in network loop: {exc!r}")
+            raise
     
     def control_loop(self):
         """Main control loop"""
@@ -2451,10 +2982,28 @@ class REIPNode:
         
         while self.running:
             start = time.time()
+            now_mono = time.monotonic()
 
             if not self.trial_started and not printed_waiting:
                 print(f"[R{self.robot_id}] Waiting for 'start' command...")
                 printed_waiting = True
+
+            if (self.current_leader == self.robot_id and
+                self.state == RobotState.LEADER and
+                self._leader_claim_mono > 0.0 and
+                now_mono - self._leader_claim_mono > PEER_TIMEOUT and
+                not self._leader_quorum_ok()):
+                print(f"[ELECTION] Lost leader quorum, stepping down")
+                self.state = RobotState.FOLLOWER
+                self.current_leader = None
+                self.my_vote = None
+                self._leader_claim_mono = 0.0
+                self._leader_quorum_mono = 0.0
+                self._leader_ack_sets.clear()
+                self._leader_last_digest = None
+                self._leader_broadcast_seq = 0
+                self.leader_assigned_target = None
+                self.leader_assignment_rx_mono = 0.0
 
             # Elections run even before trial starts so the leader is
             # already elected by the time motors engage.
@@ -2487,7 +3036,7 @@ class REIPNode:
             # Motors only engage when: trial started + fresh position data.
             left, right = 0.0, 0.0
             pos_age = time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else float('inf')
-            if self.trial_started and self.position_rx_mono > 0 and pos_age < 2.0:
+            if self.trial_started and self.position_rx_mono > 0 and pos_age < POSITION_STOP_TIMEOUT_S:
                 left, right = self.compute_motor_command()
                 self.hw.set_motors(left, right)
             else:
@@ -2499,6 +3048,7 @@ class REIPNode:
                     self._last_stop_reason = "stale_position"
                 self._last_motor_cmd = (0.0, 0.0)
                 self.hw.stop()
+            self._publish_motor_intent(left, right)
             
             # Logging (for visualization)
             if time.time() - last_log > 0.2:  # 5 Hz logging
@@ -2572,6 +3122,9 @@ if __name__ == "__main__":
         UDP_POSITION_PORT += port_offset
         UDP_PEER_PORT += port_offset
         UDP_FAULT_PORT += port_offset
+        UDP_SIM_MOTOR_PORT += port_offset
+        UDP_SIM_PEER_RELAY_PORT += port_offset
+        UDP_SIM_SENSOR_PORT += port_offset
     
     # Parse --ablation for ablation study
     ablation_mode = None

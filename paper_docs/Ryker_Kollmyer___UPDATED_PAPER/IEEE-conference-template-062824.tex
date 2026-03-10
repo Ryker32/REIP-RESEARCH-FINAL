@@ -48,32 +48,11 @@ rykerkollmyer@gmail.com}}
 %=========================================================================
 \begin{abstract}
 %=========================================================================
-This paper introduces the Resilient Election and Impeachment Policy
-(REIP), a distributed governance framework that enables multi-robot
-teams to detect, impeach, and replace compromised leaders without
-centralized oversight.  Unlike reactive trust models that measure
-performance after commands are executed, REIP verifies each leader
-assignment \emph{before execution} using local knowledge ranked by
-source reliability: personal visit history (ground truth), sensor
-readings (physically verifiable), and peer-reported coverage (lower
-confidence).  This proactive command verification yields a closed-form
-detection bound of two commands under ground-truth evidence and eight
-under peer reports, enabling sub-second fault detection without
-wasting physical movement on bad commands.  In multiroom simulation with dual sequential Byzantine fault
-injection (100 trials per condition), REIP achieves 100\% median
+This paper introduces the Resilient Election and Impeachment Policy (REIP), a distributed governance framework that enables multi-robot teams to detect, impeach, and replace compromised leaders without centralized oversight.  Each robot maintains a trust ledger and verifies leader commands before execution using a three-tier confidence-weighted model: personal visit history (ground truth), sensor readings (physically verifiable), and peer-reported coverage (lower confidence). This proactive approach yields a closed-form detection bound of two commands under ground-truth evidence and eight under peer reports. In a multi-room simulation with dual sequential Byzantine fault injection (100 trials per condition), REIP achieves 100\% median
 coverage under both clean and adversarial conditions, with median
-first suspicion in 0.20--0.21 seconds and impeachment in
-1.21--1.67 seconds across fault types---a 24.5 percentage point mean
-coverage advantage over the state-of-the-art Raft consensus protocol
-under Byzantine Assignment and 32.2 percentage points under Freeze
-Leader.  Raft, which governs production systems such as etcd and
-Kubernetes, cannot detect a leader that misbehaves while maintaining
-heartbeats.  An ablation study
-confirms that removing the trust model collapses coverage to 39.7\%,
-demonstrating that trust is the core mechanism.  Simulation validates
-sub-second fault detection; a five-robot embedded hardware platform
-(\$15 Raspberry Pi Zero~2W per robot, 512\,MB RAM) demonstrates that
-Byzantine-resilient governance requires no specialized compute.
+first suspicion in 0.20--0.21 seconds and impeachment in 1.21--1.67 seconds across fault types---a 24.5 percentage point mean
+coverage advantage over the state-of-the-art Raft consensus protocol under Byzantine Assignment and 32.2 percentage points under Freeze Leader. Raft, which governs production systems such as etcd and Kubernetes, cannot detect a leader that misbehaves while maintaining heartbeats.  An ablation study
+confirms that removing the trust model collapses coverage to 39.7\%, demonstrating that trust is the core mechanism.  Simulation validates sub-second fault detection; a five-robot embedded hardware platform(\$15 Raspberry Pi Zero~2W per robot, 512\,MB RAM) demonstrates that Byzantine-resilient governance requires no specialized compute.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -87,142 +66,124 @@ robotics, autonomous swarms, distributed fault detection
 
 \subsection{Motivation and Context}
 
+Avalanche and wilderness search-and-rescue missions are strongly
+time-critical: survival can decrease sharply as rescue is delayed, making fast and reliable area coverage essential \cite{rauch2024avalanche}. Robot search teams could help survey hazardous terrain, avalanche debris, or unstable environments more quickly than human responders alone while reducing rescuer exposure to danger. More broadly, multi-robot systems are relevant to disaster response, underground mapping, inspection, and other hazardous missions because they can aid in mapping, situational assessment, communication support, and victim search \cite{queralta2020sar, murphy2004rescue}.
 
-Approximately 45,000 people die annually in earthquake-related structural collapses alone, with survival probability dropping below 50\% after 24~hours~\cite{undrr2020}. Robot search teams could cover rubble fields and explore destroyed buildings using specialized instruments without risking the lives of heroic first responders~\cite{murphy2004rescue}. Furthermore, in space exploration, teams of robots could help keep humans from developing deadly levels of radiation exposure by conducting research on the soil of Mars or other solar bodies. Self-sustaining, resilient robot teams remain a critical topic in today's world. Furthermore, for  Mars, one-way communication delays of 4--24~minutes eliminate the efficiency of human-in-the-loop oversight. \cite{mcbrayer2022comm}
+For exploration and search tasks, hierarchical leader-follower coordination offers important advantages over purely decentralized behavior. A designated leader coordinates these teams by allocating search zones, preventing redundant sweeps, and maintaining a global picture of coverage progress \cite{yamauchi1997frontier, burgard2000collaborative, simmons2000coordination}. However, this leads to a major vulnerability: if a leader becomes compromised or experiences a fault, the rest of the team will continue to follow poor commands, wasting time, energy, and coverage speed \cite{chandola2009anomaly}. In time-critical missions such as search-and-rescue for avalanche victims, even extra minutes of slowdown defines life or death \cite{rauch2024avalanche}.
 
-Multi robot exploration teams enable surface mapping, disaster-response surveys, and autonomous inspection missions faster than single robots can cover in any given time \cite{yamauchi1997frontier, burgard2000collaborative}. Hierarchical leader-follower coordination remains relevant because a designated leader allocates frontiers, manages conflicts, and provides a global context that improves task efficiency over purely decentralized swarms \cite{burgard2000collaborative}.
-
-
-
-
-Autonomous mining fleets already require resilient coordination when individual vehicles degrade~\cite{marshall2016robotics}, but these deployments are only viable if the system can survive equipment failures
-autonomously.  The DARPA Subterranean Challenge confirmed that
-coordinated multi-robot teams consistently outperform single platforms
-in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission will deploy cooperative autonomous rovers on the lunar surface where communication blackouts make centralized human control infeasible~\cite{cadre2024, whittaker2012lunar}.  On Mars, one-way communication delays of 4--24~minutes eliminate human-in-the-loop
-oversight entirely---robot teams must self-govern.
-
-Leader--follower architectures are widely adopted for these
-missions~\cite{simmons2000coordination}: a designated leader allocates
-frontier targets, prevents duplication, and exploits a global view of
-coverage state.  The leader also absorbs the cost of global map fusion
-and frontier scoring, keeping per-agent compute lightweight on
-resource-constrained platforms such as the Raspberry Pi Zero~2W used in
-this work.  However, this architecture introduces a critical
-vulnerability: a \emph{subtly compromised} leader can remain alive,
-maintain heartbeats, and continue issuing degraded or adversarial
-commands while appearing healthy to liveness
-checks~\cite{douceur2002sybil, ji2023hallucination}.  Sensor faults,
-dust occlusion, and AI hallucinations can all produce this failure mode.
-Multi-robot teams cannot be trusted in life-critical missions if a
-single compromised leader can silently waste the entire team's effort.
+Beyond search-and-rescue, the same vulnerability appears wherever autonomous teams operate without human oversight. Autonomous mining fleets already require resilient coordination when individual vehicles degrade~\cite{marshall2016robotics}, but these deployments are only viable if the system can survive equipment failures autonomously. The DARPA Subterranean Challenge confirmed that coordinated multi-robot teams consistently outperform single platforms in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission will deploy cooperative autonomous rovers on the lunar surface where communication blackouts make centralized human control infeasible~\cite{delacroix2024cadre, whittaker2012lunar}.  On Mars, one-way communication delays of 4--24~minutes eliminate human-in-the-loop oversight entirely---robot teams must self-govern \cite{mcbrayer2022comm}.
 
 \subsection{Problem Statement}
-However, when leader-follower systems are used within adversarial or limited-communication contexts, sensor faults, adversarial interference, and Large Language Model (LLM) hallucinations within AI-based leaders can cause system-wide interference from the single point of failure at the leader \cite{douceur2002sybil}, \cite{ji2023hallucination}.
 
+Leader--follower coordination improves efficiency in many multi-robot
+systems, but it also creates a critical single point of failure: if the
+leader becomes faulty or compromised, the rest of the team may continue
+executing harmful commands. In adversarial or communication-limited
+environments, this failure can arise from sensor degradation,
+adversarial interference, software faults, or erroneous outputs from
+AI-based decision systems \cite{douceur2002sybil, ji2023hallucination}.
+A compromised leader does not need to crash to cause mission failure; it
+only needs to remain active while issuing low-quality or misleading
+assignments.
 
-Classical Byzantine Fault-Tolerant (BFT) protocols assume reliable
-all-to-all communication and honest supermajorities rarely achievable
-in range-limited robotic teams~\cite{lamport1982byzantine,
-castro1999practical}.  The state-of-the-art Raft consensus
-protocol---which governs leader election in production systems such as
-etcd, Kubernetes, and CockroachDB---detects leader failure only via
-heartbeat timeout~\cite{ongaro2014raft}; a leader that misbehaves while
-maintaining heartbeats is invisible to Raft.
-Frontier-based exploration strategies assume agents act in good
-faith~\cite{yamauchi1997frontier, burgard2000collaborative}, and
-existing trust frameworks~\cite{marsh1994formalising} are seldom
-coupled with concrete impeachment-and-replacement policies for robotic
-teams.  Reactive trust models that measure performance \emph{after}
-commands are followed introduce detection latency that wastes physical
-time and energy~\cite{chandola2009anomaly}---a cost unacceptable in
-disaster response or planetary exploration where every movement
-consumes limited battery and mission time.
+Classical Byzantine fault-tolerant (BFT) protocols assume reliable
+all-to-all communication and honest supermajorities, assumptions that
+are often unrealistic in range-limited robotic teams
+\cite{lamport1982byzantine, castro1999practical}. Raft, a widely used
+consensus protocol for crash-tolerant distributed systems, detects
+leader failure through heartbeat timeout \cite{ongaro2014raft}. However,
+a leader that continues transmitting heartbeats while issuing degraded
+commands remains invisible to Raft. In parallel, frontier-based
+exploration methods typically assume that agents act in good faith
+\cite{yamauchi1997frontier, burgard2000collaborative}, and existing
+computational trust frameworks are rarely coupled with explicit
+impeachment-and-replacement mechanisms for robotic teams
+\cite{marsh1994formalising}.
+
+Reactive trust models provide only a partial solution because they infer
+faults \emph{after} followers execute commands and observe poor
+outcomes. This introduces detection latency that wastes physical time,
+battery, and coverage \cite{chandola2009anomaly}. In time-critical
+missions such as search-and-rescue, that delay is unacceptable. The core
+problem, therefore, is how a robot team can detect and remove a leader
+that is still alive and communicating, but no longer making trustworthy
+decisions.
 
 \subsection{Proposed Solution}
 This paper proposes the \textbf{Resilient Election and Impeachment
-Policy (REIP)}, a trust-based governance framework for distributed
-multi-agent systems.  REIP combines per-agent fault detection,
-democratic leader impeachment, and merit-based leader election without
-centralized oversight or ground-truth oracle access.
+Policy (REIP)}, a trust-based governance framework for multi-robot
+teams. REIP enables followers to detect compromised leaders, impeach
+them through distributed voting, and elect replacements without
+centralized oversight or access to a ground-truth oracle.
 
-The core mechanism is \emph{proactive command verification}: each
-robot verifies leader assignments against local knowledge \emph{before
-execution} using three-tier confidence-weighted suspicion accumulation.
-This differs fundamentally from reactive trust models (which measure
-performance after execution) and from leader liveness checks (which
-only detect heartbeat failures).  REIP verifies \emph{assignment
-quality}---whether a leader's command conflicts with the robot's local
-knowledge---enabling detection of compromised leaders that remain alive
-and maintain heartbeats.  Evidence is ranked by source reliability
-(personal experience $>$ sensor readings $>$ peer reports), enabling
-fast detection from strong evidence while preventing false positives
-from stale data.  An earlier reactive model using CUSUM--Bayesian fault
-detection~\cite{page1954cusum, gelman2013bayesian} was validated across
-2\,000 GridWorld trials (76~pp resilience advantage), but reactive
-detection requires following bad commands before measuring their
-damage.  The proactive model described here runs identical code in
-simulation (Section~\ref{sec:hw_sim}) and on embedded hardware
-(Raspberry Pi Zero~2W), achieving sub-second fault detection without
-executing bad commands.
+The core mechanism is a \emph{proactive} trust model in which each
+robot verifies leader commands \emph{before execution} against its own
+local knowledge. REIP uses three-tier confidence-weighted suspicion
+accumulation, ranking evidence by source reliability: personal
+experience outweighs sensor readings, which outweigh peer reports.
+This allows the system to respond quickly to high-confidence faults
+while reducing false positives caused by stale or indirect
+information.
+
+An earlier reactive formulation of REIP used CUSUM--Bayesian fault
+detection~\cite{page1954cusum, gelman2013bayesian}. This proposed solution required followers to execute bad commands before their effects could be measured. REIP addresses that limitation by shifting fault detection to the command-verification stage itself. The proactive model described here runs unchanged in both simulation (Section~\ref{sec:hw_sim}) and on embedded Raspberry Pi Zero~2W hardware, achieving sub-second fault detection without wasting physical movement on harmful commands.
 
 \subsection{Contributions}
 \begin{enumerate}[leftmargin=*]
-    \item \textbf{Proactive command verification before execution}: Unlike
-    reactive trust models that measure performance after commands are
-    executed, REIP verifies each leader assignment \emph{before} physical
-    movement using local knowledge (visited cells, sensor readings, peer
-    reports). This eliminates the cost of executing bad commands while
-    maintaining sub-second detection latency.
-    \item \textbf{Command-level Byzantine detection with closed-form bounds}:
-    REIP detects compromised leaders by verifying \emph{assignment quality}
-    (not just leader liveness), yielding a worst-case detection bound of
-    $\lceil \sigma / (w_{\text{tier}} - r) \rceil$ commands---2~under
-    ground-truth evidence, 8~under peer reports. This contrasts with
-    Raft, which cannot detect a leader that misbehaves while maintaining
-    heartbeats.
-    \item \textbf{Three-tier confidence-weighted evidence ranking}: Evidence
-    sources are ranked by reliability (personal experience $>$ sensor
-    readings $>$ peer reports), enabling fast detection from strong
-    evidence while preventing false positives from stale peer data. A
-    causality-aware timestamping mechanism prevents false positives from
-    concurrent exploration.
-    \item \textbf{Rigorous validation}: $N{=}100$ trials per condition
-    comparing REIP against Raft consensus and decentralized baselines
-    under dual sequential Byzantine fault injection, plus a component
-    ablation study confirming that removing the trust model collapses
-    coverage to 39.7\%.
-    \item \textbf{Hardware validation}: Five-robot embedded platform
-    (\$15 Raspberry Pi Zero~2W, 512\,MB RAM per robot) demonstrating
-    that Byzantine-resilient governance requires no specialized compute.
+    \item A trust-based governance framework for multi-robot teams that
+    enables distributed leader fault detection, democratic impeachment,
+    and merit-based leader replacement without centralized oversight or
+    ground-truth oracle access.
+    
+    \item A proactive three-tier confidence-weighted trust model that
+    verifies leader commands \emph{before execution} using local
+    knowledge ranked by source reliability, together with a closed-form
+    worst-case detection bound.
+    
+    \item A causality-aware verification mechanism that suppresses false
+    positives from concurrent exploration by comparing visited-cell
+    timestamps against leader assignment times.
+    
+    \item A rigorous empirical evaluation with $N{=}100$ trials per
+    condition, comparing REIP against Raft and decentralized baselines
+    under dual sequential Byzantine fault injection, plus an ablation
+    study quantifying the role of each major component.
+    
+    \item Hardware validation on a five-robot embedded platform
+    (\$15 Raspberry Pi Zero~2W, 512\,MB RAM per robot; \$514 total system
+    cost) with overhead ArUco-based localization~\cite{garrido2014aruco},
+    demonstrating that Byzantine-resilient governance is achievable on
+    ultra-low-cost hardware.
 \end{enumerate}
 
 \subsection{Paper Organization}
-Section~II reviews related work.  Section~III presents the system
-architecture.  Section~IV describes the REIP methodology.  Section~V
-presents hardware-equivalent multiroom experiments with $N{=}100$
-trials and a component ablation study.  Section~VI describes hardware
-validation.  Section~VII discusses implications, and Section~VIII
-concludes.
+Section~II reviews related work. Section~III presents the system
+architecture. Section~IV describes the REIP methodology. Section~V
+reports multiroom simulation experiments and ablation results.
+Section~VI presents hardware validation. Section~VII discusses
+limitations, implications, and future work. Section~VIII concludes.
 
 %=========================================================================
 \section{Background and Related Work}
 %=========================================================================
 
-REIP lies at the intersection of Byzantine fault tolerance, frontier-based
-exploration, and computational trust.  We review each area and highlight
-the gap that motivates our approach.
+REIP lies at the intersection of Byzantine fault tolerance,
+multi-robot frontier exploration, and trust-based coordination
+in multi-agent systems. We briefly review each area and
+highlight the gap that motivates our approach
+
+
 
 \subsection{Byzantine Fault Tolerance and Distributed Governance}
-Classical BFT protocols provide strong guarantees against arbitrary faults
-under assumptions of reliable communication and honest
-supermajorities~\cite{lamport1982byzantine}.  Practical protocols such as
+Classical BFT protocols provide strong guarantees against arbitrary
+faults under assumptions of reliable communication and honest
+supermajorities~\cite{lamport1982byzantine}. Practical protocols such as
 PBFT relax some synchrony assumptions~\cite{castro1999practical}, and
-the state-of-the-art Raft protocol provides leader election and log
-replication for crash-tolerant distributed
-systems~\cite{ongaro2014raft}, powering production infrastructure from
-Kubernetes to CockroachDB.  However, these approaches typically assume
-dense communication graphs or reliable message delivery that are
-difficult to realize in range-limited robot teams.
+the widely used Raft protocol provides leader election and log
+replication for crash-tolerant distributed systems~\cite{ongaro2014raft}.
+Raft also underlies etcd, which serves as Kubernetes' backing store for
+cluster state \cite{ongaro2014raft}. However, these assumptions are
+often difficult to satisfy in range-limited robot teams.
 
 REIP adopts the spirit of BFT---explicitly modeling faulty leaders and
 governing their authority---but operates under partial observability and
@@ -237,11 +198,8 @@ detection, leaving the team under indefinite faulty leadership.
 \subsection{Multi-Robot Frontier Exploration}
 Frontier-based exploration assigns robots to boundaries between known and
 unknown space~\cite{yamauchi1997frontier}, with multi-robot extensions
-coordinating assignments to maximize coverage
-rate~\cite{burgard2000collaborative}.  Leader--follower architectures
-exploit a global view for coordinated
-assignment~\cite{simmons2000coordination}, but treat the leader as
-implicitly trustworthy.  There is no mechanism for detecting
+coordinating assignments to maximize coverage rate~\cite{burgard2000collaborative}.  Leader--follower architectures
+exploit a global view for coordinated assignment~\cite{simmons2000coordination}, but treat the leader as implicitly trustworthy.  There is no mechanism for detecting
 when the leader's directions become counterproductive, nor for replacing
 the leader without external supervision.  REIP augments a standard
 frontier-based leader--follower stack with a governance layer that
@@ -256,8 +214,7 @@ peer-to-peer networks, e-commerce, and multi-agent
 simulations~\cite{ramchurn2004trust}.  However, most trust models assume
 access to ground-truth outcomes: a buyer can verify whether the product
 was delivered correctly.  In multi-robot exploration under partial
-observability, ground truth is not directly available; agents observe only
-local coverage changes and peer broadcasts.
+observability, ground truth is not directly available; agents observe only local coverage changes and peer broadcasts.
 
 REIP implements a belief-only trust ledger that operates without an
 oracle map or centralized evaluator.  Rather than measuring trust from
@@ -311,9 +268,6 @@ segments (Section~\ref{sec:hw_sim}).  Robot processes run the full
 REIP/Raft/Decentralized node software and communicate via UDP---identical
 to hardware deployment.  Time-based physics ensure consistent movement
 regardless of CPU load, with sub-step collision detection against walls.
-An earlier GridWorld simulation ($60 \times 60$ cells, 2\,000 seeds)
-validated the reactive trust model; those results are summarized in
-Section~\ref{sec:sim_trust} and detailed in the supplemental repository.
 
 \subsection{Hardware Platform}
 \label{sec:hw_arch}
@@ -423,25 +377,13 @@ $\clip{\cdot}$           & Positive-part operator $\max(0,\cdot)$ \\
 \end{tabular}
 \end{table}
 
-\subsection{From Reactive to Proactive Detection}
-\label{sec:sim_trust}
 
-Reactive trust models require followers to \emph{execute} a command
-before measuring its damage---an unacceptable cost when battery and
-mission time are finite.  An earlier REIP prototype using
-CUSUM~\cite{page1954cusum} and Bayesian change-point
-analysis~\cite{gelman2013bayesian} confirmed this limitation across
-2\,000 GridWorld trials.  The proactive model below eliminates this
-cost entirely: commands are verified \emph{before execution} against
-locally held evidence ranked by source reliability.
 
 %---------------------------------------------------
-\subsection{Proactive Trust Model: Three-Tier Verification}
-\label{sec:hw_trust}
+\subsection{A Proactive Detection Model}
+\label{sec:sim_trust}
 
-This section details the proactive trust model used in all multiroom
-and hardware experiments; identical code runs on simulation processes
-and Raspberry Pi Zero~2W nodes.
+Reactive trust models monitor discrepancies in outcomes; e.g., comparing leader-commanded coverage gain against observed gain. The initial REIP system used CUSUM~\cite{page1954cusum} and Bayesian change-point analysis~\cite{gelman2013bayesian}. Across 2\,000 trials in a simulation, a core fundamental limitation was understood: followers must \emph{execute} potentially bad commands before measuring their damage. When tasks are time crucial and leave little room for error, making sure that followers eliminate faults before they can cause damage is critical. The proactive model described below eliminates this cost by verifying commands \emph{before execution} against locally held evidence ranked by source reliability.
 
 \subsubsection{Information Zones and Verification}
 Each robot maintains two overlapping information zones that determine
@@ -493,6 +435,30 @@ Let $w_t \defeq w(c_t) + w_d(\alpha_t,\, w(c_t))$ denote the total
 evidence weight at cycle~$t$, including the direction-consistency bonus
 (Section~\ref{sec:direction_consistency}).
 
+\begin{algorithm}[b]
+\caption{Three-Tier Evidence Weighting}
+\label{alg:evidence}
+\begin{algorithmic}[1]
+\REQUIRE Target cell $c$, assignment time $t_a$
+\ENSURE Evidence weight $w$
+\STATE $w \leftarrow 0$
+\IF{$c \in \texttt{my\_visited}$ \AND $t_{\text{visit}}(c) < t_a - \delta_b$}
+    \STATE $w \leftarrow 1.0$
+    \COMMENT{Tier~1: personal ground truth}
+\ELSIF{$c$ within ToF range \AND obstacle at $c$}
+    \STATE $w \leftarrow 1.0$
+    \COMMENT{Tier~2: sensor verification}
+\ELSIF{$c \in \texttt{known\_visited} \setminus \texttt{my\_visited}$
+       \AND $t_{\text{known}}(c) < t_a - \delta_b$}
+    \STATE $w \leftarrow 0.3$
+    \COMMENT{Tier~3: peer-reported}
+\ENDIF
+\RETURN $w$
+\end{algorithmic}
+\end{algorithm}
+%foid boy and chud chud
+
+
 \begin{definition}[Trust State Machine]
 \label{def:trust_sm}
 The per-follower trust state
@@ -522,39 +488,15 @@ the model runs on a Raspberry Pi Zero~2W without significant overhead,
 and a single explainable mechanism is easier to validate than a layered
 multi-threshold system.
 
-\begin{algorithm}[t]
-\caption{Three-Tier Evidence Weighting}
-\label{alg:evidence}
-\begin{algorithmic}[1]
-\REQUIRE Target cell $c$, assignment time $t_a$
-\ENSURE Evidence weight $w$
-\STATE $w \leftarrow 0$
-\IF{$c \in \texttt{my\_visited}$ \AND $t_{\text{visit}}(c) < t_a - \delta_b$}
-    \STATE $w \leftarrow 1.0$
-    \COMMENT{Tier~1: personal ground truth}
-\ELSIF{$c$ within ToF range \AND obstacle at $c$}
-    \STATE $w \leftarrow 1.0$
-    \COMMENT{Tier~2: sensor verification}
-\ELSIF{$c \in \texttt{known\_visited} \setminus \texttt{my\_visited}$
-       \AND $t_{\text{known}}(c) < t_a - \delta_b$}
-    \STATE $w \leftarrow 0.3$
-    \COMMENT{Tier~3: peer-reported}
-\ENDIF
-\RETURN $w$
-\end{algorithmic}
-\end{algorithm}
+
+
 
 \subsubsection{Worst-Case Detection Bound}
 \label{sec:detection_bound}
-
-The deterministic structure of Definition~\ref{def:trust_sm} yields a
-closed-form bound on how quickly a Byzantine leader is detected and
-removed.
+The deterministic structure of Definition~\ref{def:trust_sm} yields a closed-form bound on how quickly a Byzantine leader is detected and removed.
 
 \begin{theorem}[Worst-Case Detection Bound]
-\label{thm:detection}
-Under persistent adversarial commands verified with tier-$k$ evidence
-weight~$w_k > r$, the first trust decay occurs within
+\label{thm:detection} Under persistent adversarial commands verified with tier-$k$ evidence weight~$w_k > r$, the first trust decay occurs within
 \begin{equation}
     n_{\text{detect}} = \left\lceil \frac{\sigma}{w_k - r}
     \right\rceil
@@ -741,24 +683,7 @@ first three elections occur at 0.5\,s intervals before switching to the
 normal 2.0\,s election interval.  This eliminates the startup latency
 where robots sit idle waiting for the first election to converge.
 
-\begin{algorithm}[b]
-\caption{Democratic Leader Election}
-\label{alg:election}
-\begin{algorithmic}[1]
-\STATE $\mathcal{E} \leftarrow \{i : T_{\cdot,i} > T_{\text{thresh}}\}$
-    \COMMENT{Eligible candidates}
-\FOR{each robot $j$}
-    \STATE $v_j \leftarrow \arg\max_{i \in \mathcal{E}}\; T_{j,i}$
-    \COMMENT{Vote for highest-trust}
-\ENDFOR
-\STATE $\ell^{*} \leftarrow \arg\max_{i \in \mathcal{E}}\;
-       |\{j : v_j = i\}|$
-\STATE Ties: fewest $\texttt{failures}(i)$, then lowest ID
-\STATE $T_{\cdot,\ell^{*}} \leftarrow 1.0$;\;
-       $S \leftarrow 0$
-    \COMMENT{Clean evaluation window}
-\end{algorithmic}
-\end{algorithm}
+
 
 \subsection{Peer Anomaly Detection}
 Non-leader peers are monitored for behavioral anomalies to prevent
@@ -907,8 +832,7 @@ to isolate leadership-fault resilience.
 \subsection{Fault Conditions}
 \begin{itemize}
     \item \textbf{Clean (NoFault)}: No faults injected.  Establishes
-    baseline performance and confirms that the trust model does not
-    degrade efficiency when the leader is reliable.
+    baseline performance and confirms that the trust model does not degrade efficiency when the leader is reliable.
     \item \textbf{Bad Leader (Byzantine Assignment)}: At $t{=}10\,$s,
     Robot~1 is compromised to persistently assign already-explored cells
     as targets.  Followers are directed toward cells that provide zero
@@ -1708,6 +1632,21 @@ the hardware platform.
 % References ordered by first citation in the paper.
 \begin{thebibliography}{00}
 %=========================================================================
+\bibitem{rauch2024avalanche}
+S.~Rauch, H.~Brugger, M.~Falk, B.~Zweifel, G.~Strapazzon,
+R.~Albrecht, and U.~Pietsch,
+``Avalanche survival rates in Switzerland, 1981--2020,''
+\emph{JAMA Netw.\ Open}, vol.~7, no.~9, Art.~e2435253, 2024,
+doi: 10.1001/jamanetworkopen.2024.35253.
+
+\bibitem{queralta2020sar}
+J.~Pe\~na Queralta, J.~Taipalmaa, B.~Can Pullinen, V.~K. Sarker,
+T.~Nguyen Gia, H.~Tenhunen, M.~Gabbouj, J.~Raitoharju, and
+T.~Westerlund,
+``Collaborative multi-robot search and rescue: Planning, coordination,
+perception, and active vision,''
+\emph{IEEE Access}, vol.~8, pp.~191617--191643, 2020,
+doi: 10.1109/ACCESS.2020.3030190.
 
 % [1] — Intro, first sentence
 \bibitem{yamauchi1997frontier}
@@ -1719,7 +1658,7 @@ in \emph{Proc.\ IEEE Int.\ Symp.\ Comput.\ Intell.\ Robot.\ Autom.\
 \bibitem{burgard2000collaborative}
 W.~Burgard, M.~Moors, D.~Fox, R.~Simmons, and S.~Thrun,
 ``Collaborative multi-robot exploration,''
-in \emph{Proc.\ IEEE Int.\ Conf.\ Robot.\ Autom.\ (ICRA)}, 2000,
+in \emph{Proc.\ IEEE Int.\ Conf.\ Robot.\ Autom.\ (ICRA)}, vol.~1, 2000,
 pp.~476--481.
 
 % [3] — Intro, disaster statistics
@@ -1729,19 +1668,20 @@ Centre for Research on the Epidemiology of Disasters (CRED),
 ``Human cost of disasters: An overview of the last 20 years
 (2000--2019),'' Geneva, Switzerland, 2020.
 
-
-
 % [4] — Intro, rescue robotics
 \bibitem{murphy2004rescue}
 R.~R. Murphy,
 ``Human--robot interaction in rescue robotics,''
-\emph{IEEE Trans.\ Syst., Man, Cybern.\ C}, vol.~34, no.~2,
-pp.~138--153, 2004.
+\emph{IEEE Trans.\ Syst., Man, Cybern., Part C (Appl.\ Rev.)},
+vol.~34, no.~2, pp.~138--153, 2004.
 
+% [5] — Intro, Mars communication delays
 \bibitem{mcbrayer2022comm}
-K.~McBrayer, P.~Chai, and E.~Judd, ``Communication delays, disruptions, and blackouts for crewed Mars missions,'' in \textit{Proc. AIAA ASCEND}, 2022, doi: 10.2514/6.2022-4384.
+K.~T. McBrayer, P.~Chai, and E.~L. Judd,
+``Communication delays, disruptions, and blackouts for crewed Mars missions,''
+in \emph{Proc.\ AIAA ASCEND}, 2022, doi: 10.2514/6.2022-4239.
 
-% [5] — Intro, DARPA SubT
+% [6] — Intro, DARPA SubT
 \bibitem{chung2023darpa}
 T.~H. Chung, V.~Orekhov, and A.~Maio,
 ``Into the robotic depths: Analysis and insights from the DARPA
@@ -1749,19 +1689,25 @@ Subterranean Challenge,''
 \emph{Annu.\ Rev.\ Control Robot.\ Auton.\ Syst.}, vol.~6,
 pp.~477--501, 2023.
 
-% [6] — Intro, NASA CADRE
-\bibitem{cadre2024}
-A.~Agha-mohammadi \emph{et al.},
-``CADRE: Cooperative Autonomous Distributed Robotic Exploration,''
-NASA Jet Propulsion Laboratory, Tech.\ Rep., 2024.
+% [7] — Intro, NASA CADRE
+\bibitem{delacroix2024cadre}
+J.-P. de la Croix, F.~Rossi, R.~Brockers, D.~Aguilar, K.~Albee,
+E.~Boroson, A.~Cauligi, J.~Delaune, R.~Hewitt, D.~Kogan, G.~Lim,
+B.~Morrell, Y.~Nakka, V.~Nguyen, P.~Proen\c{c}a, G.~Rabideau,
+J.~Russino, M.~S. da Silva, G.~Zohar, and S.~Comandur,
+``Multi-Agent Autonomy for Space Exploration on the CADRE Lunar
+Technology Demonstration,''
+in \emph{IEEE Aerospace Conference}, 2024, pp.~1--14,
+doi: 10.1109/AERO58975.2024.10521425.
 
-% [7] — Intro, lunar lava tubes
+% [8] — Intro, lunar lava tubes
 \bibitem{whittaker2012lunar}
 W.~Whittaker, ``Technologies enabling exploration of skylights, lava
-tubes, and caves,'' NASA Innovative Advanced Concepts (NIAC),
-Tech.\ Rep., Carnegie Mellon Univ., 2012.
+tubes, and caves,''
+NASA Innovative Advanced Concepts (NIAC), Tech.\ Rep.,
+Carnegie Mellon Univ., 2012.
 
-% [8] — Intro, leader--follower coordination
+% [9] — Intro, leader--follower coordination
 \bibitem{simmons2000coordination}
 R.~Simmons, D.~Apfelbaum, W.~Burgard, D.~Fox, M.~Moors, S.~Thrun,
 and H.~Younes,
@@ -1769,62 +1715,62 @@ and H.~Younes,
 in \emph{Proc.\ Natl.\ Conf.\ Artif.\ Intell.\ (AAAI)}, 2000,
 pp.~852--858.
 
-% [9] — Intro, Sybil attack
+% [10] — Intro, Sybil attack
 \bibitem{douceur2002sybil}
 J.~R. Douceur, ``The Sybil attack,''
 in \emph{Proc.\ 1st Int.\ Workshop Peer-to-Peer Syst.\ (IPTPS)}, 2002,
 pp.~251--260.
 
-% [10] — Intro, hallucinations
+% [11] — Intro, hallucinations
 \bibitem{ji2023hallucination}
 Z.~Ji, N.~Lee, V.~Prabhakaran, \emph{et al.},
 ``Survey of hallucination in natural language generation,''
-\emph{ACM Comput.\ Surv.}, vol.~55, no.~12, art.~248, 2023.
+\emph{ACM Comput.\ Surv.}, vol.~55, no.~12, Art.~248, 2023.
 
-% [11] — Problem Statement, BFT
+% [12] — Problem Statement, BFT
 \bibitem{lamport1982byzantine}
 L.~Lamport, R.~Shostak, and M.~Pease,
 ``The Byzantine generals problem,''
 \emph{ACM Trans.\ Program.\ Lang.\ Syst.}, vol.~4, no.~3,
 pp.~382--401, 1982.
 
-% [12] — Problem Statement, PBFT
+% [13] — Problem Statement, PBFT
 \bibitem{castro1999practical}
 M.~Castro and B.~Liskov,
 ``Practical Byzantine fault tolerance,''
 in \emph{Proc.\ 3rd Symp.\ Oper.\ Syst.\ Des.\ Implement.\ (OSDI)},
 1999, pp.~173--186.
 
-% [13] — Problem Statement, Raft
+% [14] — Problem Statement, Raft
 \bibitem{ongaro2014raft}
 D.~Ongaro and J.~Ousterhout,
 ``In search of an understandable consensus algorithm,''
 in \emph{Proc.\ USENIX Annu.\ Tech.\ Conf.\ (ATC)}, 2014,
 pp.~305--319.
 
-% [14] — Problem Statement, trust
+% [15] — Problem Statement, trust
 \bibitem{marsh1994formalising}
 S.~Marsh, ``Formalising trust as a computational concept,''
-Ph.D. dissertation, Univ.\ of Stirling, UK, 1994.
+Ph.D. dissertation, Univ.\ of Stirling, Stirling, U.K., 1994.
 
-% [15] — Problem Statement, anomaly detection
+% [16] — Problem Statement, anomaly detection
 \bibitem{chandola2009anomaly}
 V.~Chandola, A.~Banerjee, and V.~Kumar,
 ``Anomaly detection: A survey,''
-\emph{ACM Comput.\ Surv.}, vol.~41, no.~3, art.~15, 2009.
+\emph{ACM Comput.\ Surv.}, vol.~41, no.~3, Art.~15, 2009.
 
-% [16] — Proposed Solution, CUSUM
+% [17] — Proposed Solution, CUSUM
 \bibitem{page1954cusum}
 E.~S. Page, ``Continuous inspection schemes,''
 \emph{Biometrika}, vol.~41, no.~1/2, pp.~100--115, 1954.
 
-% [17] — Proposed Solution, Bayesian
+% [18] — Proposed Solution, Bayesian
 \bibitem{gelman2013bayesian}
 A.~Gelman, J.~B. Carlin, H.~S. Stern, D.~B. Dunson, A.~Vehtari,
 and D.~B. Rubin, \emph{Bayesian Data Analysis}, 3rd~ed.\
 Boca Raton, FL, USA: Chapman and Hall/CRC, 2013.
 
-% [18] — Contributions, ArUco
+% [19] — Contributions, ArUco
 \bibitem{garrido2014aruco}
 S.~Garrido-Jurado, R.~Mu\~{n}oz-Salinas, F.~J. Madrid-Cuevas, and
 M.~J. Mar\'{i}n-Jim\'{e}nez,
@@ -1832,20 +1778,19 @@ M.~J. Mar\'{i}n-Jim\'{e}nez,
 under occlusion,''
 \emph{Pattern Recognit.}, vol.~47, no.~6, pp.~2280--2292, 2014.
 
-% [19] — Related Work, multi-robot mining
+% [20] — Related Work, multi-robot mining
 \bibitem{marshall2016robotics}
 J.~A. Marshall, A.~Bonchis, E.~Nebot, and S.~Scheding,
 ``Robotics in mining,''
-in \emph{Springer Handbook of Robotics}, 2nd~ed.\
+in \emph{Springer Handbook of Robotics}, 2nd~ed.,
 B.~Siciliano and O.~Khatib, Eds.\
 Berlin, Germany: Springer, 2016, ch.~59, pp.~1549--1576.
 
-% [20] — Related Work, trust survey
+% [21] — Related Work, trust survey
 \bibitem{ramchurn2004trust}
 S.~D. Ramchurn, D.~Huynh, and N.~R. Jennings,
 ``Trust in multi-agent systems,''
 \emph{Knowl.\ Eng.\ Rev.}, vol.~19, no.~1, pp.~1--25, 2004.
-
 \end{thebibliography}
 
 \end{document}

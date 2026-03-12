@@ -568,16 +568,19 @@ def main():
     args = parse_args()
     output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
+    main_dir = os.path.normpath(args.main_dir)
+    freeze_dir = os.path.normpath(args.freeze_dir)
+    ablation_dir = os.path.normpath(args.ablation_dir)
 
     print("Loading data …")
-    print(f"  main:     {args.main_dir}")
-    print(f"  freeze:   {args.freeze_dir}")
-    print(f"  ablation: {args.ablation_dir}")
+    print(f"  main:     {main_dir}")
+    print(f"  freeze:   {freeze_dir}")
+    print(f"  ablation: {ablation_dir}")
     print(f"  output:   {output_dir}")
 
-    wallfixed = load_results(args.main_dir)
-    freeze    = load_results(args.freeze_dir)
-    ablation  = load_results(args.ablation_dir)
+    wallfixed = load_results(main_dir)
+    freeze = [] if freeze_dir == main_dir else load_results(freeze_dir)
+    ablation = load_results(ablation_dir)
 
     combined = [r for r in wallfixed if (r.get('fault_type') or 'none') != 'oscillate_leader']
     combined.extend(freeze)
@@ -587,7 +590,10 @@ def main():
     for k in sorted(groups.keys()):
         print(f"    {k[0]:>15} | {k[1]:<15} : {len(groups[k])}")
 
-    timelines = load_timelines([args.main_dir, args.freeze_dir])
+    timeline_dirs = [main_dir]
+    if freeze_dir != main_dir:
+        timeline_dirs.append(freeze_dir)
+    timelines = load_timelines(timeline_dirs)
     print(f"  {sum(len(v) for v in timelines.values())} timelines")
 
     print("\nGenerating IEEE figures …")

@@ -28,7 +28,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional, Tuple
+from typing import Iterable, List, Dict, Optional, Tuple
 from collections import defaultdict
 import heapq
 
@@ -212,6 +212,35 @@ class SimRobotPlant:
     contact_memory_s: float = 0.0
     turn_metric: float = 0.0
     wall_proximity: float = 0.0
+
+
+PEER_EMERGENCY_REFRACTORY_S = 3.0
+
+
+def _count_peer_emergency_incidents(records: Iterable[dict], refractory_s: float = PEER_EMERGENCY_REFRACTORY_S) -> int:
+    """Count distinct peer-emergency incidents instead of raw mode toggles.
+
+    The controller can briefly alternate between `peer_emergency` and escape /
+    recovery commands while resolving one physical congestion event. Using a
+    short refractory window keeps the sim and hardware metrics aligned to
+    incident-level behavior rather than edge flicker in the low-level loop.
+    """
+    count = 0
+    prev_active = False
+    last_incident_t = None
+    for rec in records:
+        active = (
+            rec.get("command_source") == "peer_emergency" or
+            rec.get("stop_reason") == "peer_emergency"
+        )
+        if active and not prev_active:
+            rec_t = rec.get("t")
+            current_t = float(rec_t) if rec_t is not None else None
+            if current_t is None or last_incident_t is None or (current_t - last_incident_t) > refractory_s:
+                count += 1
+                last_incident_t = current_t
+        prev_active = active
+    return count
 
 
 IMPAIRMENT_PRESETS = {
@@ -411,7 +440,6 @@ class ExperimentRunner:
             if not os.path.exists(stdout_log_path):
                 continue
             jsonl_path = None
-            prev_peer_emergency = False
             try:
                 with open(stdout_log_path, 'r', errors='replace') as f:
                     for line in f:
@@ -424,6 +452,7 @@ class ExperimentRunner:
                         break
                 if not jsonl_path:
                     continue
+                records = []
                 with open(jsonl_path, 'r', errors='replace') as f:
                     for line in f:
                         line = line.strip()
@@ -433,13 +462,8 @@ class ExperimentRunner:
                             rec = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        active = (
-                            rec.get('command_source') == 'peer_emergency' or
-                            rec.get('stop_reason') == 'peer_emergency'
-                        )
-                        if active and not prev_peer_emergency:
-                            peer_emergency_count += 1
-                        prev_peer_emergency = active
+                        records.append(rec)
+                peer_emergency_count += _count_peer_emergency_incidents(records)
             except OSError:
                 continue
         return {
@@ -2339,8 +2363,8 @@ def _parse_robot_log_metrics(log_dir: str, t0: float) -> Dict[str, object]:
         if log_path is None:
             continue
 
-        prev_peer_emergency = False
         try:
+            records = []
             with open(log_path, "r", errors="replace") as f:
                 for line in f:
                     line = line.strip()
@@ -2362,14 +2386,7 @@ def _parse_robot_log_metrics(log_dir: str, t0: float) -> Dict[str, object]:
                         rec = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-
-                    active = (
-                        rec.get("command_source") == "peer_emergency" or
-                        rec.get("stop_reason") == "peer_emergency"
-                    )
-                    if active and not prev_peer_emergency:
-                        peer_emergency_count += 1
-                    prev_peer_emergency = active
+                    records.append(rec)
 
                     rec_t = rec.get("t")
                     if rec_t is None:
@@ -2377,6 +2394,7 @@ def _parse_robot_log_metrics(log_dir: str, t0: float) -> Dict[str, object]:
                     elapsed = max(0.0, float(rec_t) - t0)
                     if mission_complete_time is None and rec.get("command_source") == "leader_complete":
                         mission_complete_time = elapsed
+            peer_emergency_count += _count_peer_emergency_incidents(records)
         except OSError:
             continue
 

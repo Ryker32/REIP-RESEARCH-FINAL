@@ -221,6 +221,8 @@ class PeerInfo:
     coverage_count: int = 0
     visited_cells: Set[tuple] = field(default_factory=set)
     assigned_target: Optional[Tuple[float, float]] = None  # Leader's assignment for them
+    navigation_target: Optional[Tuple[float, float]] = None
+    command_source: str = "startup"
     reported_leader_id: Optional[int] = None
     reported_term: int = 0
     reported_leader_seq: int = 0
@@ -428,7 +430,8 @@ class REIPNode:
         self._leader_ack_sets: Dict[str, Set[int]] = {}
         self._leader_quorum_mono: float = 0.0
         self._leader_claim_mono: float = 0.0
-        self._last_acked_leader_key: Optional[Tuple[int, int, int, str]] = None
+        self._last_acked_leader_key: Optional[Tuple[int, int, str]] = None
+        self._last_acked_leader_mono: float = 0.0
         
         # Detection timing metrics (for convergence bound validation)
         self.bad_commands_received = 0       # Count of bad commands since fault started
@@ -456,6 +459,14 @@ class REIPNode:
         self._last_target_angle = 0.0
         self._last_heading_error = 0.0
         self._last_motor_cmd = (0.0, 0.0)
+        self._last_peer_emergency_debug = {
+            'count': 0,
+            'hard_count': 0,
+            'forward_count': 0,
+            'closest_dist': None,
+            'max_forward_proj': None,
+            'trigger_peer_ids': [],
+        }
         self._last_motor_publish = 0.0
         
         # Assignment staleness
@@ -623,6 +634,9 @@ class REIPNode:
             'command_source': self._last_command_source,
             'tof': dict(self.tof),
             'motor_cmd': [self._last_motor_cmd[0], self._last_motor_cmd[1]],
+            'leader_quorum_ok': self._leader_quorum_ok(),
+            'leader_quorum_age': time.monotonic() - self._leader_quorum_mono if self._leader_quorum_mono > 0 else None,
+            'peer_emergency_debug': dict(self._last_peer_emergency_debug),
         }
         self.log_file.write(json.dumps(record) + '\n')
         self.log_file.flush()
@@ -787,12 +801,11 @@ class REIPNode:
             return False
         return peer.leader_established and peer.mission_complete
 
-    def _leader_digest(self, leader_id: int, term: int, leader_seq: int,
+    def _leader_digest(self, leader_id: int, term: int,
                        assignments: Dict[str, Tuple[float, float]]) -> str:
         payload = {
             'leader_id': leader_id,
             'term': term,
-            'leader_seq': leader_seq,
             'assignments': assignments,
         }
         raw = json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()
@@ -800,8 +813,15 @@ class REIPNode:
 
     def _send_leader_ack(self, leader_id: int, leader_term: int,
                          leader_seq: int, leader_digest: str):
-        ack_key = (leader_id, leader_term, leader_seq, leader_digest)
-        if self._last_acked_leader_key == ack_key:
+        ack_key = (leader_id, leader_term, leader_digest)
+        now_mono = time.monotonic()
+        # Refresh quorum periodically while the leader is advertising the same
+        # semantic assignment digest. This avoids rejecting valid late ACKs just
+        # because a newer broadcast sequence was sent before the ACK returned.
+        if (
+            self._last_acked_leader_key == ack_key and
+            (now_mono - self._last_acked_leader_mono) < (LEADER_ACK_STALE * 0.5)
+        ):
             return
         msg = {
             'type': 'leader_ack',
@@ -819,6 +839,7 @@ class REIPNode:
             else:
                 self.peer_socket.sendto(data, (BROADCAST_IP, UDP_PEER_PORT))
             self._last_acked_leader_key = ack_key
+            self._last_acked_leader_mono = now_mono
         except Exception:
             pass
 
@@ -828,8 +849,6 @@ class REIPNode:
         if msg.get('term') != self.current_term:
             return
         if msg.get('leader_digest') != self._leader_last_digest:
-            return
-        if msg.get('leader_seq') != self._leader_broadcast_seq:
             return
         ack_robot = msg.get('robot_id')
         if ack_robot == self.robot_id or ack_robot not in self.active_robot_ids:
@@ -854,7 +873,7 @@ class REIPNode:
             if leader_established:
                 assignments = self.compute_task_assignments()
                 mission_complete = not assignments and self.my_assigned_target is None
-            leader_digest = self._leader_digest(self.robot_id, self.current_term, leader_seq, assignments)
+            leader_digest = self._leader_digest(self.robot_id, self.current_term, assignments)
             self._leader_last_digest = leader_digest
             self._leader_ack_sets = {leader_digest: self._leader_ack_sets.get(leader_digest, set())}
         self._peer_seq += 1
@@ -889,6 +908,7 @@ class REIPNode:
             'navigation_target': list(self.current_navigation_target) if self.current_navigation_target else None,
             'predicted_target': list(self.my_predicted_target) if self.my_predicted_target else None,
             'commanded_target': list(self.leader_assigned_target) if self.leader_assigned_target else None,
+            'command_source': self._last_command_source,
             'assignments': assignments,  # Leader broadcasts assignments
             'timestamp': time.time()
         }
@@ -961,6 +981,11 @@ class REIPNode:
         peer.leader_established = bool(msg.get('leader_established', False))
         peer.mission_complete = bool(msg.get('mission_complete', False))
         peer.has_fresh_position = bool(msg.get('has_fresh_position', False))
+        commanded_target = msg.get('commanded_target')
+        peer.assigned_target = tuple(commanded_target) if commanded_target else None
+        navigation_target = msg.get('navigation_target')
+        peer.navigation_target = tuple(navigation_target) if navigation_target else None
+        peer.command_source = str(msg.get('command_source', 'startup') or 'startup')
         peer.last_seen = time.time()
         
         # Merge their visited cells (with timestamps for causality)
@@ -1160,7 +1185,32 @@ class REIPNode:
         for pid, peer in self.peers.items():
             if time.time() - peer.last_seen > 0.6:
                 continue
-            if self.distance(target, (peer.x, peer.y)) < PEER_TARGET_CLEARANCE:
+            if not peer.has_fresh_position:
+                continue
+            if self.distance(target, (peer.x, peer.y)) >= PEER_TARGET_CLEARANCE:
+                continue
+
+            peer_claiming_same_area = (
+                peer.assigned_target is not None and
+                self.distance(target, peer.assigned_target) < PEER_TARGET_CLEARANCE
+            )
+            peer_actively_tracking_same_area = (
+                peer.navigation_target is not None and
+                peer.command_source in ("leader_assigned", "leader_frontier") and
+                self.distance(target, peer.navigation_target) < PEER_TARGET_CLEARANCE
+            )
+
+            peer_lingering = False
+            if peer.last_update_time > 0:
+                dt_vel = peer.last_seen - peer.last_update_time
+                if dt_vel > 1e-3:
+                    peer_speed = self.distance((peer.x, peer.y), (peer.last_x, peer.last_y)) / dt_vel
+                    peer_lingering = peer_speed < 120.0
+
+            # A peer merely passing through the assigned cell should not trigger
+            # distrust. Keep the safety tripwire for peers that are actually
+            # lingering there or that the leader is also assigning into the same area.
+            if peer_claiming_same_area or (peer_lingering and peer_actively_tracking_same_area):
                 suspicion_added += WEIGHT_PEER_SAFETY
                 reasons.append(f"peer_conflict_r{pid}")
                 break
@@ -2499,6 +2549,10 @@ class REIPNode:
         _closest_peer_dist = 9999.0
         _flee_px, _flee_py = 0.0, 0.0
         _emergency_peer_count = 0
+        _hard_contact_count = 0
+        _forward_contact_count = 0
+        _max_forward_proj = -1.0
+        _trigger_peer_ids = []
         heading_x = math.cos(self.theta)
         heading_y = math.sin(self.theta)
         for pid, peer in self.peers.items():
@@ -2528,15 +2582,29 @@ class REIPNode:
                 continue
 
             peer_ahead_proj = ((est_x - self.x) * heading_x + (est_y - self.y) * heading_y) / pdist
+            if peer_ahead_proj > _max_forward_proj:
+                _max_forward_proj = peer_ahead_proj
             in_forward_corridor = peer_ahead_proj > 0.45
-            should_emergency = (
-                pdist < PEER_HARD_CONTACT_DIST or
-                (pdist < PEER_FORWARD_CONTACT_DIST and in_forward_corridor)
-            )
+            hard_contact = pdist < PEER_HARD_CONTACT_DIST
+            forward_contact = pdist < PEER_FORWARD_CONTACT_DIST and in_forward_corridor
+            should_emergency = hard_contact or forward_contact
             if should_emergency:
                 _emergency_peer_count += 1
+                if hard_contact:
+                    _hard_contact_count += 1
+                if forward_contact:
+                    _forward_contact_count += 1
+                _trigger_peer_ids.append(pid)
                 _flee_px += pdx / pdist
                 _flee_py += pdy / pdist
+        self._last_peer_emergency_debug = {
+            'count': _emergency_peer_count,
+            'hard_count': _hard_contact_count,
+            'forward_count': _forward_contact_count,
+            'closest_dist': None if _closest_peer_dist >= 9999.0 else _closest_peer_dist,
+            'max_forward_proj': None if _max_forward_proj < -0.5 else _max_forward_proj,
+            'trigger_peer_ids': _trigger_peer_ids[:4],
+        }
         if _emergency_peer_count > 0 and (abs(_flee_px) > 0.01 or abs(_flee_py) > 0.01):
             self._last_command_source = "peer_emergency"
             flee_angle = math.atan2(_flee_py, _flee_px)

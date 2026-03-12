@@ -9,13 +9,14 @@ Usage:
   python run_trial.py                          # REIP + bad_leader (default)
   python run_trial.py --controller reip --fault bad_leader
   python run_trial.py --controller reip --fault self_injure_leader
+  python run_trial.py --controller reip --fault freeze_leader
   python run_trial.py --controller raft --fault bad_leader
   python run_trial.py --controller reip --fault none          # clean run
   python run_trial.py --controller decentralized --fault none
   python run_trial.py --robots 1              # single-robot test (only deploy/launch R1)
   python run_trial.py --batch                  # run full experiment matrix
 
-Timing (matches isef_experiments.py):
+Timing (hardware paper-trial mode by default):
   t=0s   : deploy + launch robots
   t=10s  : FAULT #1 on current leader
   t=30s  : FAULT #2 on current leader (may differ after impeachment)
@@ -65,7 +66,6 @@ WIFI_BIND_IP = "192.168.20.214"
 EXPERIMENT_DURATION = 120
 FAULT_INJECT_TIME_1 = 10
 FAULT_INJECT_TIME_2 = 30
-
 # Time from "go" to trial clock start. Robots need boot + localization + leader election.
 # Reduce to 5s for fast networks; increase if Pis are slow to boot or election is flaky.
 START_DELAY_SEC = 5
@@ -73,15 +73,17 @@ START_DELAY_SEC = 5
 REIP_LOCAL = os.path.join(os.path.dirname(__file__), 'robot', 'reip_node.py')
 RAFT_LOCAL = os.path.join(os.path.dirname(__file__), 'robot', 'baselines', 'raft_node.py')
 
-# Full experiment matrix (matches isef_experiments.py)
+# Full hardware experiment matrix: one fault condition per run
 EXPERIMENT_MATRIX = [
     # (controller, fault, description)
     ("reip",          "none",         "REIP clean baseline"),
     ("reip",          "bad_leader",   "REIP vs bad leader (KEY DEMO)"),
+    ("reip",          "freeze_leader", "REIP vs freeze leader"),
+    ("reip",          "self_injure_leader", "REIP vs follower crash"),
     ("raft",          "none",         "Raft clean baseline"),
     ("raft",          "bad_leader",   "Raft vs bad leader (no detection)"),
-    ("decentralized", "none",         "Decentralized clean baseline"),
-    ("decentralized", "bad_leader",   "Decentralized vs bad leader (immune)"),
+    ("raft",          "freeze_leader", "Raft vs freeze leader"),
+    ("raft",          "self_injure_leader", "Raft vs follower crash"),
 ]
 TRIALS_PER_CONDITION = 3
 
@@ -333,7 +335,8 @@ def clear_faults(robot_ids):
 
 # ==================== Single trial ====================
 def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=None,
-                    start_delay=None, preflight=False):
+                    start_delay=None, preflight=False, fault_time_1=FAULT_INJECT_TIME_1,
+                    fault_time_2=FAULT_INJECT_TIME_2):
     if robot_ids is None:
         robot_ids = sorted(HOSTS.keys())
     if preflight:
@@ -351,8 +354,9 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
     print(f" Robots: {robot_ids}")
     print(f" Duration: {EXPERIMENT_DURATION}s")
     if fault_type and fault_type != 'none':
-        print(f" Fault #1 at t={FAULT_INJECT_TIME_1}s")
-        print(f" Fault #2 at t={FAULT_INJECT_TIME_2}s")
+        print(f" Fault at t={fault_time_1}s")
+        if fault_time_2 is not None:
+            print(f" Fault #2 at t={fault_time_2}s")
     print(f" Output: {trial_dir}")
     print(f"{'='*60}\n")
 
@@ -361,8 +365,8 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
         'trial_name': trial_name, 'controller': controller,
         'fault_type': fault_type, 'trial_num': trial_num,
         'duration': EXPERIMENT_DURATION,
-        'fault_time_1': FAULT_INJECT_TIME_1 if fault_type and fault_type != 'none' else None,
-        'fault_time_2': FAULT_INJECT_TIME_2 if fault_type and fault_type != 'none' else None,
+        'fault_time_1': fault_time_1 if fault_type and fault_type != 'none' else None,
+        'fault_time_2': fault_time_2 if fault_type and fault_type != 'none' else None,
         'start_time': time.time(), 'start_ts': ts,
     }
 
@@ -415,7 +419,7 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
 
             # Fault #1
             if (fault_type and fault_type != 'none'
-                    and elapsed >= FAULT_INJECT_TIME_1
+                    and elapsed >= fault_time_1
                     and len(fault_robots) == 0):
                 print(f"[t={elapsed:.1f}s] Scanning for leader...")
                 leader = find_leader(timeout=3.0)
@@ -431,7 +435,8 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
 
             # Fault #2
             if (fault_type and fault_type != 'none'
-                    and elapsed >= FAULT_INJECT_TIME_2
+                    and fault_time_2 is not None
+                    and elapsed >= fault_time_2
                     and len(fault_robots) == 1):
                 print(f"\n[t={elapsed:.1f}s] Scanning for leader (fault #2)...")
                 leader2 = find_leader(timeout=3.0)
@@ -543,6 +548,10 @@ if __name__ == '__main__':
                         help='Trials per condition in batch mode')
     parser.add_argument('--duration', type=int, default=EXPERIMENT_DURATION,
                         help='Trial duration in seconds')
+    parser.add_argument('--fault-time', type=float, default=FAULT_INJECT_TIME_1,
+                        help=f'Seconds after trial start for the primary fault injection (default: {FAULT_INJECT_TIME_1})')
+    parser.add_argument('--second-fault-time', type=float, default=FAULT_INJECT_TIME_2,
+                        help=f'Seconds after trial start for the second fault injection (default: {FAULT_INJECT_TIME_2}). Use a negative value to disable.')
     parser.add_argument('--start-delay', type=float, default=None,
                         help=f'Seconds to wait after launch before trial start (default: {START_DELAY_SEC})')
     parser.add_argument('--preflight', action='store_true',
@@ -553,9 +562,11 @@ if __name__ == '__main__':
 
     EXPERIMENT_DURATION = args.duration
     robot_ids = _parse_robot_ids(args.robots)
+    second_fault_time = None if args.second_fault_time is not None and args.second_fault_time < 0 else args.second_fault_time
 
     if args.batch:
         run_batch(args.output, args.trials_per, start_delay=args.start_delay, preflight=args.preflight)
     else:
         run_single_trial(args.controller, args.fault, args.trial, args.output, robot_ids,
-                        start_delay=args.start_delay, preflight=args.preflight)
+                        start_delay=args.start_delay, preflight=args.preflight,
+                        fault_time_1=args.fault_time, fault_time_2=second_fault_time)

@@ -1,0 +1,29 @@
+REIP Experiment Run: run_20260311_233025_multiroom_1trials_Leader
+Date: 2026-03-11 23:35
+Layouts: ['multiroom']
+Conditions: 6
+Trials per condition: 1
+Total experiments: 6
+Workers: 3
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault        Ablation          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+multiroom  decentralized  bad_leader   none              1      71.3+/-0.0    76.8+/-0.0    96.8+/-0.0           N/A             N/A             N/A     0%   0.0      58.2
+multiroom  decentralized  freeze_leader none              1      77.0+/-0.0    57.5+/-0.0    86.0+/-0.0           N/A             N/A             N/A     0%   0.0      63.1
+multiroom  raft           bad_leader   none              1       4.9+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       4.9
+multiroom  raft           freeze_leader none              1       4.9+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       4.9
+multiroom  reip           bad_leader   none              1      50.0+/-0.0   119.1+/-0.0           N/A           N/A             N/A     0.00+/-0.00   100%  68.0      43.4
+multiroom  reip           freeze_leader none              1      34.4+/-0.0           N/A           N/A           N/A     0.23+/-0.00     0.00+/-0.00   100%  59.0      23.0
+========================================================================================================================
+
+KEY COMPARISONS:
+
+  [multiroom] Bad Leader — REIP vs RAFT:
+    Coverage: REIP 50.0% vs RAFT 4.9% (+45.1pp advantage)
+    REIP detection: 100% rate at 0.00s avg
+    RAFT detection: 0% rate (never detects)
+    REIP vs Decentralized: -21.3pp coverage (REIP 50.0% vs Dec 71.3%)

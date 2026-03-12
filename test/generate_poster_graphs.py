@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 """
-ISEF Poster Graph Generator
+Paper Figure Generator
 
-Generates publication-quality graphs from experimental data:
-1. Convergence Plot  — per-trial coverage traces (hero figure)
-2. Detection Latency — bar chart comparing detection speed
-3. Trust Timeline    — suspicion + trust decay during fault
-4. Three-tier Model  — visual explanation diagram
-5. Time-to-50% Box  — box plot of coordination speed
+Generates standalone publication-ready figures from experiment outputs.
+Each figure is exported independently so it can be placed and sized in
+Overleaf without relying on stitched multi-panel layouts.
 
 Usage:
-  python test/generate_poster_graphs.py <results_dir>
+  python test/generate_poster_graphs.py <results_dir> [output_dir]
 
 <results_dir> is the timestamped experiment output folder, e.g.
   experiments/run_20260226_163015_open_10trials_all
@@ -34,19 +31,33 @@ except ImportError:
     print("matplotlib required: pip install matplotlib numpy")
     sys.exit(1)
 
-# Poster-quality settings
+# IEEE-style defaults: compact, legible, and conservative.
 plt.rcParams.update({
-    'font.size': 13,
-    'font.family': 'sans-serif',
-    'axes.labelsize': 15,
-    'axes.titlesize': 17,
-    'legend.fontsize': 11,
-    'xtick.labelsize': 11,
-    'ytick.labelsize': 11,
-    'figure.dpi': 150,
+    'font.size': 8,
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+    'axes.labelsize': 8,
+    'axes.titlesize': 8,
+    'axes.linewidth': 0.8,
+    'legend.fontsize': 7,
+    'xtick.labelsize': 7,
+    'ytick.labelsize': 7,
+    'lines.linewidth': 1.6,
+    'lines.markersize': 4,
+    'figure.dpi': 200,
     'savefig.dpi': 300,
-    'savefig.bbox': 'tight'
+    'savefig.bbox': 'tight',
+    'pdf.fonttype': 42,
+    'ps.fonttype': 42,
+    'axes.spines.top': False,
+    'axes.spines.right': False,
 })
+
+IEEE_SINGLE_COL_W = 3.5
+IEEE_DOUBLE_COL_W = 7.16
+IEEE_SHORT_H = 2.35
+IEEE_MED_H = 2.8
+IEEE_TALL_H = 3.2
 
 # Color palette (colorblind-friendly)
 COLORS = {
@@ -60,6 +71,16 @@ LABELS = {
     'reip': 'REIP',
     'raft': 'RAFT',
     'decentralized': 'Decentralized',
+}
+FAULT_LABELS = {
+    'none': 'clean',
+    'bad_leader': 'bad_leader',
+    'freeze_leader': 'freeze_leader',
+}
+ABLATION_LABELS = {
+    'no_trust': 'No Trust',
+    'no_causality': 'No Causality',
+    'no_direction': 'No Direction',
 }
 
 # ──────────────────────────────────────────────────
@@ -119,42 +140,60 @@ def group_timelines(timelines: dict) -> dict:
     return dict(groups)
 
 
+def save_figure(fig, output_dir: str, stem: str):
+    """Save each figure in both vector and raster form."""
+    pdf_path = os.path.join(output_dir, f"{stem}.pdf")
+    png_path = os.path.join(output_dir, f"{stem}.png")
+    fig.savefig(pdf_path)
+    fig.savefig(png_path)
+    print(f"  Saved: {pdf_path}")
+    print(f"  Saved: {png_path}")
+    plt.close(fig)
+
+
+def style_axis(ax, xlabel: str, ylabel: str, xlim=None, ylim=None):
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if xlim is not None:
+        ax.set_xlim(*xlim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.grid(True, axis='both', linewidth=0.4, alpha=0.3)
+    ax.tick_params(direction='out', length=3, width=0.8)
+
+
 # ──────────────────────────────────────────────────
 # Graph 1: Convergence plot (HERO FIGURE)
 # ──────────────────────────────────────────────────
 
 def graph_convergence(timelines: dict, output_dir: str):
-    """Coverage-over-time with individual trial traces and mean.
-
-    Three panels: Clean, Bad Leader, Freeze Leader.
-    """
+    """Coverage-over-time with one standalone figure per fault condition."""
     fault_panels = [
-        ('none',        'Clean (No Fault)'),
-        ('bad_leader',  'Bad Leader Fault'),
-        ('freeze_leader', 'Freeze Leader Fault'),
+        ('none', 'Clean'),
+        ('bad_leader', 'Bad Leader'),
+        ('freeze_leader', 'Freeze Leader'),
     ]
     controllers = ['reip', 'raft', 'decentralized']
-
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5), sharey=True)
-
     tl_groups = group_timelines(timelines)
+    for fault_key, panel_title in fault_panels:
+        has_any_traces = any(tl_groups.get((ctrl, fault_key), []) for ctrl in controllers)
+        if not has_any_traces:
+            print(f"  [SKIP] convergence_{FAULT_LABELS[fault_key]} — no timeline data")
+            continue
 
-    for ax, (fault_key, panel_title) in zip(axes, fault_panels):
+        fig, ax = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
         for ctrl in controllers:
             key = (ctrl, fault_key)
             traces = tl_groups.get(key, [])
             color = COLORS[ctrl]
             label = LABELS[ctrl]
 
-            # Individual trial traces
             for tl in traces:
                 ts = [p[0] for p in tl]
                 cs = [p[1] for p in tl]
-                ax.plot(ts, cs, color=color, alpha=0.15, linewidth=0.8)
+                ax.plot(ts, cs, color=color, alpha=0.15, linewidth=0.7)
 
-            # Mean curve
             if traces:
-                # Resample all traces to common time grid
                 max_t = max(p[0] for tl in traces for p in tl) if traces else 120
                 t_grid = np.linspace(0, min(max_t, 120), 500)
                 interp_vals = []
@@ -169,42 +208,32 @@ def graph_convergence(timelines: dict, output_dir: str):
                     ax.plot(t_grid, mean_c, color=color, linewidth=2.5,
                             label=label, zorder=5)
 
-        # Fault injection line(s) - read from timeline data if available
         if fault_key != 'none':
-            # Get fault time from timeline metadata (first experiment with this fault)
-            fault_time_1 = 10.0  # default
+            fault_time_1 = 10.0
             fault_time_2 = None
             for exp_name, exp_data in timelines.items():
-                if (exp_data.get('controller') == controllers[0] and 
+                if (exp_data.get('controller') == controllers[0] and
                     (exp_data.get('fault_type') or 'none') == fault_key):
                     fault_time_1 = exp_data.get('fault_time_1', 10.0)
                     fault_time_2 = exp_data.get('fault_time_2')
                     break
-            
+
             ax.axvline(x=fault_time_1, color=COLORS['fault_line'], linestyle='--',
                        linewidth=1.5, alpha=0.7, zorder=6)
-            ax.annotate('Fault', xy=(fault_time_1 + 1, 5), fontsize=9,
-                        color=COLORS['fault_line'], fontweight='bold')
+            ax.annotate('Fault 1', xy=(fault_time_1 + 1, 8), fontsize=7,
+                        color=COLORS['fault_line'])
             if fault_time_2:
                 ax.axvline(x=fault_time_2, color=COLORS['fault_line'], linestyle=':',
                            linewidth=1.0, alpha=0.5, zorder=6)
+                ax.annotate('Fault 2', xy=(fault_time_2 + 1, 18), fontsize=7,
+                            color=COLORS['fault_line'])
 
-        ax.set_title(panel_title, fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_xlim(0, 120)
-        ax.set_ylim(0, 105)
-        ax.grid(True, alpha=0.25)
-        if ax == axes[0]:
-            ax.set_ylabel('Coverage (%)')
-        ax.legend(loc='lower right', framealpha=0.9)
-
-    fig.suptitle('Coverage Convergence: Individual Trials + Mean',
-                 fontsize=18, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    path = os.path.join(output_dir, 'convergence_plot.png')
-    plt.savefig(path)
-    print(f"  Saved: {path}")
-    plt.close()
+        style_axis(ax, 'Time (s)', 'Coverage (%)', xlim=(0, 120), ylim=(0, 105))
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(loc='lower right', frameon=False, ncol=1)
+        fig.tight_layout()
+        save_figure(fig, output_dir, f"convergence_{FAULT_LABELS[fault_key]}")
 
 
 # ──────────────────────────────────────────────────
@@ -212,14 +241,17 @@ def graph_convergence(timelines: dict, output_dir: str):
 # ──────────────────────────────────────────────────
 
 def graph_time_to_50(results: list, output_dir: str):
-    """Box plots comparing time-to-50% across controllers and faults."""
+    """Standalone box plots comparing time-to-50% for each fault."""
     groups = group_results(results)
-
-    fig, axes = plt.subplots(1, 3, figsize=(14, 5), sharey=True)
     faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
     controllers = ['reip', 'raft', 'decentralized']
+    for fkey, flabel in faults:
+        has_any_trials = any(groups.get((ctrl, fkey), []) for ctrl in controllers)
+        if not has_any_trials:
+            print(f"  [SKIP] time_to_50_{FAULT_LABELS[fkey]} — no results")
+            continue
 
-    for ax, (fkey, flabel) in zip(axes, faults):
+        fig, ax = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
         data = []
         labels = []
         colors = []
@@ -231,7 +263,7 @@ def graph_time_to_50(results: list, output_dir: str):
             labels.append(LABELS[ctrl])
             colors.append(COLORS[ctrl])
 
-        bp = ax.boxplot(data, labels=labels, patch_artist=True, widths=0.6)
+        bp = ax.boxplot(data, tick_labels=labels, patch_artist=True, widths=0.6)
         for patch, c in zip(bp['boxes'], colors):
             patch.set_facecolor(c)
             patch.set_alpha(0.7)
@@ -239,17 +271,9 @@ def graph_time_to_50(results: list, output_dir: str):
             median.set_color('black')
             median.set_linewidth(2)
 
-        ax.set_title(flabel, fontweight='bold')
-        ax.set_ylabel('Time to 50% (s)' if ax == axes[0] else '')
-        ax.grid(True, axis='y', alpha=0.25)
-
-    fig.suptitle('Time to 50% Coverage: Coordination Speed',
-                 fontsize=17, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    path = os.path.join(output_dir, 'time_to_50_boxplot.png')
-    plt.savefig(path)
-    print(f"  Saved: {path}")
-    plt.close()
+        style_axis(ax, '', 'Time to 50% coverage (s)')
+        fig.tight_layout()
+        save_figure(fig, output_dir, f"time_to_50_{FAULT_LABELS[fkey]}")
 
 
 # ──────────────────────────────────────────────────
@@ -267,7 +291,7 @@ def graph_detection_latency(results: list, output_dir: str):
     impeach_times = [r['time_to_detection']
                      for r in reip_bl if r.get('time_to_detection')]
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
 
     # Theoretical bound
     ax.axhline(y=0.4, color='gray', linestyle=':', linewidth=1.5,
@@ -282,7 +306,7 @@ def graph_detection_latency(results: list, output_dir: str):
         categories.append('First\nSuspicion')
         means.append(np.mean(suspicion_times))
         stds.append(np.std(suspicion_times))
-        cols.append(COLORS['decentralized'])
+        cols.append(COLORS['reip'])
 
     if impeach_times:
         categories.append('Full\nImpeachment')
@@ -295,29 +319,23 @@ def graph_detection_latency(results: list, output_dir: str):
                       color=cols, edgecolor='black', alpha=0.85, zorder=3)
         for bar, m, s in zip(bars, means, stds):
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + s + 0.1,
-                    f'{m:.2f}s ± {s:.2f}', ha='center', fontsize=12,
-                    fontweight='bold')
+                    f'{m:.2f} s', ha='center', fontsize=7)
 
-    ax.set_ylabel('Time after fault injection (s)')
-    ax.set_title('REIP Detection Latency (Bad Leader)', fontweight='bold')
-    ax.legend(loc='upper right')
-    ax.set_ylim(0, max(means + [1]) * 1.6 if means else 5)
-    ax.grid(True, axis='y', alpha=0.25)
+    style_axis(ax, '', 'Time after fault injection (s)')
+    ax.legend(loc='upper right', frameon=False)
+    ax.set_ylim(0, max(means + [1]) * 1.45 if means else 5)
 
-    # Annotation
     n = len(reip_bl)
     detected = len([r for r in reip_bl if r.get('time_to_detection')])
     fps = sum(r.get('false_positives', 0) for r in reip_bl)
-    ax.annotate(f'{detected}/{n} detected (100%)  |  {fps} false positives',
-                xy=(0.5, 0.02), xycoords='axes fraction', fontsize=12,
-                ha='center', fontweight='bold',
-                bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.6))
+    detection_rate = (100.0 * detected / n) if n else 0.0
+    ax.annotate(f'Detection rate: {detection_rate:.0f}%   False positives: {fps}',
+                xy=(0.5, 0.02), xycoords='axes fraction', fontsize=7,
+                ha='center',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.9, linewidth=0.6))
 
-    plt.tight_layout()
-    path = os.path.join(output_dir, 'detection_latency.png')
-    plt.savefig(path)
-    print(f"  Saved: {path}")
-    plt.close()
+    fig.tight_layout()
+    save_figure(fig, output_dir, 'detection_latency_bad_leader')
 
 
 # ──────────────────────────────────────────────────
@@ -330,7 +348,7 @@ def graph_coverage_bars(results: list, output_dir: str):
     controllers = ['reip', 'raft', 'decentralized']
     faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(IEEE_DOUBLE_COL_W, IEEE_MED_H))
     x = np.arange(len(faults))
     width = 0.25
 
@@ -346,20 +364,13 @@ def graph_coverage_bars(results: list, output_dir: str):
                       label=LABELS[ctrl], color=COLORS[ctrl], edgecolor='black',
                       alpha=0.85)
 
-    ax.set_ylabel('Final Coverage (%)')
-    ax.set_title('Final Coverage @ 120s by Controller and Fault Type',
-                 fontweight='bold')
+    style_axis(ax, '', 'Final coverage at 120 s (%)', ylim=(0, 105))
     ax.set_xticks(x + width)
     ax.set_xticklabels([fl for _, fl in faults])
-    ax.legend()
-    ax.set_ylim(0, 115)
-    ax.grid(True, axis='y', alpha=0.25)
+    ax.legend(frameon=False, ncol=3, loc='upper center')
 
-    plt.tight_layout()
-    path = os.path.join(output_dir, 'coverage_bars.png')
-    plt.savefig(path)
-    print(f"  Saved: {path}")
-    plt.close()
+    fig.tight_layout()
+    save_figure(fig, output_dir, 'coverage_bars')
 
 
 # ──────────────────────────────────────────────────
@@ -368,7 +379,7 @@ def graph_coverage_bars(results: list, output_dir: str):
 
 def graph_three_tier_trust(output_dir: str):
     """Visual explanation of three-tier trust model."""
-    fig, ax = plt.subplots(figsize=(10, 7))
+    fig, ax = plt.subplots(figsize=(IEEE_DOUBLE_COL_W, IEEE_TALL_H))
 
     # Pyramid tiers (bottom-up: Peer, Sensor, Personal)
     tier_data = [
@@ -397,20 +408,58 @@ def graph_three_tier_trust(output_dir: str):
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 8)
     ax.axis('off')
-    ax.set_title('Three-Tier Confidence-Weighted Trust Model',
-                 fontsize=17, fontweight='bold', pad=15)
-
-    # Key insight box
     ax.text(5, 7.6,
             'Higher tiers = faster detection  |  Lower tiers = more coverage but slower',
-            ha='center', fontsize=11,
-            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+            ha='center', fontsize=7,
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, linewidth=0.6))
 
-    plt.tight_layout()
-    path = os.path.join(output_dir, 'three_tier_trust.png')
-    plt.savefig(path)
-    print(f"  Saved: {path}")
-    plt.close()
+    fig.tight_layout()
+    save_figure(fig, output_dir, 'three_tier_trust')
+
+
+def graph_ablation(results: list, output_dir: str):
+    """Standalone ablation figures for bad-leader coverage and false positives."""
+    ablation_results = [r for r in results if r.get('ablation')]
+    if not ablation_results:
+        print("  [SKIP] ablation figures — no ablation data")
+        return
+
+    baseline_bl = [
+        r for r in results
+        if r.get('controller') == 'reip'
+        and (r.get('fault_type') or 'none') == 'bad_leader'
+        and not r.get('ablation')
+    ]
+
+    labels = ['Baseline']
+    coverage_means = [np.mean([r['final_coverage'] for r in baseline_bl])] if baseline_bl else [0.0]
+    fp_means = [np.mean([r.get('false_positives', 0) for r in baseline_bl])] if baseline_bl else [0.0]
+
+    for ablation_key in ['no_trust', 'no_causality', 'no_direction']:
+        subset = [r for r in ablation_results if r.get('ablation') == ablation_key]
+        if not subset:
+            continue
+        labels.append(ABLATION_LABELS[ablation_key])
+        coverage_means.append(np.mean([r['final_coverage'] for r in subset]))
+        fp_means.append(np.mean([r.get('false_positives', 0) for r in subset]))
+
+    x = np.arange(len(labels))
+
+    fig_cov, ax_cov = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
+    ax_cov.bar(x, coverage_means, color=COLORS['reip'], edgecolor='black', alpha=0.85)
+    ax_cov.set_xticks(x)
+    ax_cov.set_xticklabels(labels, rotation=20, ha='right')
+    style_axis(ax_cov, '', 'Final coverage (%)', ylim=(0, 105))
+    fig_cov.tight_layout()
+    save_figure(fig_cov, output_dir, 'ablation_final_coverage')
+
+    fig_fp, ax_fp = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
+    ax_fp.bar(x, fp_means, color=COLORS['fault_line'], edgecolor='black', alpha=0.85)
+    ax_fp.set_xticks(x)
+    ax_fp.set_xticklabels(labels, rotation=20, ha='right')
+    style_axis(ax_fp, '', 'False positives per trial')
+    fig_fp.tight_layout()
+    save_figure(fig_fp, output_dir, 'ablation_false_positives')
 
 
 # ──────────────────────────────────────────────────
@@ -418,15 +467,14 @@ def graph_three_tier_trust(output_dir: str):
 # ──────────────────────────────────────────────────
 
 def main():
-    output_dir = "poster_graphs"
-    os.makedirs(output_dir, exist_ok=True)
-
     if len(sys.argv) < 2:
-        print("Usage: python test/generate_poster_graphs.py <results_dir>")
+        print("Usage: python test/generate_poster_graphs.py <results_dir> [output_dir]")
         print("  <results_dir> = experiments/run_YYYYMMDD_HHMMSS_*/")
         sys.exit(1)
 
     results_dir = sys.argv[1]
+    output_dir = sys.argv[2] if len(sys.argv) >= 3 else os.path.join(results_dir, "paper_figures")
+    os.makedirs(output_dir, exist_ok=True)
     print(f"Loading data from: {results_dir}")
 
     results = load_results_json(results_dir)
@@ -435,7 +483,7 @@ def main():
     print(f"  {len(results)} experiment results")
     print(f"  {len(timelines)} coverage timelines")
 
-    print("\nGenerating poster graphs...")
+    print("\nGenerating standalone paper figures...")
 
     if timelines:
         graph_convergence(timelines, output_dir)
@@ -446,6 +494,7 @@ def main():
         graph_time_to_50(results, output_dir)
         graph_detection_latency(results, output_dir)
         graph_coverage_bars(results, output_dir)
+        graph_ablation(results, output_dir)
 
     graph_three_tier_trust(output_dir)
 

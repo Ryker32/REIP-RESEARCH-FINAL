@@ -8,10 +8,11 @@ IEEE formatting rules (IEEEtran compliance):
   - Axes:          Thin (0.5 pt), ticks inward
   - Grid:          Horizontal only, very faint
   - Colors:        Muted, B&W-distinguishable (hatching required)
-  - No embedded figure titles — use LaTeX \caption{}
+  - No embedded figure titles — use LaTeX \\caption{}
   - 300 DPI minimum for raster output
 """
 
+import argparse
 import json, os, sys, glob
 import numpy as np
 from collections import defaultdict
@@ -92,11 +93,11 @@ CTRL_LABELS  = {'reip': 'REIP (Proposed)', 'raft': 'Raft (Baseline)',
 CTRL_MARKERS = {'reip': 'o',  'raft': 's',  'decentralized': '^'}
 MARKER_EVERY = 20
 
-# ---- Paths ----
-WALLFIXED_DIR = 'experiments/run_20260228_014625_multiroom_100trials_all'
-FREEZE_DIR    = 'experiments/run_20260228_135632_multiroom_100trials_FreezeLeader'
-ABLATION_DIR  = 'experiments/run_20260228_102956_multiroom_30trials_all'
-OUTPUT_DIR    = 'paper_docs/Ryker_Kollmyer___UPDATED_PAPER'
+# ---- Default paths ----
+DEFAULT_MAIN_DIR = 'experiments/run_20260228_014625_multiroom_100trials_all'
+DEFAULT_FREEZE_DIR = 'experiments/run_20260228_135632_multiroom_100trials_FreezeLeader'
+DEFAULT_ABLATION_DIR = 'experiments/run_20260228_102956_multiroom_30trials_all'
+DEFAULT_OUTPUT_DIR = 'paper_docs/Ryker_Kollmyer___UPDATED_PAPER'
 
 
 # ====================================================================
@@ -536,13 +537,47 @@ def fig_ablation(ablation_results, n100_results, output_dir):
 # ====================================================================
 # Main
 # ====================================================================
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Generate IEEE paper figures from current experiment outputs."
+    )
+    parser.add_argument(
+        "--main-dir",
+        default=DEFAULT_MAIN_DIR,
+        help="Main results directory containing Clean + BadLeader runs",
+    )
+    parser.add_argument(
+        "--freeze-dir",
+        default=DEFAULT_FREEZE_DIR,
+        help="FreezeLeader-only results directory",
+    )
+    parser.add_argument(
+        "--ablation-dir",
+        default=DEFAULT_ABLATION_DIR,
+        help="Ablation results directory",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=DEFAULT_OUTPUT_DIR,
+        help="Directory to write paper figures into",
+    )
+    return parser.parse_args()
+
+
 def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    args = parse_args()
+    output_dir = args.output_dir
+    os.makedirs(output_dir, exist_ok=True)
 
     print("Loading data …")
-    wallfixed = load_results(WALLFIXED_DIR)
-    freeze    = load_results(FREEZE_DIR)
-    ablation  = load_results(ABLATION_DIR)
+    print(f"  main:     {args.main_dir}")
+    print(f"  freeze:   {args.freeze_dir}")
+    print(f"  ablation: {args.ablation_dir}")
+    print(f"  output:   {output_dir}")
+
+    wallfixed = load_results(args.main_dir)
+    freeze    = load_results(args.freeze_dir)
+    ablation  = load_results(args.ablation_dir)
 
     combined = [r for r in wallfixed if (r.get('fault_type') or 'none') != 'oscillate_leader']
     combined.extend(freeze)
@@ -552,18 +587,18 @@ def main():
     for k in sorted(groups.keys()):
         print(f"    {k[0]:>15} | {k[1]:<15} : {len(groups[k])}")
 
-    timelines = load_timelines([WALLFIXED_DIR, FREEZE_DIR])
+    timelines = load_timelines([args.main_dir, args.freeze_dir])
     print(f"  {sum(len(v) for v in timelines.values())} timelines")
 
     print("\nGenerating IEEE figures …")
-    fig_coverage_bars(groups, OUTPUT_DIR)
-    fig_detection_timing(groups, OUTPUT_DIR)
-    fig_per_trial_traces(timelines, OUTPUT_DIR)
-    fig_convergence_by_controller(timelines, OUTPUT_DIR)
-    fig_resilience_contrast(timelines, OUTPUT_DIR)
-    fig_ablation(ablation, wallfixed, OUTPUT_DIR)
+    fig_coverage_bars(groups, output_dir)
+    fig_detection_timing(groups, output_dir)
+    fig_per_trial_traces(timelines, output_dir)
+    fig_convergence_by_controller(timelines, output_dir)
+    fig_resilience_contrast(timelines, output_dir)
+    fig_ablation(ablation, wallfixed, output_dir)
 
-    print(f"\nAll saved to {OUTPUT_DIR}/")
+    print(f"\nAll saved to {output_dir}/")
 
 
 if __name__ == '__main__':

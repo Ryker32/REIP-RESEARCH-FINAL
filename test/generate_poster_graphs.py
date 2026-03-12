@@ -285,6 +285,9 @@ def graph_detection_latency(results: list, output_dir: str):
     groups = group_results(results)
 
     reip_bl = groups.get(('reip', 'bad_leader'), [])
+    if not reip_bl:
+        print("  [SKIP] detection_latency_bad_leader — no REIP bad-leader data")
+        return
 
     suspicion_times = [r['time_to_first_suspicion']
                        for r in reip_bl if r.get('time_to_first_suspicion')]
@@ -346,7 +349,12 @@ def graph_coverage_bars(results: list, output_dir: str):
     """Grouped bar chart: final coverage by controller and fault."""
     groups = group_results(results)
     controllers = ['reip', 'raft', 'decentralized']
-    faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
+    all_faults = [('none', 'Clean'), ('bad_leader', 'Bad Leader'), ('freeze_leader', 'Freeze Leader')]
+    faults = [(fkey, flabel) for fkey, flabel in all_faults
+              if any(groups.get((ctrl, fkey), []) for ctrl in controllers)]
+    if not faults:
+        print("  [SKIP] coverage_bars — no coverage results")
+        return
 
     fig, ax = plt.subplots(figsize=(IEEE_DOUBLE_COL_W, IEEE_MED_H))
     x = np.arange(len(faults))
@@ -358,8 +366,8 @@ def graph_coverage_bars(results: list, output_dir: str):
         for fkey, _ in faults:
             trials = groups.get((ctrl, fkey), [])
             covs = [t['final_coverage'] for t in trials]
-            means.append(np.mean(covs) if covs else 0)
-            stds_.append(np.std(covs) if covs else 0)
+            means.append(np.mean(covs) if covs else np.nan)
+            stds_.append(np.std(covs) if covs else 0.0)
         bars = ax.bar(x + i * width, means, width, yerr=stds_, capsize=4,
                       label=LABELS[ctrl], color=COLORS[ctrl], edgecolor='black',
                       alpha=0.85)

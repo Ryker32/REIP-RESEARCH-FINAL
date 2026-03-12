@@ -4,7 +4,7 @@ Trust Model: Three-tier confidence-weighted
   Personal: 1.0, ToF: 1.0, Peer: 0.3
   Suspicion threshold: 1.5, Recovery: 0.1
 
-  Logging to: logs/robot_5_20260305_232710.jsonl
+  Logging to: logs/robot_5_20260308_155038.jsonl
 Initializing hardware...
   Hardware: SIMULATED
 [INFO] Position socket listening on port 5105
@@ -16,19 +16,35 @@ Ready!
 Running... Press Ctrl+C to stop
 
 [R5] Waiting for 'start' command...
-[ELECTION] New leader: 5
-Stopped.
-Traceback (most recent call last):
-  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2510, in <module>
-    node.run()
-    ~~~~~~~~^^
-  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2420, in run
-    self.control_loop()
-    ~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 2386, in control_loop
-    self.log_state()
-    ~~~~~~~~~~~~~~^^
-  File "C:\Users\ryker\research\reip-sim-public\robot\reip_node.py", line 521, in log_state
-    'in_pivot': self._in_pivot,
-                ^^^^^^^^^^^^^^
-AttributeError: 'REIPNode' object has no attribute '_in_pivot'
+[R5] pos=(0,0) state=follower leader=None trust=1.00 susp=0.00 cov=0.0%/0.0% mot=(0,0) tgt=None
+[ELECTION] New leader: 1
+[R5] pos=(682,700) state=follower leader=1 trust=1.00 susp=0.00 cov=2.6%/8.3% mot=(0,0) tgt=None
+[R5] pos=(913,802) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,821) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,822) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(911,822) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,803) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,823) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,801) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(912,824) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(911,824) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(911,826) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/10.9% mot=(0,0) tgt=None
+[R5] pos=(911,810) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/14.1% mot=(0,0) tgt=None
+[R5] pos=(912,810) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/16.1% mot=(0,0) tgt=None
+[R5] pos=(911,807) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,807) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,818) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,818) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,803) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,823) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,823) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(912,801) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,801) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,826) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,826) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,810) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[R5] pos=(911,810) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[FAULT] Motor fault injected: spin
+[R5] pos=(911,787) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None
+[FAULT] All faults cleared
+[R5] pos=(911,803) state=follower leader=1 trust=1.00 susp=0.00 cov=3.6%/17.7% mot=(0,0) tgt=None

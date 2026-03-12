@@ -85,6 +85,17 @@ ARENA_LAYOUTS = {
         (1300, 500, 1300, 1000),
     ],
 }
+# Exact starts captured from the clean hardware REIP no-fault run
+# `trials/reip_none_t1_20260308_151155`.
+START_PRESETS = {
+    "hardware_clone_20260308": {
+        1: (185.9, 382.1, 0.188),
+        2: (792.9, 709.2, 2.255),
+        3: (318.8, 147.4, 0.736),
+        4: (768.7, 219.2, 1.577),
+        5: (182.4, 709.9, 0.410),
+    },
+}
 # Select layout via command line: python test/visual_sim.py 5 multiroom
 ARENA_LAYOUT = "open"  # Default
 
@@ -161,10 +172,12 @@ class RobotState:
 
 # ============== Visual Simulation ==============
 class VisualSimulation:
-    def __init__(self, num_robots: int = NUM_ROBOTS, layout: str = "open"):
+    def __init__(self, num_robots: int = NUM_ROBOTS, layout: str = "open",
+                 start_preset: Optional[str] = None):
         self.num_robots = num_robots
         self.walls = ARENA_LAYOUTS.get(layout, [])
         self.layout_name = layout
+        self.start_preset = start_preset
         
         # Pygame
         pygame.init()
@@ -193,22 +206,27 @@ class VisualSimulation:
         # This prevents startup race condition where robots explore randomly
         # before the leader can coordinate them
         self.sim_robots: Dict[int, SimRobot] = {}
+        preset_starts = START_PRESETS.get(start_preset, {})
         for i in range(1, num_robots + 1):
-            if layout in ("multiroom", "multiroom2"):
+            if i in preset_starts:
+                start_x, start_y, start_theta = preset_starts[i]
+            elif layout in ("multiroom", "multiroom2"):
                 # Cluster all robots in Room A (left room, x < 1000)
                 # This is critical for demonstrating leader coordination advantage
                 col = (i - 1) % 2
                 row = (i - 1) // 2
                 start_x = 200 + col * 250
                 start_y = 200 + row * 300
+                start_theta = 0
             else:
                 start_x = 200 + (i - 1) * 300
                 start_y = ARENA_HEIGHT / 2
+                start_theta = 0
             self.sim_robots[i] = SimRobot(
                 robot_id=i,
                 x=start_x,
                 y=start_y,
-                theta=0,
+                theta=start_theta,
                 target_x=start_x,  # Stay in place until assigned
                 target_y=start_y,
                 prev_x=start_x,
@@ -997,17 +1015,23 @@ class VisualSimulation:
 def main():
     num_robots = int(sys.argv[1]) if len(sys.argv) > 1 else NUM_ROBOTS
     layout = sys.argv[2] if len(sys.argv) > 2 else "open"
+    start_preset = sys.argv[3] if len(sys.argv) > 3 else None
     
     if layout not in ARENA_LAYOUTS:
         print(f"Unknown layout '{layout}'. Available: {', '.join(ARENA_LAYOUTS.keys())}")
+        sys.exit(1)
+    if start_preset is not None and start_preset not in START_PRESETS:
+        print(f"Unknown start preset '{start_preset}'. Available: {', '.join(START_PRESETS.keys())}")
         sys.exit(1)
     
     print(f"REIP Visual Simulation - {num_robots} robots, layout: {layout}")
     print("=" * 50)
     if layout != "open":
         print(f"  Walls: {len(ARENA_LAYOUTS[layout])} segments")
+    if start_preset:
+        print(f"  Start preset: {start_preset}")
     
-    sim = VisualSimulation(num_robots, layout)
+    sim = VisualSimulation(num_robots, layout, start_preset=start_preset)
     sim.run()
 
 if __name__ == "__main__":

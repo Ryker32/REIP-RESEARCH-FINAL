@@ -19,6 +19,12 @@ from collections import deque
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in os.sys.path:
+    os.sys.path.insert(0, PROJECT_ROOT)
+
+from hardware_fidelity import DEFAULT_ARENA, DEFAULT_ARUCO, hardware_overlay_header
+
 # ============== Configuration ==============
 CAMERA_ID = 0
 CAMERA_WIDTH = 1280   # 720p — faster ArUco detection, higher FPS for position updates
@@ -33,8 +39,8 @@ ARUCO_DICT = cv2.aruco.DICT_4X4_50  # IDs 0-49 available
 CORNER_MARKER_IDS = [40, 41, 42, 43]
 
 # Arena - must match reip_node.py
-ARENA_WIDTH_MM = 2000   # mm
-ARENA_HEIGHT_MM = 1500  # mm (16:12 aspect, ~matches 16:9 camera)
+ARENA_WIDTH_MM = DEFAULT_ARENA.width_mm
+ARENA_HEIGHT_MM = DEFAULT_ARENA.height_mm
 
 # Network - MUST MATCH robot/reip_node.py
 # Hardware mode: all robots listen on UDP_PORT (5100).
@@ -42,7 +48,7 @@ ARENA_HEIGHT_MM = 1500  # mm (16:12 aspect, ~matches 16:9 camera)
 UDP_PORT = 5100  # Position updates to robots
 UDP_PEER_PORT = 5200  # Robot peer-to-peer broadcasts (we eavesdrop)
 BROADCAST_IP = "192.168.20.255"
-POSITION_RATE = 30  # Hz
+POSITION_RATE = int(DEFAULT_ARUCO.position_rate_hz)
 
 # Robot IPs (None = broadcast to all, or set specific IPs for unicast)
 ROBOT_IPS = {
@@ -104,7 +110,7 @@ class PositionServer:
         self.homography = None      # 3x3 pixel→arena transform
         self.inv_homography = None  # 3x3 arena→pixel (for overlay drawing)
         self.use_homography = True  # Try to use corner markers
-        self._corner_history = deque(maxlen=20)
+        self._corner_history = deque(maxlen=DEFAULT_ARUCO.stable_corner_frames)
         self._homography_locked = False
         
         # Fallback linear calibration
@@ -240,26 +246,11 @@ class PositionServer:
     def _write_calibration_header(self):
         """Write calibration/homography data as first JSONL line so post-processing
         can reconstruct arena-to-pixel transforms without the live server."""
-        header = {
-            'type': 'calibration',
-            'arena_width_mm': ARENA_WIDTH_MM,
-            'arena_height_mm': ARENA_HEIGHT_MM,
-            'cam_h': self.CAM_H,
-            'corner_h': self.CORNER_H,
-            'robot_tag_h': self.ROBOT_TAG_H,
-            'camera_center_x': self.CAMERA_CENTER_X,
-            'camera_center_y': self.CAMERA_CENTER_Y,
-            'floor_scale': self.FLOOR_SCALE,
-            'robot_scale': self.ROBOT_SCALE,
+        header = {'type': 'calibration', **hardware_overlay_header()}
+        header.update({
             'homography': self.homography.tolist() if self.homography is not None else None,
             'inv_homography': self.inv_homography.tolist() if self.inv_homography is not None else None,
-            'corner_dst_pts': [[-115, 0], [2110, 0],
-                               [2110, ARENA_HEIGHT_MM], [-113, ARENA_HEIGHT_MM]],
-            'cell_size': 125,
-            'interior_wall_x_left': 1000,
-            'interior_wall_x_right': 1036,
-            'interior_wall_y_end': 1200,
-        }
+        })
         if self.state_log_file:
             self.state_log_file.write(json.dumps(header) + '\n')
 
@@ -308,13 +299,13 @@ class PositionServer:
     # Two height corrections — homography maps the wall-top plane (152mm).
     # 1. Arena contour: wall-top → floor (0mm), scale outward ~7.5%
     # 2. Robot positions: wall-top → robot tag height (80mm), scale outward ~3.5%
-    CAM_H = 2190             # mm — camera above arena floor
-    CORNER_H = 152           # mm — corner tags on 6-inch walls
-    ROBOT_TAG_H = 80         # mm — robot ArUco tags are 8 cm up
-    CAMERA_CENTER_X = 1000   # arena X directly below camera
-    CAMERA_CENTER_Y = -40    # arena Y directly below camera (750 - 790)
-    FLOOR_SCALE = CAM_H / (CAM_H - CORNER_H)                    # ~1.075 for arena overlay
-    ROBOT_SCALE = (CAM_H - ROBOT_TAG_H) / (CAM_H - CORNER_H)   # ~1.035 for robot positions
+    CAM_H = DEFAULT_ARUCO.cam_h_mm
+    CORNER_H = DEFAULT_ARUCO.corner_h_mm
+    ROBOT_TAG_H = DEFAULT_ARUCO.robot_tag_h_mm
+    CAMERA_CENTER_X = DEFAULT_ARUCO.camera_center_x_mm
+    CAMERA_CENTER_Y = DEFAULT_ARUCO.camera_center_y_mm
+    FLOOR_SCALE = DEFAULT_ARUCO.floor_scale
+    ROBOT_SCALE = DEFAULT_ARUCO.robot_scale
 
     def pixel_to_arena(self, px: float, py: float) -> Tuple[float, float]:
         """Convert pixel coords to arena coords (mm), corrected for floor plane."""
@@ -379,12 +370,7 @@ class PositionServer:
         #   BR(41) = 211  cm right of origin (11 cm past right edge)
         #   TR(42) = 11   cm right of right edge, level with y=1500
         #   TL(43) = 11.3 cm left of origin,      level with y=1500
-        dst_pts = np.array([
-            [-115,            0],   # BL — 11.5 cm left of origin
-            [2110,            0],   # BR — 211 cm right of origin
-            [2110, ARENA_HEIGHT_MM],   # TR — 11 cm past right edge
-            [-113, ARENA_HEIGHT_MM],   # TL — 11.3 cm left of origin
-        ], dtype=np.float32)
+        dst_pts = np.array(DEFAULT_ARUCO.corner_destination_points, dtype=np.float32)
         
         if self._homography_locked:
             return
@@ -506,29 +492,12 @@ class PositionServer:
 
     def _is_wall_cell(self, cx: int, cy: int) -> bool:
         """Mirror of robot's _is_wall_cell for overlay rendering."""
-        OUTER_WALL_MARGIN = 110  # match robot ROBOT_RADIUS — excludes perimeter cells
-        DIVIDER_MARGIN = 64   # match robot BODY_HALF_WIDTH
-        BODY_RADIUS = 77
-        CELL_SIZE = 125
-        INTERIOR_WALL_X_LEFT = 1000
-        INTERIOR_WALL_X_RIGHT = 1036
-        INTERIOR_WALL_Y_END = 1200
-
-        x = cx * CELL_SIZE + CELL_SIZE / 2
-        y = cy * CELL_SIZE + CELL_SIZE / 2
-        if x < OUTER_WALL_MARGIN or x > ARENA_WIDTH_MM - OUTER_WALL_MARGIN:
-            return True
-        if y < OUTER_WALL_MARGIN or y > ARENA_HEIGHT_MM - OUTER_WALL_MARGIN:
-            return True
-        if y < INTERIOR_WALL_Y_END and (
-            INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN < x < INTERIOR_WALL_X_RIGHT + DIVIDER_MARGIN):
-            return True
-        return False
+        return DEFAULT_ARENA.is_wall_cell(cx, cy)
 
     def _build_cell_cache(self):
         """Pre-compute cell pixel corners and wall status (called once when
         homography is established, avoids 768 perspective transforms per frame)."""
-        CELL_SIZE = 125
+        CELL_SIZE = DEFAULT_ARENA.cell_size_mm
         cells_x = int(ARENA_WIDTH_MM / CELL_SIZE)
         cells_y = int(ARENA_HEIGHT_MM / CELL_SIZE)
         self._cell_polys = []
@@ -589,11 +558,11 @@ class PositionServer:
             return
 
         WALL_MARGIN = 0    # no software padding — ToF handles avoidance
-        DIVIDER_MARGIN = 64   # match robot BODY_HALF_WIDTH
-        CELL_SIZE = 125
-        INTERIOR_WALL_X_LEFT = 1000
-        INTERIOR_WALL_X_RIGHT = 1036
-        INTERIOR_WALL_Y_END = 1200
+        DIVIDER_MARGIN = DEFAULT_ARENA.divider_margin_mm
+        CELL_SIZE = DEFAULT_ARENA.cell_size_mm
+        INTERIOR_WALL_X_LEFT = DEFAULT_ARENA.interior_wall_x_left_mm
+        INTERIOR_WALL_X_RIGHT = DEFAULT_ARENA.interior_wall_x_right_mm
+        INTERIOR_WALL_Y_END = DEFAULT_ARENA.interior_wall_y_end_mm
         cells_x = int(ARENA_WIDTH_MM / CELL_SIZE)
         cells_y = int(ARENA_HEIGHT_MM / CELL_SIZE)
 

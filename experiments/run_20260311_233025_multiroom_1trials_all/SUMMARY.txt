@@ -1,0 +1,21 @@
+REIP Experiment Run: run_20260311_233025_multiroom_1trials_all
+Date: 2026-03-11 23:35
+Layouts: ['multiroom']
+Conditions: 4
+Trials per condition: 1
+Total experiments: 4
+Workers: 2
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault        Ablation          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+multiroom  reip           bad_leader   no_causality      1       4.9+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       4.9
+multiroom  reip           bad_leader   no_direction      1      45.9+/-0.0           N/A           N/A           N/A     0.17+/-0.00     2.02+/-0.00   100%   0.0      45.9
+multiroom  reip           bad_leader   no_trust          1       4.9+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       4.9
+multiroom  reip           none         no_causality      1       4.9+/-0.0           N/A           N/A           N/A             N/A             N/A     0%   0.0       4.9
+========================================================================================================================
+
+KEY COMPARISONS:

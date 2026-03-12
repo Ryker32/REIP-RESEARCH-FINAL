@@ -16,6 +16,8 @@ MOTOR FAULTS (caught by anomaly detection):
 LEADERSHIP FAULT (caught by three-tier trust model):
   bad_leader <id> - Leader sends robots to already-explored cells
                     THIS IS THE KEY DEMO for WSSEF!
+  self_injure_leader <id> - Leader commands followers into an occupied peer zone
+                            Critical coordination / collision-inducing attack
 
 CONTROL:
   clear <id>     - Clear all faults, return to normal
@@ -105,7 +107,7 @@ class FaultInjector:
         print("=== REIP Fault Injector ===")
         print("Trial control:    start              <-- START THE TRIAL")
         print("Motor faults:     spin <id>, stop <id>, erratic <id>")
-        print("Leadership fault: bad_leader <id>  <-- KEY DEMO")
+        print("Leadership faults: bad_leader <id>, self_injure_leader <id>")
         print("Control:          clear <id>, status, quit\n")
         
         while True:
@@ -130,19 +132,22 @@ class FaultInjector:
                     else:
                         print("No active faults")
                 
-                elif parts[0] in ['spin', 'stop', 'erratic', 'bad_leader'] and len(parts) >= 2:
+                elif parts[0] in ['spin', 'stop', 'erratic', 'bad_leader', 'self_injure_leader'] and len(parts) >= 2:
                     rid = int(parts[1])
                     self.inject(rid, parts[0])
                     if parts[0] == 'bad_leader':
                         print("  → Leader will now send robots to explored cells")
                         print("  → Watch for trust decay in followers!")
+                    elif parts[0] == 'self_injure_leader':
+                        print("  → Leader will now attract followers into an occupied peer zone")
+                        print("  → Watch whether REIP followers reject the unsafe command!")
                 
                 elif parts[0] == 'clear' and len(parts) >= 2:
                     rid = int(parts[1])
                     self.inject(rid, 'none')
                 
                 else:
-                    print("Unknown command. Try: bad_leader 1, spin 2, clear 1, status, quit")
+                    print("Unknown command. Try: bad_leader 1, self_injure_leader 1, spin 2, clear 1, status, quit")
                     
             except ValueError:
                 print("Invalid robot ID")

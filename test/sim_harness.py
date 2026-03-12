@@ -35,6 +35,21 @@ BROADCAST_IP = "127.0.0.1"
 ARENA_WIDTH = 2000
 ARENA_HEIGHT = 1500
 CELL_SIZE = 125
+ARENA_LAYOUTS = {
+    "open": [],
+    "multiroom": [
+        (1000, 0, 1000, 1200),
+    ],
+}
+START_PRESETS = {
+    "hardware_clone_20260308": {
+        1: (185.9, 382.1, 0.188),
+        2: (792.9, 709.2, 2.255),
+        3: (318.8, 147.4, 0.736),
+        4: (768.7, 219.2, 1.577),
+        5: (182.4, 709.9, 0.410),
+    },
+}
 
 # Simulation
 SIM_RATE = 10  # Hz
@@ -232,20 +247,45 @@ class FaultInjector:
 # ============== Main ==============
 def main():
     num_robots = int(sys.argv[1]) if len(sys.argv) > 1 else NUM_ROBOTS
+    layout = sys.argv[2] if len(sys.argv) > 2 else "open"
+    start_preset = sys.argv[3] if len(sys.argv) > 3 else None
     
     print(f"Starting REIP simulation with {num_robots} robots...")
     print("This tests the actual reip_node.py code with mocked positions.\n")
+    if layout not in ARENA_LAYOUTS:
+        print(f"Unknown layout '{layout}'. Available: {', '.join(ARENA_LAYOUTS.keys())}")
+        sys.exit(1)
+    if start_preset is not None and start_preset not in START_PRESETS:
+        print(f"Unknown start preset '{start_preset}'. Available: {', '.join(START_PRESETS.keys())}")
+        sys.exit(1)
     
     # Create simulated robots with random starting positions
     robots = {}
+    preset_starts = START_PRESETS.get(start_preset, {})
     for i in range(1, num_robots + 1):
+        if i in preset_starts:
+            start_x, start_y, start_theta = preset_starts[i]
+            target_x, target_y = start_x, start_y
+        elif layout == "multiroom":
+            col = (i - 1) % 2
+            row = (i - 1) // 2
+            start_x = 200 + col * 250
+            start_y = 200 + row * 300
+            start_theta = 0.0
+            target_x, target_y = start_x, start_y
+        else:
+            start_x = random.uniform(200, ARENA_WIDTH - 200)
+            start_y = random.uniform(200, ARENA_HEIGHT - 200)
+            start_theta = random.uniform(0, 2 * math.pi)
+            target_x = random.uniform(100, ARENA_WIDTH - 100)
+            target_y = random.uniform(100, ARENA_HEIGHT - 100)
         robots[i] = SimRobot(
             robot_id=i,
-            x=random.uniform(200, ARENA_WIDTH - 200),
-            y=random.uniform(200, ARENA_HEIGHT - 200),
-            theta=random.uniform(0, 2 * math.pi),
-            target_x=random.uniform(100, ARENA_WIDTH - 100),
-            target_y=random.uniform(100, ARENA_HEIGHT - 100)
+            x=start_x,
+            y=start_y,
+            theta=start_theta,
+            target_x=target_x,
+            target_y=target_y
         )
     
     # Start mock position server

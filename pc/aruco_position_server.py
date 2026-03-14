@@ -102,6 +102,14 @@ class PositionServer:
         # ArUco
         self.aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
         self.aruco_params = cv2.aruco.DetectorParameters()
+        self.aruco_params.adaptiveThreshWinSizeMin = 3
+        self.aruco_params.adaptiveThreshWinSizeMax = 30
+        self.aruco_params.adaptiveThreshWinSizeStep = 5
+        self.aruco_params.adaptiveThreshConstant = 7
+        self.aruco_params.minMarkerPerimeterRate = 0.01
+        self.aruco_params.maxMarkerPerimeterRate = 4.0
+        self.aruco_params.perspectiveRemovePixelPerCell = 6
+        self.aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
         self.detector = cv2.aruco.ArucoDetector(self.aruco_dict, self.aruco_params)
         
         # Calibration - two modes:

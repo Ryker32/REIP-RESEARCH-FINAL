@@ -41,18 +41,68 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if PROJECT_ROOT not in os.sys.path:
     os.sys.path.insert(0, PROJECT_ROOT)
 
-from hardware_fidelity import (
-    BROADCAST_RATE_HZ,
-    CONTROL_RATE_HZ,
-    DEFAULT_ARENA,
-    LEADER_ACK_STALE_S,
-    PEER_TIMEOUT_S,
-    POSITION_FRESHNESS_S,
-    POSITION_STOP_TIMEOUT_S,
-    SIM_MOTOR_PORT,
-    SIM_PEER_RELAY_PORT,
-    SIM_SENSOR_PORT,
-)
+try:
+    from hardware_fidelity import (
+        BROADCAST_RATE_HZ,
+        CONTROL_RATE_HZ,
+        DEFAULT_ARENA,
+        LEADER_ACK_STALE_S,
+        PEER_TIMEOUT_S,
+        POSITION_FRESHNESS_S,
+        POSITION_STOP_TIMEOUT_S,
+        SIM_MOTOR_PORT,
+        SIM_PEER_RELAY_PORT,
+        SIM_SENSOR_PORT,
+    )
+except ImportError:
+    import math as _math
+
+    BROADCAST_RATE_HZ = 5.0
+    CONTROL_RATE_HZ = 10.0
+    LEADER_ACK_STALE_S = 1.5
+    PEER_TIMEOUT_S = 3.0
+    POSITION_FRESHNESS_S = 0.5
+    POSITION_STOP_TIMEOUT_S = 2.0
+    SIM_MOTOR_PORT = 6100
+    SIM_PEER_RELAY_PORT = 6200
+    SIM_SENSOR_PORT = 6300
+
+    class _ArenaGeometry:
+        width_mm = 1905; height_mm = 1500; cell_size_mm = 150
+        robot_radius_mm = 100; body_radius_mm = 77; body_half_width_mm = 64
+        body_front_mm = 55; swept_radius_mm = int(_math.sqrt(77**2 + 64**2))
+        tof_sensor_offset_mm = 55; avoid_distance_mm = 280; critical_distance_mm = 160
+        interior_wall_x_left_mm = 1000; interior_wall_x_right_mm = 1036
+        interior_wall_x_mm = 1018; interior_wall_y_end_mm = 1050
+        outer_wall_margin_mm = 110; divider_margin_mm = 64; repulsion_zone_mm = 350
+
+        @property
+        def divider_tip_clearance_mm(self):
+            return self.swept_radius_mm
+
+        def cell_to_pos(self, cell):
+            return ((cell[0] + 0.5) * self.cell_size_mm, (cell[1] + 0.5) * self.cell_size_mm)
+
+        def is_free_point(self, x_mm, y_mm, wall_clearance_mm=None):
+            c = self.outer_wall_margin_mm if wall_clearance_mm is None else wall_clearance_mm
+            if x_mm < c or x_mm > self.width_mm - c:
+                return False
+            if y_mm < c or y_mm > self.height_mm - c:
+                return False
+            if y_mm < self.interior_wall_y_end_mm:
+                dc = min(c, self.divider_margin_mm)
+                if self.interior_wall_x_left_mm - dc < x_mm < self.interior_wall_x_right_mm + dc:
+                    return False
+            for tip_x in (self.interior_wall_x_left_mm, self.interior_wall_x_right_mm):
+                if _math.hypot(x_mm - tip_x, y_mm - self.interior_wall_y_end_mm) < self.divider_tip_clearance_mm:
+                    return False
+            return True
+
+        def is_wall_cell(self, cx, cy):
+            pos = self.cell_to_pos((cx, cy))
+            return not self.is_free_point(pos[0], pos[1], wall_clearance_mm=self.outer_wall_margin_mm)
+
+    DEFAULT_ARENA = _ArenaGeometry()
 
 MAX_RX_MESSAGES_PER_TICK = 32
 
@@ -136,23 +186,37 @@ class Hardware:
             print("  Hardware: SIMULATED")
             return
 
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 self.uart = serial.Serial('/dev/serial0', 115200, timeout=0.1)
                 time.sleep(0.5)
                 self.uart.reset_input_buffer()
                 self.bus = smbus.SMBus(1)
+                try:
+                    self.bus.write_byte(0x70, 0)
+                except Exception:
+                    pass
+                time.sleep(0.2)
                 self.i2c = busio.I2C(board.SCL, board.SDA)
                 self.MUX_ADDR = 0x70
                 self.tof_sensors = {}
                 self._init_tof_sensors()
+                if len(self.tof_sensors) < 3:
+                    raise RuntimeError(f"Only {len(self.tof_sensors)}/5 ToF sensors init'd")
                 self._ping_pico()
                 self.hw_ok = True
                 break
             except Exception as e:
-                print(f"  Hardware init attempt {attempt+1} failed: {e}")
-                if attempt == 0:
-                    time.sleep(1)
+                print(f"  Hardware init attempt {attempt+1}/3 failed: {e}")
+                try:
+                    self.bus.close()
+                except Exception:
+                    pass
+                try:
+                    self.i2c.deinit()
+                except Exception:
+                    pass
+                time.sleep(1.0 + attempt)
         if not self.hw_ok:
             print("  WARNING: Hardware init failed, running with degraded sensors")
     
@@ -287,6 +351,7 @@ class RAFTNode:
         self.leader_mission_complete = False
         self.active_robot_ids: Set[int] = set(range(1, NUM_ROBOTS + 1))
         self.active_robot_count: int = NUM_ROBOTS
+        self._votes_received: Set[int] = set()
         self._heartbeat_seq = 0
         self._heartbeat_digest: Optional[str] = None
         self._heartbeat_ack_sets: Dict[str, Set[int]] = {}
@@ -331,6 +396,8 @@ class RAFTNode:
         self._init_sockets()
         
         self.trial_started = False
+        self._trial_start_mono = 0.0
+        self._trial_max_duration = 180.0
 
         # Fault injection
         self.injected_fault = None
@@ -656,7 +723,8 @@ class RAFTNode:
             'visited_cells': list(self.my_visited)[-100:],
             'navigation_target': list(self.current_navigation_target) if self.current_navigation_target else None,
             'commanded_target': list(self.assigned_target) if self.assigned_target else None,
-            'assignments': assignments,  # Include for experiment harness
+            'assignments': assignments,
+            'trial_started': self.trial_started,
             'timestamp': time.time()
         }
         self.broadcast_message(msg)
@@ -708,7 +776,7 @@ class RAFTNode:
             self._handle_heartbeat_ack(msg)
     
     def handle_heartbeat(self, msg: dict):
-        """Receive heartbeat from leader - reset election timeout"""
+        """Receive heartbeat from leader - reset election timeout."""
         leader_id = msg.get('leader_id')
         term = msg.get('term', 0)
         
@@ -724,7 +792,6 @@ class RAFTNode:
             if heartbeat_digest and heartbeat_seq is not None:
                 self._send_heartbeat_ack(leader_id, term, heartbeat_seq, heartbeat_digest)
             
-            # Get my assignment (NO TRUST CHECK - just follow)
             assignments = msg.get('assignments', {})
             if str(self.robot_id) in assignments:
                 self.assigned_target = tuple(assignments[str(self.robot_id)])
@@ -734,7 +801,7 @@ class RAFTNode:
                 self.assigned_target_rx_mono = 0.0
     
     def handle_vote_request(self, msg: dict):
-        """Handle vote request from candidate"""
+        """Handle vote request from candidate."""
         candidate_id = msg.get('candidate_id')
         term = msg.get('term', 0)
         
@@ -742,23 +809,25 @@ class RAFTNode:
             self.current_term = term
             self.voted_for = None
             self.state = RaftState.FOLLOWER
+            self.last_heartbeat = time.time()
+            self.election_timeout = self._random_election_timeout()
         
         if term >= self.current_term and self.voted_for in (None, candidate_id):
             self.voted_for = candidate_id
+            self.last_heartbeat = time.time()
+            self.election_timeout = self._random_election_timeout()
             self.send_vote(candidate_id, term)
     
     def handle_vote_response(self, msg: dict):
-        """Handle vote response"""
+        """Handle vote response -- check for majority."""
         if self.state != RaftState.CANDIDATE:
             return
         
         if msg.get('granted') and msg.get('term') == self.current_term:
-            # Count votes
             voter = msg.get('voter_id')
             if voter not in self._votes_received:
                 self._votes_received.add(voter)
             
-            # Check majority
             if len(self._votes_received) >= self._quorum_size():
                 self.become_leader()
     
@@ -768,6 +837,20 @@ class RAFTNode:
         if peer_id and peer_id != self.robot_id:
             if peer_id not in self.active_robot_ids:
                 return
+            if msg.get('trial_started') and not self.trial_started:
+                self.trial_started = True
+                self._trial_start_mono = time.monotonic()
+                self.my_visited.clear()
+                self.known_visited.clear()
+                self.assigned_target_rx_mono = 0.0
+                self.current_navigation_target = None
+                self._raw_navigation_target = None
+                self._last_stop_reason = "trial_started"
+                self._last_command_source = "trial_started"
+                self._last_motor_cmd = (0.0, 0.0)
+                if hasattr(self, '_nav_history'):
+                    self._nav_history.clear()
+                print(f"[START] Auto-started via peer R{peer_id} broadcast")
             existing = self.peers.get(peer_id, {})
             peer_seq = msg.get('peer_seq')
             if peer_seq is not None:
@@ -795,45 +878,45 @@ class RAFTNode:
                 self.known_visited.add(tuple(cell))
     
     def check_election_timeout(self):
-        """Check if we should start election (leader heartbeat timeout)"""
+        """Check if we should start election (leader heartbeat timeout)."""
         if self.state == RaftState.LEADER:
             return
-        
         if time.time() - self.last_heartbeat > self.election_timeout:
             self.start_election()
     
     def start_election(self):
-        """Start leader election"""
+        """Start leader election -- increment term, vote for self, request votes."""
         self.state = RaftState.CANDIDATE
         self.current_term += 1
         self.voted_for = self.robot_id
         self._votes_received = {self.robot_id}
         self.election_timeout = self._random_election_timeout()
         self.last_heartbeat = time.time()
-        
         print(f"[RAFT] Starting election, term {self.current_term}")
         self.request_votes()
     
     def become_leader(self):
-        """Transition to leader state"""
-        # Split-brain resolution: if a peer with lower ID already claims
-        # leadership, yield to them instead.
+        """Transition to leader state after winning election."""
         for pid, peer in self.peers.items():
             if (peer.get('state') == 'leader' and pid < self.robot_id and
                 time.time() - peer.get('last_seen', 0) < self.peer_timeout):
                 self.state = RaftState.FOLLOWER
                 self.current_leader = pid
-                print(f"[RAFT] Yielding leader to lower-ID R{pid}")
+                self.last_heartbeat = time.time()
+                self.election_timeout = self._random_election_timeout()
+                print(f"[RAFT] Yielding to lower-ID leader R{pid}")
                 return
+        
         self.state = RaftState.LEADER
         self.current_leader = self.robot_id
-        self._leader_quorum_mono = 0.0
+        self._leader_quorum_mono = time.monotonic()
         self._leader_claim_mono = time.monotonic()
         self._heartbeat_seq = 0
         self._heartbeat_digest = None
         self._heartbeat_ack_sets.clear()
         self._prev_assignments.clear()
-        print(f"[RAFT] Became leader, term {self.current_term}")
+        print(f"[RAFT] Won election, term {self.current_term}")
+        self.send_heartbeat()
     
     # ==================== TASK ASSIGNMENT ====================
     def _side_of_divider(self, pos: Tuple[float, float]) -> int:
@@ -1229,10 +1312,18 @@ class RAFTNode:
 
     def _finalize_motor_command(self, left: float, right: float,
                                 stop_reason: Optional[str] = None) -> Tuple[float, float]:
-        MAX_PWM_STEP = 20.0
-        prev_left, prev_right = self._last_motor_cmd
-        left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
-        right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
+        if stop_reason in ("escape_reverse", "stuck_escape"):
+            pass
+        elif stop_reason in ("peer_emergency", "tof_emergency", "escape_pivot"):
+            MAX_PWM_STEP = 50.0
+            prev_left, prev_right = self._last_motor_cmd
+            left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+            right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
+        else:
+            MAX_PWM_STEP = 20.0
+            prev_left, prev_right = self._last_motor_cmd
+            left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+            right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
         if abs(left) < 1e-6:
             left = 0.0
         if abs(right) < 1e-6:
@@ -1267,13 +1358,13 @@ class RAFTNode:
 
         self._nav_history.append((now, self.x, self.y))
         self._nav_history = [(t, x, y) for t, x, y in self._nav_history
-                             if now - t < 3.0]
+                             if now - t < 2.5]
         if len(self._nav_history) < 2:
             return False
         oldest_t, oldest_x, oldest_y = self._nav_history[0]
         elapsed = now - oldest_t
         moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-        return elapsed > 1.5 and moved < 20
+        return elapsed > 0.8 and moved < 15
 
     def _nearest_navigable_cell(self, cx, cy):
         """BFS from a wall cell to find the closest non-wall cell."""
@@ -1549,11 +1640,11 @@ class RAFTNode:
                  abs(self.x - INTERIOR_WALL_X) < DIVIDER_MARGIN + 80)
             )
 
-            reverse_dur = 0.0 if in_wall_zone else 0.4
-            pivot_end = reverse_dur + 0.6
+            reverse_dur = 0.0 if in_wall_zone else 0.55
+            pivot_end = reverse_dur + 0.5
 
             if phase_elapsed < reverse_dur:
-                return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
+                return self._finalize_motor_command(-BASE_SPEED * 0.75, -BASE_SPEED * 0.75, "escape_reverse")
             elif phase_elapsed < pivot_end:
                 diff = escape_angle - self.theta
                 while diff > math.pi: diff -= 2 * math.pi
@@ -1600,8 +1691,8 @@ class RAFTNode:
 
         TOF_EMERGENCY_DIST = 120
         if min_front > 20 and min_front < TOF_EMERGENCY_DIST:
-            self._tof_emergency_count += 1
-            if self._tof_emergency_count >= 3:
+            self._tof_emergency_count += 2
+            if self._tof_emergency_count >= 4:
                 self._tof_emergency_count = 0
                 self._stuck_count += 1
                 escape_time = min(2.0 + self._stuck_count * 0.5, 4.0)
@@ -1625,7 +1716,7 @@ class RAFTNode:
                 self._last_command_source = "tof_emergency"
                 return self._finalize_motor_command(-BASE_SPEED * 0.7, -BASE_SPEED * 0.7, "tof_emergency")
         else:
-            self._tof_emergency_count = 0
+            self._tof_emergency_count = max(0, self._tof_emergency_count - 1)
 
         PEER_HARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 20
         PEER_FORWARD_CONTACT_DIST = 2 * ROBOT_RADIUS + 50
@@ -1959,6 +2050,7 @@ class RAFTNode:
                         if self.trial_started:
                             continue
                         self.trial_started = True
+                        self._trial_start_mono = time.monotonic()
                         self.my_visited.clear()
                         self.known_visited.clear()
                         self.assigned_target_rx_mono = 0.0
@@ -2053,28 +2145,20 @@ class RAFTNode:
             self.receive_messages()
             
             now = time.time()
+            now_mono = time.monotonic()
             
             # State broadcast
             if now - last_broadcast > 1.0 / BROADCAST_RATE:
                 self.send_state()
                 last_broadcast = now
             
+            # Raft election timeout check
+            self.check_election_timeout()
+
             # Leader heartbeat
             if self.state == RaftState.LEADER and now - last_heartbeat > HEARTBEAT_INTERVAL:
                 self.send_heartbeat()
                 last_heartbeat = now
-
-            if (self.state == RaftState.LEADER and
-                now - self._leader_claim_mono > HEARTBEAT_TIMEOUT and
-                not self._leader_quorum_ok()):
-                print("[RAFT] Lost heartbeat quorum, stepping down")
-                self.state = RaftState.FOLLOWER
-                self.current_leader = None
-                self.last_heartbeat = now
-                self.election_timeout = self._random_election_timeout()
-            
-            # Check election timeout
-            self.check_election_timeout()
             
             # Prune peers
             dead = [p for p, d in self.peers.items() if now - d.get('last_seen', 0) > self.peer_timeout]
@@ -2089,15 +2173,19 @@ class RAFTNode:
         last_log = 0
         printed_waiting = False
         
-        # Initialize votes set
-        self._votes_received = set()
-        
         while self.running:
             start = time.time()
 
             if not self.trial_started and not printed_waiting:
                 print(f"[R{self.robot_id}] Waiting for 'start' command...")
                 printed_waiting = True
+
+            if (self.trial_started and self._trial_start_mono > 0 and
+                time.monotonic() - self._trial_start_mono > self._trial_max_duration):
+                print(f"[R{self.robot_id}] Trial duration exceeded {self._trial_max_duration}s, auto-stopping")
+                self.hw.stop()
+                self.running = False
+                break
 
             left, right = 0.0, 0.0
             pos_age = time.monotonic() - self.position_rx_mono if self.position_rx_mono > 0 else float('inf')

@@ -45,20 +45,74 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in os.sys.path:
     os.sys.path.insert(0, PROJECT_ROOT)
 
-from hardware_fidelity import (
-    ASSIGNMENT_STALE_S,
-    BROADCAST_RATE_HZ,
-    CAUSALITY_GRACE_S,
-    CONTROL_RATE_HZ,
-    DEFAULT_ARENA,
-    LEADER_ACK_STALE_S,
-    PEER_TIMEOUT_S,
-    POSITION_FRESHNESS_S,
-    POSITION_STOP_TIMEOUT_S,
-    SIM_MOTOR_PORT,
-    SIM_PEER_RELAY_PORT,
-    SIM_SENSOR_PORT,
-)
+try:
+    from hardware_fidelity import (
+        ASSIGNMENT_STALE_S,
+        BROADCAST_RATE_HZ,
+        CAUSALITY_GRACE_S,
+        CONTROL_RATE_HZ,
+        DEFAULT_ARENA,
+        LEADER_ACK_STALE_S,
+        PEER_TIMEOUT_S,
+        POSITION_FRESHNESS_S,
+        POSITION_STOP_TIMEOUT_S,
+        SIM_MOTOR_PORT,
+        SIM_PEER_RELAY_PORT,
+        SIM_SENSOR_PORT,
+    )
+except ImportError:
+    import math as _math
+    ASSIGNMENT_STALE_S = 5.0
+    BROADCAST_RATE_HZ = 5.0
+    CAUSALITY_GRACE_S = 0.5
+    CONTROL_RATE_HZ = 10.0
+    LEADER_ACK_STALE_S = 1.5
+    PEER_TIMEOUT_S = 3.0
+    POSITION_FRESHNESS_S = 1.0
+    POSITION_STOP_TIMEOUT_S = 2.0
+    SIM_MOTOR_PORT = 5400
+    SIM_PEER_RELAY_PORT = 5500
+    SIM_SENSOR_PORT = 5600
+
+    class _ArenaGeometry:
+        width_mm = 2000; height_mm = 1500; cell_size_mm = 125
+        robot_radius_mm = 110.0; body_radius_mm = 77.0
+        body_half_width_mm = 64.0; body_front_mm = 70.0
+        swept_radius_mm = 100.0; tof_sensor_offset_mm = 70.0
+        tof_range_mm = 200.0; avoid_distance_mm = 200.0
+        critical_distance_mm = 100.0
+        interior_wall_x_left_mm = 1000.0; interior_wall_x_right_mm = 1036.0
+        interior_wall_y_end_mm = 1200.0; repulsion_zone_mm = 220.0
+        interior_wall_x_mm = 1018.0
+        outer_wall_margin_mm = 110.0
+        divider_margin_mm = 64.0
+        divider_tip_clearance_mm = 100.0
+        cols = 16; rows = 12
+
+        def cell_to_pos(self, cell):
+            return ((cell[0] + 0.5) * self.cell_size_mm,
+                    (cell[1] + 0.5) * self.cell_size_mm)
+
+        def is_free_point(self, x_mm, y_mm, wall_clearance_mm=None):
+            c = self.outer_wall_margin_mm if wall_clearance_mm is None else wall_clearance_mm
+            if x_mm < c or x_mm > self.width_mm - c:
+                return False
+            if y_mm < c or y_mm > self.height_mm - c:
+                return False
+            if y_mm < self.interior_wall_y_end_mm:
+                dc = min(c, self.divider_margin_mm)
+                if self.interior_wall_x_left_mm - dc < x_mm < self.interior_wall_x_right_mm + dc:
+                    return False
+            for tip_x in (self.interior_wall_x_left_mm, self.interior_wall_x_right_mm):
+                if _math.hypot(x_mm - tip_x, y_mm - self.interior_wall_y_end_mm) < self.divider_tip_clearance_mm:
+                    return False
+            return True
+
+        def is_wall_cell(self, cx, cy):
+            pos = self.cell_to_pos((cx, cy))
+            return not self.is_free_point(pos[0], pos[1], wall_clearance_mm=self.outer_wall_margin_mm)
+
+    DEFAULT_ARENA = _ArenaGeometry()
 
 MAX_RX_MESSAGES_PER_TICK = 32
 
@@ -250,23 +304,37 @@ class Hardware:
             print("  Hardware: SIMULATED")
             return
 
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 self.uart = serial.Serial('/dev/serial0', 115200, timeout=0.1)
                 time.sleep(0.5)
                 self.uart.reset_input_buffer()
                 self.bus = smbus.SMBus(1)
+                try:
+                    self.bus.write_byte(0x70, 0)
+                except Exception:
+                    pass
+                time.sleep(0.2)
                 self.i2c = busio.I2C(board.SCL, board.SDA)
                 self.MUX_ADDR = 0x70
                 self.tof_sensors = {}
                 self._init_tof_sensors()
+                if len(self.tof_sensors) < 3:
+                    raise RuntimeError(f"Only {len(self.tof_sensors)}/5 ToF sensors init'd")
                 self._ping_pico()
                 self.hw_ok = True
                 break
             except Exception as e:
-                print(f"  Hardware init attempt {attempt+1} failed: {e}")
-                if attempt == 0:
-                    time.sleep(1)
+                print(f"  Hardware init attempt {attempt+1}/3 failed: {e}")
+                try:
+                    self.bus.close()
+                except Exception:
+                    pass
+                try:
+                    self.i2c.deinit()
+                except Exception:
+                    pass
+                time.sleep(1.0 + attempt)
         if not self.hw_ok:
             print("  WARNING: Hardware init failed, running with degraded sensors")
     
@@ -492,6 +560,8 @@ class REIPNode:
         
         # Trial gating — motors stay off until explicit "start" command
         self.trial_started = False
+        self._trial_start_mono = 0.0
+        self._trial_max_duration = 180.0
 
         # Fault injection state
         self.injected_fault = None  # Motor faults: 'spin', 'stop', 'erratic'
@@ -909,6 +979,7 @@ class REIPNode:
             'predicted_target': list(self.my_predicted_target) if self.my_predicted_target else None,
             'commanded_target': list(self.leader_assigned_target) if self.leader_assigned_target else None,
             'command_source': self._last_command_source,
+            'trial_started': self.trial_started,
             'assignments': assignments,  # Leader broadcasts assignments
             'timestamp': time.time()
         }
@@ -997,6 +1068,14 @@ class REIPNode:
                 self.known_visited.add(cell_tuple)
                 self.known_visited_time[cell_tuple] = now_mono  # When WE learned about it
         
+        if not self.trial_started and msg.get('trial_started'):
+            self.trial_started = True
+            self._trial_start_mono = time.monotonic()
+            self.my_visited.clear()
+            self.known_visited.clear()
+            self.known_visited_time.clear()
+            print(f"[START] Auto-started via peer R{peer_id} broadcast")
+
         if (msg.get('leader_id') == peer_id and
             peer.reported_leader_digest and
             (peer_id == self.current_leader or peer_id == self.my_vote)):
@@ -1962,21 +2041,34 @@ class REIPNode:
                 )[0][0]
 
             self.current_leader = tentative_leader
+            leader_impeached = (
+                old_leader is not None and
+                old_leader != self.robot_id and
+                old_leader in self.peers and
+                self.peers[old_leader].my_trust_for_them < IMPEACHMENT_THRESHOLD
+            )
             if tentative_leader != self.robot_id and tentative_votes < quorum_size and old_leader is not None:
-                self.current_leader = old_leader
+                if not leader_impeached:
+                    self.current_leader = old_leader
             if tentative_leader == self.robot_id and old_leader not in (None, self.robot_id):
-                if supported_external_leader is not None:
+                external_is_impeached = (
+                    supported_external_leader is not None and
+                    supported_external_leader in self.peers and
+                    self.peers[supported_external_leader].my_trust_for_them < IMPEACHMENT_THRESHOLD
+                )
+                if supported_external_leader is not None and not external_is_impeached:
                     self.current_leader = supported_external_leader
                     self.my_vote = supported_external_leader
                     print(f"[ELECTION] Following peer-reported leader R{supported_external_leader}")
-                elif self._election_settled and tentative_votes < quorum_size:
+                elif self._election_settled and tentative_votes < quorum_size and not leader_impeached:
                     self.current_leader = old_leader
                     self.state = RobotState.FOLLOWER
                     self.my_vote = old_leader
                     print(f"[ELECTION] Holding leader R{old_leader} during isolation")
             elif tentative_leader == self.robot_id and tentative_votes < quorum_size:
-                self.current_leader = old_leader
-                self.state = RobotState.FOLLOWER
+                if not leader_impeached:
+                    self.current_leader = old_leader
+                    self.state = RobotState.FOLLOWER
             
             if self.current_leader != old_leader:
                 self.current_term += 1
@@ -2083,14 +2175,18 @@ class REIPNode:
     def _finalize_motor_command(self, left: float, right: float,
                                 stop_reason: Optional[str] = None) -> Tuple[float, float]:
         """Rate-limit PWM changes so the hardware doesn't twitch between steps."""
-        # Use larger step size for emergency modes (faster response)
-        if stop_reason in ["peer_emergency", "tof_emergency", "escape_reverse", "escape_pivot"]:
+        if stop_reason in ("escape_reverse", "stuck_escape"):
+            pass  # no rate-limit -- instant reverse when wedged against wall
+        elif stop_reason in ("peer_emergency", "tof_emergency", "escape_pivot"):
             MAX_PWM_STEP = 50.0
+            prev_left, prev_right = self._last_motor_cmd
+            left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+            right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
         else:
             MAX_PWM_STEP = 20.0
-        prev_left, prev_right = self._last_motor_cmd
-        left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
-        right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
+            prev_left, prev_right = self._last_motor_cmd
+            left = max(prev_left - MAX_PWM_STEP, min(prev_left + MAX_PWM_STEP, left))
+            right = max(prev_right - MAX_PWM_STEP, min(prev_right + MAX_PWM_STEP, right))
         if abs(left) < 1e-6:
             left = 0.0
         if abs(right) < 1e-6:
@@ -2138,12 +2234,12 @@ class REIPNode:
         if self.position_rx_mono > 0.0 and now - self.position_rx_mono <= POSITION_FRESHNESS_S:
             self._nav_history.append((now, self.x, self.y))
             self._nav_history = [(t, x, y) for t, x, y in self._nav_history
-                                 if now - t < 3.0]
+                                 if now - t < 2.5]
             if len(self._nav_history) >= 2:
                 oldest_t, oldest_x, oldest_y = self._nav_history[0]
                 elapsed = now - oldest_t
                 moved = math.sqrt((self.x - oldest_x)**2 + (self.y - oldest_y)**2)
-                if elapsed > 1.5 and moved < 20:
+                if elapsed > 0.8 and moved < 15:
                     return True
         
         # Fallback: encoder-based stuck detection (works even with stale position)
@@ -2464,9 +2560,9 @@ class REIPNode:
             phase_elapsed = time.monotonic() - self._escape_start
             escape_angle = self._escape_angle
             self._set_motion_override_target(escape_angle, 300.0)
-            if phase_elapsed < 0.30:
-                return self._finalize_motor_command(-BASE_SPEED * 0.6, -BASE_SPEED * 0.6, "escape_reverse")
-            if phase_elapsed < 0.80:
+            if phase_elapsed < 0.55:
+                return self._finalize_motor_command(-BASE_SPEED * 0.75, -BASE_SPEED * 0.75, "escape_reverse")
+            if phase_elapsed < 1.05:
                 # Sharp arc (both wheels same sign): actual rotation in place. One wheel fwd, one back
                 # causes teetering/grinding on hardware instead of a clean spin.
                 diff = escape_angle - self.theta
@@ -2509,14 +2605,14 @@ class REIPNode:
         near_critical_tof = 20 < min_front_tof < (CRITICAL_DISTANCE + 18)
         side_pinched = min(fl_d, fr_d) < (CRITICAL_DISTANCE + 15) and min(left_d, right_d) < 260
         if 20 < min_front_tof < CRITICAL_DISTANCE or (near_critical_tof and in_tight_space) or side_pinched:
-            self._tof_emergency_count += 1
+            self._tof_emergency_count += 2
             left_clearance = min(fl_d, left_d)
             right_clearance = min(fr_d, right_d)
             turn_left = left_clearance >= right_clearance
             pivot_slow = max(35, BASE_SPEED * 0.28)
             self._last_command_source = "tof_emergency"
 
-            if self._tof_emergency_count >= 5:
+            if self._tof_emergency_count >= 4:
                 nearest_sensor = min(
                     (('front_left', fl_d), ('front', front_d), ('front_right', fr_d)),
                     key=lambda item: item[1]
@@ -2538,7 +2634,7 @@ class REIPNode:
             if turn_left:
                 return self._finalize_motor_command(pivot_slow, BASE_SPEED, "tof_emergency")
             return self._finalize_motor_command(BASE_SPEED, pivot_slow, "tof_emergency")
-        self._tof_emergency_count = 0
+        self._tof_emergency_count = max(0, self._tof_emergency_count - 1)
 
         # Peer collision: reserve the hard override for true near-contact.
         # Side-by-side neighbors were previously triggering full emergency
@@ -2922,6 +3018,7 @@ class REIPNode:
                         if self.trial_started:
                             continue
                         self.trial_started = True
+                        self._trial_start_mono = time.monotonic()
                         self.my_visited.clear()
                         self.known_visited.clear()
                         self.known_visited_time.clear()
@@ -3055,6 +3152,13 @@ class REIPNode:
             if not self.trial_started and not printed_waiting:
                 print(f"[R{self.robot_id}] Waiting for 'start' command...")
                 printed_waiting = True
+
+            if (self.trial_started and self._trial_start_mono > 0 and
+                now_mono - self._trial_start_mono > self._trial_max_duration):
+                print(f"[R{self.robot_id}] Trial duration exceeded {self._trial_max_duration}s, auto-stopping")
+                self.hw.stop()
+                self.running = False
+                break
 
             if (self.current_leader == self.robot_id and
                 self.state == RobotState.LEADER and

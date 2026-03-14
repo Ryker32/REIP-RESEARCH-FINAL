@@ -64,8 +64,8 @@ BROADCAST_IP = "192.168.20.255"
 WIFI_BIND_IP = "192.168.20.214"
 
 EXPERIMENT_DURATION = 120
-FAULT_INJECT_TIME_1 = 10
-FAULT_INJECT_TIME_2 = 30
+FAULT_INJECT_TIME_1 = 20
+FAULT_INJECT_TIME_2 = 40
 # Time from "go" to trial clock start. Robots need boot + localization + leader election.
 # Reduce to 5s for fast networks; increase if Pis are slow to boot or election is flaky.
 START_DELAY_SEC = 5
@@ -89,8 +89,8 @@ TRIALS_PER_CONDITION = 3
 
 
 # ==================== SSH helpers ====================
-# Short timeout so unreachable robots fail fast instead of "hanging"
-SSH_TIMEOUT = 2
+# Per-operation SSH timeout — 2s was too aggressive for Pi Zero 2W under load
+SSH_TIMEOUT = 8
 
 
 def check_connectivity(robot_ids=None):
@@ -126,10 +126,14 @@ def _ssh_connect(host, timeout=None):
 def _kill_one(rid, host):
     try:
         ssh = _ssh_connect(host)
-        ssh.exec_command('pkill -f reip_node; pkill -f raft_node')
+        ssh.exec_command(
+            'pkill -f reip_node; pkill -f raft_node; sleep 0.5; '
+            'pkill -9 -f reip_node; pkill -9 -f raft_node; pkill -9 -f "python3.*node.py"'
+        )
         ssh.close()
+        print(f"  R{rid}: killed")
     except Exception as e:
-        print(f"  R{rid}: {e}")
+        print(f"  R{rid}: kill failed ({e})")
 
 
 def kill_all(robot_ids=None):
@@ -142,8 +146,7 @@ def kill_all(robot_ids=None):
             ex.submit(_kill_one, rid, HOSTS[rid]): rid
             for rid in robot_ids
         }
-        # Fail fast: wait only slightly longer than one SSH timeout
-        concurrent.futures.wait(futs, timeout=SSH_TIMEOUT * len(robot_ids) + 2)
+        concurrent.futures.wait(futs, timeout=SSH_TIMEOUT + 5)
     time.sleep(0.5)
 
 
@@ -165,7 +168,11 @@ def clear_robot_logs(robot_ids=None):
 
 
 def deploy_and_launch(controller, robot_ids=None):
-    """Two-phase deploy: upload code to ALL robots, then launch ALL simultaneously."""
+    """Two-phase deploy: upload code, then launch with stagger.
+
+    Returns the list of robot IDs confirmed running.
+    Calls sys.exit(1) if zero robots start.
+    """
     if robot_ids is None:
         robot_ids = sorted(HOSTS.keys())
     if controller == 'raft':
@@ -182,7 +189,8 @@ def deploy_and_launch(controller, robot_ids=None):
     def _upload_one(rid, host):
         try:
             ssh = _ssh_connect(host)
-            ssh.exec_command('pkill -f reip_node; pkill -f raft_node')
+            ssh.exec_command('pkill -f reip_node; pkill -f raft_node; sleep 0.5; pkill -9 -f reip_node; pkill -9 -f raft_node; pkill -9 -f "python3.*node.py"')
+            time.sleep(1.0)
             sftp = ssh.open_sftp()
             for d in ['/home/pi/reip', '/home/pi/reip/logs', '/home/pi/reip/baselines']:
                 try:
@@ -197,7 +205,7 @@ def deploy_and_launch(controller, robot_ids=None):
             return (rid, None)
 
     ssh_connections = {}
-    upload_timeout = max(10, SSH_TIMEOUT * len(robot_ids) + 3)
+    upload_timeout = max(20, SSH_TIMEOUT * len(robot_ids) + 5)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
         futs = {ex.submit(_upload_one, rid, HOSTS[rid]): rid for rid in robot_ids}
         try:
@@ -210,45 +218,82 @@ def deploy_and_launch(controller, robot_ids=None):
             pass
     missing = [r for r in robot_ids if r not in ssh_connections]
     if missing:
-        print(f"[DEPLOY] FAILED: robot(s) {missing} did not upload. Fix network (ping, WiFi) or run with fewer robots, e.g. --robots 1")
+        print(f"[DEPLOY] FAILED: robot(s) {missing} did not upload. Fix network or run with fewer robots.")
         sys.exit(1)
 
     time.sleep(0.5)
 
-    # --- Phase 2: Launch ALL robots at once (simultaneous start) ---
-    print(f"[DEPLOY] Phase 2: launching all robots simultaneously...")
+    # --- Phase 2: Launch with stagger (0.4s gap avoids WiFi socket storm) ---
+    print(f"[DEPLOY] Phase 2: launching robots (staggered)...")
+    launch_cmds = {}
     for rid, ssh in ssh_connections.items():
-        try:
-            cmd = (f'cd /home/pi/reip && nohup python3 {remote_script} {rid}'
-                   f'{decentralized_flag}'
-                   f' > /tmp/reip_{rid}.log 2>&1 &')
-            ssh.exec_command(cmd)
-        except Exception as e:
-            print(f"  R{rid}: launch error ({e}), reconnecting...")
+        cmd = (f'cd /home/pi/reip && nohup python3 {remote_script} {rid}'
+               f'{decentralized_flag}'
+               f' > /tmp/reip_{rid}.log 2>&1 &')
+        launch_cmds[rid] = cmd
+        for attempt in range(2):
             try:
-                ssh.close()
-                ssh2 = _ssh_connect(HOSTS[rid])
-                ssh2.exec_command(cmd)
-                ssh_connections[rid] = ssh2
-                print(f"  R{rid}: relaunched OK")
-            except Exception as e2:
-                print(f"  R{rid}: relaunch FAILED - {e2}")
+                ssh.exec_command(cmd)
+                break
+            except Exception as e:
+                if attempt == 0:
+                    print(f"  R{rid}: launch error ({e}), reconnecting...")
+                    try:
+                        ssh.close()
+                    except Exception:
+                        pass
+                    try:
+                        ssh2 = _ssh_connect(HOSTS[rid])
+                        ssh_connections[rid] = ssh2
+                        ssh = ssh2
+                    except Exception as e2:
+                        print(f"  R{rid}: reconnect FAILED - {e2}")
+                        break
+                else:
+                    print(f"  R{rid}: relaunch FAILED - {e}")
+        time.sleep(0.4)
 
-    time.sleep(1)
-    # Verify all running in parallel; cap wait so we never hang
-    def _verify_one(rid, ssh):
+    time.sleep(2)
+
+    # --- Phase 3: Verify which robots are actually running ---
+    running = []
+    failed_launch = []
+    def _verify_one(rid):
         try:
+            ssh = _ssh_connect(HOSTS[rid])
             _, stdout, _ = ssh.exec_command(f'pgrep -f "{remote_script}"')
             pid = stdout.read().decode().strip()
             ssh.close()
-            return (rid, f"RUNNING (pid={pid})" if pid else "FAILED")
+            return (rid, pid)
         except Exception as e:
-            return (rid, f"error: {e}")
+            return (rid, None)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        vfuts = {ex.submit(_verify_one, rid, ssh): rid for rid, ssh in list(ssh_connections.items())}
+        vfuts = {ex.submit(_verify_one, rid): rid for rid in ssh_connections}
         for fut in concurrent.futures.as_completed(vfuts, timeout=upload_timeout):
-            rid, status = fut.result()
-            print(f"  R{rid}: {status}")
+            rid, pid = fut.result()
+            if pid:
+                running.append(rid)
+                print(f"  R{rid}: RUNNING (pid={pid})")
+            else:
+                failed_launch.append(rid)
+                print(f"  R{rid}: FAILED")
+
+    # Close any leftover SSH connections from Phase 2
+    for ssh in ssh_connections.values():
+        try:
+            ssh.close()
+        except Exception:
+            pass
+
+    running.sort()
+    if not running:
+        print(f"\n[DEPLOY] FATAL: No robots started! Aborting.")
+        sys.exit(1)
+    elif failed_launch:
+        print(f"\n[DEPLOY] WARNING: {len(failed_launch)} robot(s) failed: {failed_launch}")
+        print(f"[DEPLOY] Continuing with {len(running)} robot(s): {running}")
+
+    return running
 
 
 def _collect_logs_one(rid, host, trial_dir):
@@ -374,13 +419,18 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
     kill_all(robot_ids)
     clear_robot_logs(robot_ids)
 
-    # Phase 1: Deploy and launch (socket timeouts in _ssh_connect prevent indefinite hang)
-    deploy_and_launch(controller, robot_ids)
+    # Phase 1: Deploy and launch — returns only robots confirmed running
+    active_robots = deploy_and_launch(controller, robot_ids)
 
-    print(f"[CONFIG] Broadcasting active robot set: {robot_ids}")
+    if len(active_robots) < len(robot_ids):
+        print(f"\n[WARNING] Only {len(active_robots)}/{len(robot_ids)} robots running.")
+        print(f"          Requested: {robot_ids}  |  Active: {active_robots}")
+    meta['active_robots'] = active_robots
+
+    print(f"\n[CONFIG] Broadcasting active robot set: {active_robots}")
     trial_config = {
-        'active_robot_ids': list(robot_ids),
-        'active_robot_count': len(robot_ids),
+        'active_robot_ids': list(active_robots),
+        'active_robot_count': len(active_robots),
     }
     for _ in range(3):
         inject_fault(0, 'set_trial_robots', trial_config)
@@ -400,9 +450,9 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
     _reset_sock.close()
 
     print(f"[START] Sending start signal to all robots...")
-    for _ in range(5):
+    for _ in range(10):
         inject_fault(0, 'start', trial_config)
-        time.sleep(0.2)
+        time.sleep(0.15)
 
     t0 = time.time()
     fault_robots = []

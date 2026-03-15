@@ -64,7 +64,7 @@ except ImportError:
     POSITION_FRESHNESS_S = 0.5
     POSITION_STOP_TIMEOUT_S = 2.0
     SIM_MOTOR_PORT = 6100
-    SIM_PEER_RELAY_PORT = 6200
+    SIM_PEER_RELAY_PORT = 5500  # Must match REIP and harness
     SIM_SENSOR_PORT = 6300
 
     class _ArenaGeometry:
@@ -1055,6 +1055,8 @@ class RAFTNode:
             self._prev_assignments.clear()
             return {}
         
+        # Collect all robot positions and headings (me + peers)
+        # REIP doesn't check position freshness here - just uses whatever positions it has
         robots = {self.robot_id: (self.x, self.y)}
         robot_thetas = {self.robot_id: self.theta}
         for pid, peer in self.peers.items():
@@ -1210,17 +1212,28 @@ class RAFTNode:
         targets forever.  raft has no trust model - followers obey the stale
         assignments indefinitely, coverage stalls once targets are explored."""
         if not self._frozen_assignments:
-            # First call: snapshot current assignments or use leader position
+            # First call: snapshot current assignments or compute fresh ones
             if self._prev_assignments:
                 self._frozen_assignments = dict(self._prev_assignments)
             else:
-                # no previous assignments - assign everyone to leader position
-                robots = {self.robot_id: (self.x, self.y)}
-                for pid, peer in self.peers.items():
-                    if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
-                        robots[pid] = (peer['x'], peer['y'])
-                for rid in robots:
-                    self._frozen_assignments[str(rid)] = (self.x, self.y)
+                # No previous assignments - temporarily disable freeze mode to compute fresh assignments
+                # This prevents the bug where everyone gets assigned to leader's starting position
+                # and avoids infinite recursion (compute_task_assignments calls _compute_freeze_assignments)
+                self.freeze_leader_mode = False
+                try:
+                    fresh_assignments = self.compute_task_assignments()
+                    if fresh_assignments:
+                        self._frozen_assignments = fresh_assignments
+                    else:
+                        # Fallback: assign everyone to leader position (shouldn't happen in normal operation)
+                        robots = {self.robot_id: (self.x, self.y)}
+                        for pid, peer in self.peers.items():
+                            if time.time() - peer.get('last_seen', 0) < self.peer_timeout:
+                                robots[pid] = (peer['x'], peer['y'])
+                        for rid in robots:
+                            self._frozen_assignments[str(rid)] = (self.x, self.y)
+                finally:
+                    self.freeze_leader_mode = True
             
             print(f"[FREEZE_LEADER] Raft frozen {len(self._frozen_assignments)} assignments "
                   f"(will never update -- NO DETECTION POSSIBLE)")
@@ -1769,8 +1782,17 @@ class RAFTNode:
                 target = self.get_my_frontier()
             self._last_command_source = "leader_frontier"
         elif self.assigned_target:
-            target = self.assigned_target  # Follow blindly!
-            self._last_command_source = "leader_assigned"
+            # Check if assignment is stale (like REIP does)
+            assignment_age = time.monotonic() - self.assigned_target_rx_mono if self.assigned_target_rx_mono > 0 else float('inf')
+            ASSIGNMENT_STALE_TIME = 5.0  # Must survive WiFi drops (leader broadcasts at 5Hz)
+            if assignment_age < ASSIGNMENT_STALE_TIME:
+                target = self.assigned_target  # Follow assignment
+                self._last_command_source = "leader_assigned"
+            else:
+                # Assignment is stale - fall back to autonomous exploration
+                target = self.get_my_frontier()
+                self._last_command_source = "predicted_frontier"
+                self.assigned_target = None  # Clear stale assignment
         elif self._trusted_leader_reports_complete():
             target = None
             self._last_command_source = "leader_complete"
@@ -2259,6 +2281,9 @@ if __name__ == "__main__":
         UDP_POSITION_PORT += port_offset
         UDP_PEER_PORT += port_offset
         UDP_FAULT_PORT += port_offset
+        UDP_SIM_PEER_RELAY_PORT += port_offset  # Must match harness relay port
+        UDP_SIM_MOTOR_PORT += port_offset       # Must match harness motor port
+        UDP_SIM_SENSOR_PORT += port_offset      # Must match harness sensor port
     
     # Parse --arena-width / --arena-height for scaled layouts
     if "--arena-width" in sys.argv:

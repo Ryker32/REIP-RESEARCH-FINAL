@@ -2829,7 +2829,7 @@ def main():
         conditions = ABLATION_CONDITIONS
     else:
         conditions = EXPERIMENT_CONDITIONS
-    if args.condition:
+    if args.condition and args.condition.lower() != "all":
         conditions = [c for c in conditions if args.condition.lower() in c[0].lower()
                       or args.condition.lower() in c[1].lower()]
 

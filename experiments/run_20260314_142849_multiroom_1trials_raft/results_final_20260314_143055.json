@@ -1,0 +1,161 @@
+[
+  {
+    "name": "multiroom_raft_NoFault_t1",
+    "controller": "raft",
+    "fault_type": null,
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 4.918032786885246,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 4.918032786885246,
+    "coverage_timeline": [],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 1,
+    "min_peer_separation_mm": 269.715590947205,
+    "min_wall_clearance_mm": 147.4,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_BadLeader_t1",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 4.918032786885246,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": 67.07457089424133,
+    "num_leader_changes": 10,
+    "false_positives": 0,
+    "coverage_at_90s": 4.918032786885246,
+    "coverage_timeline": [],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 1,
+    "min_peer_separation_mm": 269.715590947205,
+    "min_wall_clearance_mm": 147.4,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_FreezeLeader_t1",
+    "controller": "raft",
+    "fault_type": "freeze_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 4.918032786885246,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": 60.40167570114136,
+    "num_leader_changes": 9,
+    "false_positives": 0,
+    "coverage_at_90s": 4.918032786885246,
+    "coverage_timeline": [],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 1,
+    "min_peer_separation_mm": 269.715590947205,
+    "min_wall_clearance_mm": 147.4,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ]
+    ]
+  }
+]

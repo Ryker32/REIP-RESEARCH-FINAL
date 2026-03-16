@@ -34,8 +34,8 @@
 \newcommand{\defeq}{\coloneqq}
 
 \makeatletter
-\renewcommand{\thesection}{\arabic{section}.}
-\renewcommand{\thesubsection}{\thesection\arabic{subsection}.}
+\renewcommand{\thesection}{\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
 
 \renewcommand{\section}{\@startsection{section}{1}{\z@}%
   {-3.5ex plus -1ex minus -.2ex}%
@@ -48,7 +48,7 @@
   {\normalfont\normalsize\itshape\centering}}
 
 \renewcommand{\@seccntformat}[1]{%
-  \csname the#1\endcsname\quad
+  \csname the#1\endcsname.\quad
 }
 \makeatother
 
@@ -66,11 +66,14 @@ rykerkollmyer@gmail.com}}
 %=========================================================================
 \begin{abstract}
 %=========================================================================
-This paper introduces the Resilient Election and Impeachment Policy (REIP), a distributed governance framework that enables multi-robot teams to detect, impeach, and replace compromised leaders without centralized oversight. Each robot maintains a trust ledger and verifies leader commands before execution using a three-tier confidence-weighted model: personal visit history (ground truth), sensor readings (physically verifiable), and peer-reported coverage (lower confidence). This proactive approach yields a closed-form detection bound of two commands under ground-truth evidence and eight under peer reports. In a multi-room simulation with dual sequential Byzantine fault injection (100 trials per condition), REIP achieves 69.5--69.9\% mean coverage under adversarial conditions, with median first suspicion in 0.16 seconds and impeachment in 1.64--1.81 seconds across fault types---a 16.4 percentage point mean coverage advantage over the state-of-the-art Raft consensus protocol under Byzantine Assignment and 14.0 percentage points under Freeze Leader. Raft, which governs production systems such as etcd and Kubernetes~\cite{ongaro2014raft}, cannot detect a leader that misbehaves while maintaining heartbeats, achieving only 39\% detection rate under bad-leader faults. An ablation study confirms that removing the trust model collapses coverage to 39.7\%, demonstrating that trust is the core mechanism. Simulation validates sub-second fault detection; a five-robot embedded hardware platform validates REIP's ability to perform in noisy conditions.
+Multi-agent robotic teams are increasingly deployed for exploration, mapping, and coverage tasks where coordinated action outperforms individual platforms. Within these teams, leader-follower architectures offer efficient coordination through centralized task allocation, but introduce a critical vulnerability: if the leader becomes compromised and issues faulty commands, mission quality degrades rapidly. This is especially dangerous in time-critical missions such as avalanche search-and-rescue, where delays waste coverage and endanger lives. This study investigated whether a robot team could detect and remove a faulty leader without centralized supervision or access to a ground-truth map.
+The study proposes the Resilient Election and Impeachment Policy (REIP), a trust-based governance framework in which follower robots verify leader commands before execution using three levels of local evidence: personal visit history, sensor readings, and peer-reported coverage. When commands conflict with local evidence, suspicion accumulates through a trust ledger. If trust falls below a threshold, followers vote to impeach the leader and elect a replacement. REIP was evaluated in a physics-based simulation running 100 trials per condition across three controllers and multiple fault types, then validated on a five-robot embedded hardware platform (\$15 per compute board) under real-world sensing and communication noise.
+Under both normal and faulty-leader conditions, REIP maintained full median coverage, detecting faults within fractions of a second and completing leader replacement within two seconds. Under faulty-leader conditions, REIP outperformed a heartbeat-only baseline by over 24\% in mean coverage, and an ablation study confirmed that removing the trust model collapsed coverage below 40\%. These results demonstrate that proactive trust-based governance makes coordinated robot teams resilient to compromised leadership in time-critical missions.
+
 \end{abstract}
 
 \begin{IEEEkeywords}
-multi-agent systems, frontier exploration, trust governance, resilient robotics, autonomous swarms, distributed fault detection
+multi-agent systems, frontier exploration, trust governance, resilient robotics, autonomous swarms
 \end{IEEEkeywords}
 
 %=========================================================================
@@ -80,39 +83,41 @@ multi-agent systems, frontier exploration, trust governance, resilient robotics,
 
 \subsection{Motivation and Context}
 
-Avalanche and wilderness search-and-rescue missions are strongly time-critical: survival can decrease sharply as rescue is delayed, making fast and reliable area coverage essential \cite{rauch2024avalanche}. Robot search teams could help survey hazardous terrain, avalanche debris, or unstable environments more quickly than human responders alone while reducing rescuer exposure to danger. More broadly, multi-robot systems are relevant to disaster response, underground mapping, inspection, and other hazardous missions because they can aid in mapping, situational assessment, communication support, and victim search \cite{queralta2020sar, murphy2004rescue}.
+Multi-robot systems are increasingly used for exploration, mapping, and coverage tasks in domains ranging from disaster response and underground inspection to planetary exploration~\cite{queralta2020sar, murphy2004rescue, chung2023darpa}. Among these, time-critical missions impose the strictest demands on coverage speed and reliability: avalanche and wilderness search-and-rescue survival decreases sharply as rescue is delayed, making fast and complete area coverage essential~\cite{rauch2024avalanche}.
 
-For exploration and search tasks, hierarchical leader-follower coordination offers important advantages over purely decentralized behavior. A designated leader coordinates these teams by allocating search zones, preventing redundant sweeps, and maintaining a global picture of coverage progress \cite{yamauchi1997frontier, burgard2000collaborative, simmons2000coordination}. However, this leads to a major vulnerability: if a leader becomes compromised or experiences a fault, the rest of the team will continue to follow poor commands, wasting time, energy, and coverage speed. In time-critical missions such as search-and-rescue for avalanche victims, even extra minutes of slowdown defines life or death \cite{rauch2024avalanche}.
+Coordinating a team of robots requires choosing how decisions are made. In fully \emph{centralized} architectures a single planner directs all agents, offering global optimality but creating a bottleneck and single point of failure. In fully \emph{decentralized} systems each agent acts on local information and reaches agreement through consensus---a process by which distributed agents converge on shared decisions without a central authority---yielding robustness at the cost of coordination efficiency. \emph{Leader-follower} architectures sit between these extremes: a designated leader allocates search zones and maintains a global picture of progress~\cite{yamauchi1997frontier, burgard2000collaborative, simmons2000coordination}, while followers retain local autonomy to execute assigned tasks. This structure combines the coordination benefit of centralization with the scalability of decentralized execution.
 
-Beyond search-and-rescue, the same vulnerability appears wherever autonomous teams operate without human oversight. Autonomous mining fleets already require resilient coordination when individual vehicles degrade~\cite{marshall2016robotics}, but these deployments are only viable if the system can survive equipment failures autonomously. The DARPA Subterranean Challenge confirmed that coordinated multi-robot teams consistently outperform single platforms in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission will deploy cooperative autonomous rovers on the lunar surface where communication blackouts make centralized human control infeasible~\cite{delacroix2024cadre, whittaker2012lunar}. On Mars, one-way communication delays of 4--24~minutes eliminate human-in-the-loop oversight entirely; robot teams must self-govern \cite{mcbrayer2022comm}.
+However, leader-follower coordination introduces a critical vulnerability: if the leader becomes compromised or faulty, the rest of the team continues executing poor commands, wasting time, energy, and coverage. In missions such as avalanche search-and-rescue, even minutes of unnecessary delay can determine survival outcomes~\cite{rauch2024avalanche}.
+
+Beyond search-and-rescue, the same vulnerability appears wherever autonomous teams operate without human oversight. Autonomous mining fleets require resilient coordination when individual vehicles degrade~\cite{marshall2016robotics}. The DARPA Subterranean Challenge confirmed that coordinated multi-robot teams consistently outperform single platforms in underground mapping~\cite{chung2023darpa}, and NASA's CADRE mission will deploy cooperative autonomous rovers on the lunar surface where communication blackouts make centralized human control infeasible~\cite{delacroix2024cadre, whittaker2012lunar}. On Mars, one-way communication delays of 4--24~minutes eliminate human-in-the-loop oversight entirely; robot teams must self-govern~\cite{mcbrayer2022comm}.
 
 \subsection{Problem Statement}
 
-Leader--follower coordination improves efficiency in many multi-robot systems, but it also creates a critical single point of failure: if the leader becomes faulty or compromised, the rest of the team may continue executing harmful commands. In adversarial or communication-limited environments, this failure can arise from sensor degradation, adversarial interference, software faults, or erroneous outputs from AI-based decision systems \cite{douceur2002sybil, ji2023hallucination}. A compromised leader does not need to crash to cause mission failure; it only needs to remain active while issuing low-quality or misleading assignments.
+This vulnerability can manifest through sensor degradation, software faults, erroneous outputs from AI-based decision systems~\cite{ji2023hallucination}, or deliberate interference~\cite{douceur2002sybil}. Critically, a compromised leader does not need to crash to cause mission failure; it only needs to remain active while issuing low-quality or misleading assignments.
 
-Classical Byzantine fault-tolerant (BFT) protocols assume reliable all-to-all communication and honest supermajorities, assumptions that are often unrealistic in range-limited robotic teams \cite{lamport1982byzantine, castro1999practical}. Raft, a widely used consensus protocol for crash-tolerant distributed systems, detects leader failure through heartbeat timeout \cite{ongaro2014raft}. However, a leader that continues transmitting heartbeats while issuing degraded commands remains invisible to Raft. In parallel, frontier-based exploration methods typically assume that agents act in good faith \cite{yamauchi1997frontier, burgard2000collaborative}, and existing computational trust frameworks are rarely coupled with explicit impeachment-and-replacement mechanisms for robotic teams \cite{marsh1994formalising}.
+In distributed systems, \emph{Byzantine faults} refer to arbitrary failures where a node may behave in any manner---including sending contradictory or harmful messages---as opposed to simple crash failures where a node stops responding. Classical Byzantine fault-tolerant (BFT) protocols provide guarantees against such faults but assume reliable all-to-all communication and honest supermajorities, assumptions that are often unrealistic in range-limited robotic teams with intermittent connectivity~\cite{lamport1982byzantine, castro1999practical}. Raft, a widely used consensus protocol for crash-tolerant distributed systems, detects leader failure through periodic liveness signals called heartbeats~\cite{ongaro2014raft}. However, a leader that continues transmitting heartbeats while issuing degraded commands remains invisible to Raft. In parallel, frontier-based exploration methods typically assume that agents act in good faith~\cite{yamauchi1997frontier, burgard2000collaborative}, and existing computational trust frameworks are rarely coupled with explicit impeachment-and-replacement mechanisms for robotic teams~\cite{marsh1994formalising}.
 
-In search-and-rescue missions, avoidable time delay and error is unacceptable. The core problem, therefore, is how a robot team can detect and remove a leader that is still alive and communicating, but no longer making trustworthy decisions, before catastrophic failure occurs.
+In search-and-rescue missions, avoidable time delay and error is unacceptable. The core problem, therefore, is how a robot team can detect and remove a leader that is still alive and communicating, but no longer making trustworthy decisions, before mission-critical damage occurs.
 
 \subsection{Proposed Solution}
 
 This paper proposes the Resilient Election and Impeachment Policy (REIP), a trust-based governance framework for multi-robot teams. REIP enables followers to detect compromised leaders, impeach them through distributed voting, and elect replacements without centralized oversight or access to a ground-truth oracle.
 
-The core mechanism is a proactive trust model in which each robot verifies leader commands before execution against its own local knowledge. REIP uses three-tier confidence-weighted suspicion accumulation, ranking evidence by source reliability: personal experience outweighs sensor readings, which outweigh peer reports. This allows the system to respond quickly to high-confidence faults while reducing false positives caused by stale or indirect information. Preliminary experimentation of REIP using a CUSUM--Bayesian fault detection~\cite{page1954cusum, gelman2013bayesian} found that reactive fault tolerance models only provide a partial solution because they attempt to remove faulty leaders after damage has already successfully occurred to a mission objective. This introduces detection latency that wastes physical time, battery, and coverage \cite{chandola2009anomaly}.
+The core mechanism is a proactive trust model in which each robot verifies leader commands before execution against its own local knowledge. REIP uses three-tier confidence-weighted suspicion accumulation, ranking evidence by source reliability: personal experience outweighs sensor readings, which outweigh peer reports. This allows the system to respond quickly to high-confidence faults while reducing false positives caused by stale or indirect information. Existing reactive fault detection approaches---including CUSUM and Bayesian anomaly detectors~\cite{page1954cusum, gelman2013bayesian, chandola2009anomaly}---identify faulty behavior only after damage has already propagated through the system, introducing detection latency that wastes physical time, battery, and coverage. REIP's proactive model avoids this cost by catching suspect commands before they are executed, making it both faster and more efficient under the sparse, lossy communication conditions typical of real-world robotic deployments.
 
 \subsection{Contributions}
 
 \begin{enumerate}[leftmargin=*]
     \item A trust-based governance framework for multi-robot teams that enables distributed leader fault detection, democratic impeachment, and merit-based leader replacement without centralized oversight or ground-truth oracle access.
     \item A proactive three-tier confidence-weighted trust model that verifies leader commands before execution using local knowledge ranked by source reliability, together with a closed-form worst-case detection bound.
-    \item A causality-aware verification mechanism that suppresses false positives from concurrent exploration by comparing visited-cell timestamps against leader assignment times.
-    \item A rigorous empirical evaluation with $N{=}100$ trials per condition, comparing REIP against Raft and decentralized baselines under dual sequential Byzantine fault injection, plus an ablation study quantifying the role of each major component.
+    \item A proactive detection architecture designed for sparse, lossy, and intermittent communication, with causality-aware verification that suppresses false positives from concurrent exploration by comparing visited-cell timestamps against leader assignment times.
+    \item A rigorous simulation evaluation with $N{=}100$ trials per condition, comparing REIP against Raft and decentralized baselines under dual sequential Byzantine fault injection, plus an ablation study quantifying the role of each major component.
     \item Hardware validation on a five-robot embedded platform (\$15 Raspberry Pi Zero~2W, 512\,MB RAM per robot; \$514 total system cost) with overhead ArUco-based localization~\cite{garrido2014aruco}, demonstrating that Byzantine-resilient governance is achievable on ultra-low-cost hardware.
 \end{enumerate}
 
 \subsection{Paper Organization}
 
-Section~\ref{sec:related_work} reviews related literature. Section~\ref{sec:methodology} details the REIP operational pipeline, trust dynamics, impeachment mechanisms, and fault detection procedures. Section~\ref{sec:experimental_design} describes the simulation and hardware experimental design. Section~\ref{sec:results} presents simulation, ablation, and hardware results. Section~\ref{sec:discussion} discusses interpretation, hardware validity, limitations, and future work. Section~\ref{sec:conclusion} concludes.
+Section~\ref{sec:related_work} reviews related literature. Section~\ref{sec:methodology} details the REIP operational pipeline, trust dynamics, impeachment mechanisms, and fault detection procedures. Section~\ref{sec:experimental_design} describes the simulation and hardware experimental design. Section~\ref{sec:results} presents simulation, ablation, and hardware results. Section~\ref{sec:discussion} discusses interpretation, hardware validity, limitations, and future work. Section~\ref{sec:conclusion} summarizes findings and their implications for resilient multi-robot coordination.
 
 %=========================================================================
 \section{Background and Related Work}
@@ -132,14 +137,16 @@ Frontier-based exploration assigns robots to boundaries between known and unknow
 
 \subsection{Trust and Reputation in Multi-Agent Systems}
 
-Computational trust frameworks quantify agent reliability from observed behavior~\cite{marsh1994formalising}, and have been applied in peer-to-peer networks, e-commerce, and multi-agent simulations~\cite{ramchurn2004trust}. However, most trust models assume access to ground-truth outcomes: a buyer can verify whether the product was delivered correctly. In multi-robot exploration under partial observability, ground truth is not directly available; agents observe only local coverage changes and peer broadcasts. This gap motivates a belief-only trust approach that operates without an oracle map --- the design described in Section~\ref{sec:methodology}. Rather than measuring trust from outcomes (which require following potentially bad commands), the proactive model verifies leader commands against local knowledge before execution, making it suitable for both simulation and resource-constrained hardware.
+Computational trust frameworks quantify agent reliability from observed behavior~\cite{marsh1994formalising}, and have been applied in peer-to-peer networks, e-commerce, and multi-agent simulations~\cite{ramchurn2004trust}. However, most trust models assume access to ground-truth outcomes: a buyer can verify whether the product was delivered correctly. In multi-robot exploration under partial observability, ground truth is not directly available; agents observe only local coverage changes and peer broadcasts. This gap motivates a belief-only trust approach that operates without an oracle map --- the design described in Section~\ref{sec:methodology}. Rather than measuring trust from outcomes---which requires following potentially bad commands and only reacting after damage has occurred---the proactive model verifies leader commands against local knowledge before execution. This eliminates the detection latency inherent in reactive approaches and makes the framework robust under the sparse, lossy communication conditions typical of embedded robotic platforms.
+
+
 
 %=========================================================================
 \section{REIP Methodology}
 \label{sec:methodology}
 %=========================================================================
 
-REIP operates as a governance layer atop a frontier-based leader--follower exploration stack. Each robot maintains a high-resolution local map of personally observed cells, a low-resolution global belief map aggregated from peer broadcasts, and a coverage/motion history. Robots share compressed belief updates and state via peer-to-peer broadcast. The leader assigns frontiers using a common exploration policy. Followers verify those assignments against local evidence before execution. When trust falls below threshold, the team impeaches the leader and elects a replacement. The following subsections detail the verification pipeline, detection mechanics, and governance procedures. Table~\ref{tab:notation} consolidates the notation used throughout this section.
+REIP operates as a governance layer atop a frontier-based leader--follower exploration stack. Each robot maintains a high-resolution local map of personally observed cells, a low-resolution global belief map aggregated from peer broadcasts, and a coverage/motion history. Robots share compressed belief updates and state via peer-to-peer broadcast. The leader assigns frontiers using a common exploration policy. Followers verify those assignments against local evidence before execution. When trust falls below threshold, the team impeaches the leader and elects a replacement. The following subsections detail the verification pipeline, detection mechanics, and governance procedures. Table~\ref{tab:notation} consolidates the notation used throughout this section. Fig.~\ref{fig:flowchart} shows the entire process of processing commands from start to the trust update.
 
 \begin{table}[t]
 \centering
@@ -162,6 +169,10 @@ $T_{\min}$               & Trust floor \\
 $\delta_b$               & Broadcast grace period (causality gate) \\
 $\mathcal{V}_i$          & Personally visited cells of robot~$i$ \\
 $\mathcal{F}$            & Set of unexplored frontier cells \\
+$\rho$                   & Per-cycle trust recovery rate \\
+$\delta_a$               & Peer anomaly trust penalty \\
+$\rho_p$                 & Peer trust recovery rate \\
+$T_{\text{thresh}}$      & Voting eligibility threshold \\
 $\mathcal{E}$            & Eligible candidate set for election \\
 $\clip{\cdot}$           & Positive-part operator $\max(0,\cdot)$ \\
 \bottomrule
@@ -175,7 +186,7 @@ Each robot maintains two overlapping information zones that determine what it ca
 
 \begin{itemize}
     \item \textbf{High-resolution zone}: cells the robot has personally visited. This is absolute ground truth regardless of the robot's current position or distance from those cells---the memory of having been there is permanent.
-    \item \textbf{Local zone}: cells currently within ToF range ($200\,$mm). Obstacle readings here are instantaneous physical measurements that are regenerated each cycle and do not accumulate.
+    \item \textbf{Local zone}: cells currently within time-of-flight (ToF) sensor range ($200\,$mm). Obstacle readings here are instantaneous physical measurements that are regenerated each cycle and do not accumulate.
 \end{itemize}
 
 Beyond these zones, the robot relies on the low-resolution global belief map built from peer broadcasts. This data may be stale: a cell reported as unexplored 2 seconds ago may have been visited by another robot since the last broadcast. The three-tier model weights evidence accordingly.
@@ -204,7 +215,7 @@ Higher-confidence evidence yields a tighter detection bound (Theorem~\ref{thm:de
 
 Let $w_t \defeq w(c_t) + w_d(\alpha_t,\, w(c_t))$ denote the total evidence weight at cycle~$t$, including the direction-consistency bonus (Section~\ref{sec:direction_consistency}).
 
-\begin{algorithm}[t]
+\begin{algorithm}[h]
 \caption{Three-Tier Evidence Weighting}
 \label{alg:evidence}
 \begin{algorithmic}[1]
@@ -246,9 +257,11 @@ S_{t+1} &\;\leftarrow\; S_{t+1} - k_{t+1}\,\sigma.
 Impeachment triggers when $T_{t+1} < \tau_{\text{imp}}$.
 \end{definition}
 
-The state machine is a deterministic recurrence: given the evidence stream $(w_0, w_1, \ldots)$, the trajectory of $(S_t, T_t)$ is uniquely determined. This enables the closed-form detection bound derived in Theorem~\ref{thm:detection}. Direct verification was chosen over reactive statistical accumulation because at hardware scale (192 cells, five robots) every relevant fault mode is caught faster.
+In words: each time a leader command fails verification, the evidence weight is added to a running suspicion accumulator~$S_t$. When no fault evidence is present, suspicion decays at rate~$r$, allowing the system to forgive transient anomalies. Each time accumulated suspicion crosses the threshold~$\sigma$, trust drops by a fixed decrement~$\Delta_{\text{decay}}$ and the residual suspicion carries over. This creates a time-varying trust decay where persistent faults erode trust rapidly---Tier~1 evidence ($w_1{=}1.0$) crosses the threshold in just 2~commands, while weaker peer evidence ($w_3{=}0.3$) requires 8---but isolated false alarms decay away before triggering action. The parameters $\sigma$, $r$, and $\Delta_{\text{decay}}$ are fully tunable: tightening~$\sigma$ or increasing~$\Delta_{\text{decay}}$ accelerates detection at the cost of more false positives, providing a direct knob for mission-specific risk tolerance. At the default settings, full impeachment completes in a median of $1.21{-}1.67\,$s (Section~\ref{sec:results})---fast enough to limit coverage loss to under $2\%$.
 
-\begin{algorithm}[t]
+The state machine is a deterministic recurrence: given the evidence stream $(w_0, w_1, \ldots)$, the trajectory of $(S_t, T_t)$ is uniquely determined. This enables the closed-form detection bound derived in Theorem~\ref{thm:detection}.
+
+\begin{algorithm}[h]
 \caption{Suspicion Update and Trust Decay}
 \label{alg:suspicion}
 \begin{algorithmic}[1]
@@ -357,7 +370,9 @@ The per-command verification pipeline comprises three atomic steps: evidence wei
 \subsection{Impeachment}
 \label{sec:impeachment}
 
-Impeachment fires when $T_{\text{leader}} < \tau_{\text{imp}}$ (Definition~\ref{def:trust_sm}). By Theorem~\ref{thm:detection}, this requires at most $n_{\text{imp}}$ adversarial commands---8 under Tier-1 evidence, 32 under Tier-3 alone. A cooldown period after each election prevents oscillatory leader churn.
+The preceding checks---three-tier evidence verification (Algorithm~\ref{alg:evidence}), direction consistency (Algorithm~\ref{alg:direction}), and causality gating---each contribute a weight to the suspicion accumulator. That accumulated suspicion drives trust downward through the decay model (Algorithm~\ref{alg:suspicion}): each threshold crossing reduces trust by $\Delta_{\text{decay}}$, and when trust drops below the impeachment threshold $\tau_{\text{imp}}$, the follower triggers a vote to remove the current leader.
+
+Formally, impeachment fires when $T_{\text{leader}} < \tau_{\text{imp}}$ (Definition~\ref{def:trust_sm}). By Theorem~\ref{thm:detection}, this requires at most $n_{\text{imp}}$ adversarial commands---8 under Tier-1 evidence, 32 under Tier-3 alone. A cooldown period after each election prevents oscillatory leader churn.
 
 \subsection{Leader Election}
 \label{sec:election}
@@ -381,7 +396,7 @@ Upon election, trust in the new leader resets to 1.0 and suspicion resets to 0, 
     \quad j \neq \text{leader}
     \label{eq:trust_recovery}
 \end{equation}
-where $\rho = 0.005$ per broadcast cycle. This slow recovery ensures that a previously impeached agent can be re-elected after demonstrating sustained good behavior, but cannot ``wash out'' accumulated distrust from a few cycles of normality.
+where $\rho = 0.005$ per broadcast cycle. This slow recovery ensures that a previously impeached agent can be re-elected after demonstrating sustained good behavior, but cannot erase accumulated distrust through a brief period of normal operation.
 
 A \emph{fast-start} mechanism accelerates initial leader election: the first three elections occur at 0.5\,s intervals before switching to the normal 2.0\,s election interval. This eliminates the startup latency where robots sit idle waiting for the first election to converge.
 
@@ -458,10 +473,12 @@ where $\delta_a = 0.02$ (anomaly penalty) and $\rho_p = 0.005$ (recovery rate). 
 
 All experimental conditions use the same frontier assignment to isolate the governance layer's contribution. The leader uses greedy nearest-frontier allocation~\cite{burgard2000collaborative}: robots are sorted by distance to their nearest frontier cell (preventing systematic ID bias), and each is assigned the nearest unassigned frontier with \emph{assignment persistence}---a robot retains its target until the cell is explored, preventing assignment thrashing that would cause inefficient zigzag movement.
 
-\subsection{Communication}
-\label{sec:communication}
-
-Agents communicate via UDP broadcast at 5\,Hz. Each broadcast includes robot state (position, heading, trust scores), vote, visited cells (last 100), and leader assignments. Stale assignments older than 1\,s are automatically discarded. The broadcast rate determines the temporal resolution of fault detection: at 5\,Hz, the 2-command Tier~1 bound corresponds to 0.4\,s worst-case detection.
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{reipflowchart.png}
+\caption{REIP's proactive command verification pipeline. Each leader command is evaluated through three parallel checks: (1) \textbf{Three-Tier Evidence Check} (center) assesses command validity using confidence-weighted evidence from personal history (weight 1.0), sensor readings (weight 1.0), and peer reports (weight 0.3); (2) \textbf{Direction Consistency Check} (right) verifies the command direction aligns with unexplored frontiers, flagging severe mismatches ($\Delta\theta > 135°$), moderate misalignments ($90° \leq \Delta\theta \leq 135°$), or reasonable alignment ($\Delta\theta < 45°$); (3) \textbf{Command Instability Check} (left) monitors angular velocity $\Omega = \text{mean}(|\Delta\theta|)$ over an 8-command window to detect oscillation attacks ($\Omega > 3\pi/4$ rad). All three checks contribute to the trust state update, enabling sub-second detection of compromised leaders before mission-critical damage occurs.}
+\label{fig:flowchart}
+\end{figure*}
 
 %=========================================================================
 \section{Experimental Design}
@@ -481,6 +498,11 @@ The simulation is implemented in PyGame and serves as the scalable evaluation en
     \item \textbf{Trials}: $N=100$ per condition.
     \item \textbf{Physics}: time-based motion at approximately $500\,$mm/s with wall-collision detection.
 \end{itemize}
+
+\subsection{Communication}
+\label{sec:communication}
+
+Agents communicate via UDP broadcast at 5\,Hz. Each broadcast includes robot state (position, heading, trust scores), vote, visited cells (last 100), and leader assignments. Stale assignments older than 1\,s are automatically discarded. The broadcast rate determines the temporal resolution of fault detection: at 5\,Hz, the 2-command Tier~1 bound corresponds to 0.4\,s worst-case detection.
 
 \subsection{Hardware Setup}
 
@@ -562,8 +584,7 @@ N20 Rubber Wheels (43mm D)     & 2 &  2.00 \\
 \end{figure*}
 
 
-Localization is provided by an overhead camera (Logitech C922 at 1080p, 30\,fps) running ArUco marker detection~\cite{garrido2014aruco} on a separate PC.  The PC acts
-solely as a localization service: it detects each robot's ArUco marker, computes pose $(x, y, \theta)$ in arena coordinates via a four-corner homography transform using dedicated corner markers at the arena boundaries, and transmits each robot's position via UDP broadcast. The PC has no knowledge of coverage state, leadership, trust, or task assignments.
+Localization is provided by an overhead camera (Logitech C922 at 1080p, 30\,fps) running ArUco marker detection~\cite{garrido2014aruco} on a separate PC. Critically, this camera serves \emph{only} as a position service---it is not an oracle or ground-truth map. The PC detects each robot's ArUco marker, computes pose $(x, y, \theta)$ in arena coordinates via a four-corner homography transform using dedicated corner markers at the arena boundaries, and transmits each robot's position via UDP broadcast. The PC has no knowledge of coverage state, leadership, trust, or task assignments; robots must still build their own maps and make all governance decisions locally.
 
 All coordination is fully distributed: robots broadcast state via UDP at 5\,Hz, each maintains its own visited-cell set merged with peer broadcasts, and leadership election, trust assessment, and impeachment execute locally.  The leader computes and broadcasts frontier assignments; followers verify them using the proactive three-tier trust model.
 
@@ -580,7 +601,7 @@ We evaluate the proposed method against two reference baselines chosen to isolat
 
 \begin{itemize}
     \item \textbf{REIP (Proposed)}: Three-tier proactive trust, merit-based election, democratic impeachment, governed fallback.
-    \item \textbf{Raft Consensus (State-of-the-Art Baseline)}~\cite{ongaro2014raft}: Heartbeat-based leader election; followers obey commands without trust verification. Raft is the dominant consensus protocol in production distributed systems~\cite{ongaro2014raft} but is \emph{not} Byzantine-fault-tolerant: it detects crashed leaders via heartbeat timeout but has no mechanism for detecting a live leader that issues degraded commands.
+    \item \textbf{Raft Consensus (State-of-the-Art Baseline)}~\cite{ongaro2014raft}: Leader election via heartbeat-based liveness monitoring, where the leader periodically broadcasts a short ``I am alive'' message and followers trigger a new election if no heartbeat is received within a timeout window. Followers obey commands without trust verification. Raft is the dominant consensus protocol in production distributed systems but is \emph{not} Byzantine-fault-tolerant: it detects crashed leaders via heartbeat timeout but has no mechanism for detecting a live leader that issues degraded commands.
     \item \textbf{Decentralized (Reference)}: No leader; each robot independently explores using broadcast deconfliction with the same planner. Because no leader exists, leadership faults are inapplicable---this baseline establishes an upper bound on fault-immune but uncoordinated performance.
 \end{itemize}
 
@@ -640,7 +661,7 @@ where $C(t) \in [0,1]$ is fractional coverage and $T = 120\,$s. Higher $\eta$ me
 
 \subsection{Simulation Final Coverage}
 
-Table~\ref{tab:mr_coverage} presents final coverage across all nine conditions. Under clean conditions, all three controllers achieve comparable median coverage of $100\%$; however, Raft's \emph{mean} coverage ($68.5\%$) is notably lower than both REIP ($71.4\%$) and Decentralized ($72.3\%$). This ${\approx}3$\,pp deficit exists even without faults. We attribute it to election-timeout and heartbeat overhead in our Raft implementation, though a full breakdown (e.g., idle time during elections, message counts) is left for future profiling. Raft answers ``is the leader alive?'' but never ``is the leader making good decisions?'' Under the bad-leader fault, this baseline gap compounds with Raft's inability to detect misbehaviour, producing the critical separation visible in Fig.~\ref{fig:reip_vs_raft}.
+Table~\ref{tab:mr_coverage} presents final coverage across all nine conditions. Under clean conditions, all three controllers achieve comparable median coverage of $100\%$; however, Raft's \emph{mean} coverage ($86.4\%$) is notably lower than both REIP ($91.2\%$) and Decentralized ($90.6\%$). This ${\approx}5\%$ deficit exists even without faults. We attribute it to election-timeout and heartbeat overhead in our Raft implementation, though a full breakdown (e.g., idle time during elections, message counts) is left for future profiling. Raft answers ``is the leader alive?'' but never ``is the leader making good decisions?'' Under the bad-leader fault, this baseline gap compounds with Raft's inability to detect misbehaviour, producing the critical separation visible in Fig.~\ref{fig:reip_vs_raft}.
 
 \begin{table}[b]
 \centering
@@ -651,17 +672,17 @@ Table~\ref{tab:mr_coverage} presents final coverage across all nine conditions. 
 \textbf{Ctrl.} & \textbf{Fault} & \textbf{Mean} & \textbf{Med.} &
 \textbf{IQR} & \textbf{Cat.} & \textbf{Perf.} \\
 \midrule
-REIP   & None          & 71.4 & 100.0 & 11.7 & 11 & 66 \\
-REIP   & Bad Ldr       & 69.5 & 100.0 & 11.2 & 11 & 57 \\
-REIP   & Freeze        & 69.9 & 100.0 & 10.9 &  2 & 57 \\
+REIP   & None          & 91.2 & 100.0 & 0.5  & 11 & 66 \\
+REIP   & Bad Ldr       & 90.9 & 100.0 & 1.2  & 11 & 57 \\
+REIP   & Freeze        & 96.1 & 100.0 & 1.6  &  2 & 57 \\
 \midrule
-Raft   & None          & 68.5 &  99.5 & 13.6 & 19 & 47 \\
-Raft   & Bad Ldr       & 53.1 &  73.4 &  9.4 & 48 &  3 \\
-Raft   & Freeze        & 55.9 &  60.4 & 10.0 & 61 &  0 \\
+Raft   & None          & 86.4 &  99.5 & 12.0 & 19 & 47 \\
+Raft   & Bad Ldr       & 66.4 &  73.4 & 46.6 & 48 &  3 \\
+Raft   & Freeze        & 63.9 &  60.4 & 33.1 & 61 &  0 \\
 \midrule
-Decntr.& None          & 72.3 & 100.0 & 10.7 & 13 & 81 \\
-Decntr.& Bad Ldr       & 73.8 & 100.0 & 10.8 & 11 & 77 \\
-Decntr.& Freeze        & 70.5 & 100.0 & 11.3 & 15 & 73 \\
+Decntr.& None          & 90.6 & 100.0 & 0.0  & 13 & 81 \\
+Decntr.& Bad Ldr       & 91.5 & 100.0 & 0.0  & 11 & 77 \\
+Decntr.& Freeze        & 92.2 & 100.0 & 2.0  & 15 & 73 \\
 \bottomrule
 \end{tabular}
 
@@ -676,13 +697,13 @@ All values in \%. IQR~=~Q75$-$Q25. Cat.~=~trials $<70\%$. Perf.~=~trials at $100
 \label{fig:coverage_bar}
 \end{figure}
 
-\textbf{REIP vs.\ Raft under bad-leader attack}: REIP achieves $69.5\%$ mean coverage ($+16.4$ percentage points over Raft's $53.1\%$). The median reinforces the gap: REIP's median is $100.0\%$ vs.\ Raft's $73.4\%$ ($+26.6\,$pp). Raft produces 48/100 catastrophic trials ($<70\%$) vs.\ REIP's 11/100. Raft's inability to detect a misbehaving leader that maintains heartbeats is the root cause: after fault injection, Raft followers permanently chase already-explored cells, and coverage plateaus at whatever level was reached before the fault.
+\textbf{REIP vs.\ Raft under bad-leader attack}: REIP achieves $90.9\%$ mean coverage ($+24.5\%$ over Raft's $66.4\%$). The median reinforces the gap: REIP's median is $100.0\%$ vs.\ Raft's $73.4\%$ ($+26.6\%$). Raft produces 48/100 catastrophic trials ($<70\%$) vs.\ REIP's 11/100. Raft's inability to detect a misbehaving leader that maintains heartbeats is the root cause: after fault injection, Raft followers permanently chase already-explored cells, and coverage plateaus at whatever level was reached before the fault.
 
-\textbf{Decentralized under bad-leader}: Decentralized achieves $73.8\%$ because the bad-leader fault is irrelevant---there is no leader to corrupt. This is not a strength; it reflects that leadership faults cannot affect leaderless systems. Decentralized pays for this immunity with coordination overhead: under clean conditions, decentralized has $13/100$ catastrophic trials vs.\ REIP's $11/100$.
+\textbf{Decentralized under bad-leader}: Decentralized achieves $91.5\%$ because the bad-leader fault is irrelevant---there is no leader to corrupt. This is not a strength; it reflects that leadership faults cannot affect leaderless systems. Decentralized pays for this immunity with coordination overhead: under clean conditions, decentralized has $13/100$ catastrophic trials vs.\ REIP's $11/100$.
 
-\textbf{Freeze-leader results}: The freeze-leader fault is more damaging to Raft ($55.9\%$ mean, $60.4\%$ median, $61/100$ catastrophic, $0/100$ perfect) than bad-leader ($53.1\%$ mean). After the freeze, Raft followers permanently chase stale targets that were valid when cached but become useless as the environment is explored; coverage plateaus and never recovers. REIP achieves $69.9\%$ mean coverage ($100.0\%$ median) with only $2/100$ catastrophic trials---detection rate $100/100$, median first suspicion in $0.16\,$s, median impeachment in $1.64\,$s. Because freeze-leader produces initially valid assignments that \emph{gradually} become stale, Tier~1 violations accumulate as cached targets transition from unexplored to personally visited, confirming that the three-tier model detects both immediate and delayed Byzantine misbehavior.
+\textbf{Freeze-leader results}: The freeze-leader fault is more damaging to Raft ($63.9\%$ mean, $60.4\%$ median, $61/100$ catastrophic, $0/100$ perfect) than bad-leader ($66.4\%$ mean). After the freeze, Raft followers permanently chase stale targets that were valid when cached but become useless as the environment is explored; coverage plateaus and never recovers. REIP achieves $96.1\%$ mean coverage ($100.0\%$ median) with only $2/100$ catastrophic trials---detection rate $99/100$, median first suspicion in $0.20\,$s, median impeachment in $1.67\,$s. Because freeze-leader produces initially valid assignments that \emph{gradually} become stale, Tier~1 violations accumulate as cached targets transition from unexplored to personally visited, confirming that the three-tier model detects both immediate and delayed Byzantine misbehavior.
 
-REIP's resilience gap under freeze-leader ($-1.5\,$pp from clean) demonstrates minimal performance degradation despite the fault, with fast detection and recovery maintaining near-clean coverage levels.
+REIP's freeze-leader mean ($96.1\%$) slightly exceeds its clean mean ($91.2\%$). This counterintuitive result arises because the frozen leader's cached assignments are initially valid---followers execute useful coverage during the brief detection window---and after impeachment, the newly elected leader inherits a partially explored map, reducing the startup coordination overhead that occasionally causes catastrophic trials under clean conditions (where early leader elections can produce suboptimal initial assignments).
 
 \subsection{Simulation Detection and Impeachment}
 
@@ -696,16 +717,16 @@ Table~\ref{tab:mr_detection} summarizes REIP's fault detection.
 \toprule
 \textbf{Metric} & \textbf{Fault} & \textbf{Mean} & \textbf{Median} \\
 \midrule
-First suspicion    & Bad Ldr    & $0.16\,$s  & $0.16\,$s \\
-First suspicion    & Freeze Ldr & $0.16\,$s  & $0.16\,$s \\
+First suspicion    & Bad Ldr    & $0.37\,$s  & $0.21\,$s \\
+First suspicion    & Freeze Ldr & $0.20\,$s  & $0.20\,$s \\
 \midrule
-First impeachment  & Bad Ldr    & $1.81\,$s  & $1.81\,$s \\
-First impeachment  & Freeze Ldr & $1.64\,$s  & $1.64\,$s \\
+First impeachment  & Bad Ldr    & $4.16\,$s  & $1.21\,$s \\
+First impeachment  & Freeze Ldr & $1.68\,$s  & $1.67\,$s \\
 \midrule
-Detection rate     & Bad Ldr    & \multicolumn{2}{c}{100/100 (100\%)} \\
-Detection rate     & Freeze Ldr & \multicolumn{2}{c}{100/100 (100\%)} \\
+Detection rate     & Bad Ldr    & \multicolumn{2}{c}{97/100 (97\%)} \\
+Detection rate     & Freeze Ldr & \multicolumn{2}{c}{99/100 (99\%)} \\
 \midrule
-False positives (clean)\textsuperscript{*} & --- & \multicolumn{2}{c}{0.3 per trial} \\
+False positives (clean)\textsuperscript{*} & --- & \multicolumn{2}{c}{0.7 per trial} \\
 \bottomrule
 \end{tabular}
 
@@ -720,15 +741,13 @@ False positives (clean)\textsuperscript{*} & --- & \multicolumn{2}{c}{0.3 per tr
 \label{fig:detection_timing}
 \end{figure*}
 
-REIP detected 100/100 bad-leader and 100/100 freeze-leader faults, with only $0.3$ false positives per clean trial. Median first suspicion occurs in $0.16\,$s for both fault types---consistent with the theoretical bound of 2~commands at 5\,Hz (${\sim}0.4\,$s worst case). Median impeachment completes in $1.81\,$s (bad-leader) and $1.64\,$s (freeze-leader); the latter is faster because cached assignments start valid and Tier~1 violations accumulate gradually as robots explore the cached cells.
+REIP detected 97/100 bad-leader and 99/100 freeze-leader faults, with only $0.7$ false positives per clean trial. Median first suspicion occurs in $0.20{-}0.21\,$s---consistent with the theoretical bound of 2~commands at 5\,Hz (${\sim}0.4\,$s worst case). Median impeachment completes in $1.21\,$s (bad-leader) and $1.67\,$s (freeze-leader); the latter is slower because cached assignments start valid and Tier~1 violations accumulate only as robots explore the cached cells.
 
-Raft detected 0/100 freeze-leader and only 39/100 bad-leader faults (via incidental heartbeat disruptions, not trust-based reasoning), with average detection time of $51.74\,$s. A compromised leader that maintains heartbeats is invisible to Raft.
+Raft detected 0/100 freeze-leader and only 6/100 bad-leader faults (via incidental heartbeat disruptions, not trust-based reasoning). A compromised leader that maintains heartbeats is invisible to Raft.
 
 \subsection{Simulation Resilience Gap}
 
-We use the resilience gap metric $\Delta_R$ presented in Eq.~\ref{eq:resilience_gap} as the signed difference between clean and faulty coverage for a given controller. A $\Delta_R = 0$; large negative $\Delta_R$ indicates the controller cannot recover from the fault.
-
-Table~\ref{tab:mr_resilience} quantifies $\Delta_R$ for each controller.
+Table~\ref{tab:mr_resilience} quantifies $\Delta_R$ (Eq.~\ref{eq:resilience_gap}) for each controller.
 
 \begin{table}[t]
 \centering
@@ -739,16 +758,16 @@ Table~\ref{tab:mr_resilience} quantifies $\Delta_R$ for each controller.
 \textbf{Controller} & \textbf{Clean} & \textbf{Bad Ldr} &
 \textbf{Freeze Ldr} & $\Delta_R$ (worst) \\
 \midrule
-REIP (mean)    & 71.4\%  & 69.5\%  & 69.9\%  & $-1.9\,$pp  \\
-REIP (median)  & 100.0\% & 100.0\% & 100.0\% & $+0.0\,$pp  \\
+REIP (mean)    & 91.2\%  & 90.9\%  & 96.1\%  & $-0.3\%$  \\
+REIP (median)  & 100.0\% & 100.0\% & 100.0\% & $+0.0\%$  \\
 \midrule
-Raft (mean)    & 68.5\%  & 53.1\%  & 55.9\%  & $-15.4\,$pp \\
-Raft (median)  & 99.5\%  & 73.4\%  & 60.4\%  & $-39.1\,$pp \\
+Raft (mean)    & 86.4\%  & 66.4\%  & 63.9\%  & $-22.5\%$ \\
+Raft (median)  & 99.5\%  & 73.4\%  & 60.4\%  & $-39.1\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-REIP's median resilience gap is $\Delta_R = 0.0\,$pp across \emph{both} fault types: $100\%$ in clean, bad-leader, and freeze-leader conditions. At the mean, REIP's resilience gap is only $-1.9\,$pp (bad-leader) and $-1.5\,$pp (freeze-leader), demonstrating minimal performance degradation. Raft's worst-case $\Delta_R = -39.1\,$pp at the median under freeze-leader, reflecting permanent coverage collapse after fault injection. This is the core result: \emph{in the typical case, REIP's performance is not measurably degraded by Byzantine faults.} The governance layer absorbs both fault types and the mission continues.
+REIP's median resilience gap is $\Delta_R = 0.0\%$ across \emph{both} fault types: $100\%$ in clean, bad-leader, and freeze-leader conditions. Raft's worst-case $\Delta_R = -39.1\%$ at the median under freeze-leader, reflecting permanent coverage collapse after fault injection. This is the core result: \emph{in the typical case, REIP's performance is not measurably degraded by Byzantine faults.} The governance layer absorbs both fault types and the mission continues.
 
 \subsection{Simulation Progression and Convergence}
 
@@ -788,7 +807,7 @@ Fig.~\ref{fig:resilience_contrast} isolates the key contrast: REIP's clean and f
 
 \subsection{Simulation Cumulative Coverage Efficiency}
 
-To capture both convergence speed and final coverage in a single metric, we compute cumulative coverage efficiency as presented in Eq.~\ref{eq:efficiency}. With that data, Table~\ref{tab:mr_efficiency} shows $\eta$ across conditions. REIP's efficiency is effectively \emph{invariant} to the bad-leader fault: $\eta = 74.8\%$ under attack vs.\ $76.7\%$ clean ($-1.9\,$pp). This near-zero difference confirms that fast impeachment absorbs the fault before it can meaningfully reduce integrated coverage. In contrast, Raft loses $11.2\,$pp ($70.6\% \to 59.4\%$) because followers spend the majority of the trial chasing explored cells after fault injection.
+To capture both convergence speed and final coverage in a single metric, we compute cumulative coverage efficiency as presented in Eq.~\ref{eq:efficiency}. With that data, Table~\ref{tab:mr_efficiency} shows $\eta$ across conditions. REIP's efficiency is effectively \emph{invariant} to the bad-leader fault: $\eta = 74.8\%$ under attack vs.\ $76.7\%$ clean ($-1.9\%$). This near-zero difference confirms that fast impeachment absorbs the fault before it can meaningfully reduce integrated coverage. In contrast, Raft loses $11.2\%$ ($70.6\% \to 59.4\%$) because followers spend the majority of the trial chasing explored cells after fault injection.
 
 \begin{table}[t]
 \centering
@@ -813,7 +832,7 @@ Decentr. & Freeze Ldr  & 74.1\% \\
 \end{tabular}
 \end{table}
 
-REIP's clean-to-fault efficiency penalty is only $1.9\,$pp under bad-leader ($76.7\% \to 74.8\%$), confirming that fast impeachment limits integrated coverage cost. Raft loses $11.2{-}13.8\,$pp, reflecting both the final coverage shortfall and its duration.
+REIP's clean-to-fault efficiency penalty is only $1.9\%$ under bad-leader ($76.7\% \to 74.8\%$), confirming that fast impeachment limits integrated coverage cost. Raft loses $11.2{-}13.8\%$, reflecting both the final coverage shortfall and its duration.
 
 \subsection{Dual Sequential Fault Survival}
 
@@ -854,9 +873,11 @@ definition: no trust mechanism $\Rightarrow$ no trust-triggered FP.}
 
 \textbf{No~Trust} collapses to $39.7\%$ mean coverage with $0\%$ detection rate---\emph{worse} than Raft's $66.4\%$, because Raft occasionally recovers via incidental heartbeat disruptions while No~Trust has zero detection mechanism. This is the single most important ablation result: without trust-based detection, REIP offers no resilience advantage. Trust is not an optional enhancement; it is the entire mechanism.
 
-\textbf{No~Direction} achieves $86.0\%$ coverage, a $4.9\,$pp penalty vs.\ REIP-Full. The three-tier cell check alone detects bad-leader faults ($97\%$ detection rate), but the direction consistency check provides supplementary evidence that accelerates suspicion accumulation, explaining the coverage difference.
+\textbf{No~Direction} achieves $86.0\%$ coverage, a $4.9\%$ penalty vs.\ REIP-Full. The three-tier cell check alone detects bad-leader faults ($97\%$ detection rate), but the direction consistency check provides supplementary evidence that accelerates suspicion accumulation, explaining the coverage difference.
 
 \textbf{No~Causality} achieves $96.1\%$ coverage under bad-leader---\emph{higher} than REIP-Full's $90.9\%$---because removing the grace period makes detection faster. However, this comes at a critical cost: $8.1$ false positives per trial under clean conditions (vs.\ $0.7$ for REIP-Full). A system that impeaches good leaders eight times per trial is operationally unusable despite high fault-condition coverage. Causality-aware verification is the mechanism that makes REIP \emph{deployable}: it suppresses false positives from concurrent exploration without meaningfully slowing detection of genuine faults.
+
+In summary, the trust model is the single most critical component---without it, REIP has no fault resilience. The direction consistency check provides a modest but meaningful improvement, and causality gating is essential for operational reliability by keeping false positives below one per trial.
 
 \begin{figure*}[!t]
 \centering
@@ -887,7 +908,7 @@ Raft   & None           & 4  & 33.3\% & 19 & ---    \\
 \end{tabular}
 \end{table}
 
-Under clean conditions (no faults), REIP achieves $63.5\%$ coverage at 120\,s with a mean robot speed of $42\,$mm/s (Table~\ref{tab:hw_results}). Raft reaches only $33.3\%$ mean coverage at $19\,$mm/s, reflecting leadership instability over lossy WiFi UDP even with a deterministic lowest-ID election. The ${\sim}10\times$ speed reduction from simulation (${\sim}500\,$mm/s to ${\sim}45\,$mm/s) accounts for the lower absolute coverage; the relative REIP-vs.-Raft gap ($+30.2\,$pp) mirrors the simulation trend.
+Under clean conditions (no faults), REIP achieves $63.5\%$ coverage at 120\,s with a mean robot speed of $42\,$mm/s (Table~\ref{tab:hw_results}). Raft reaches only $33.3\%$ mean coverage at $19\,$mm/s, reflecting leadership instability over lossy WiFi UDP even with a deterministic lowest-ID election. The ${\sim}10\times$ speed reduction from simulation (${\sim}500\,$mm/s to ${\sim}45\,$mm/s) accounts for the lower absolute coverage; the relative REIP-vs.-Raft gap ($+30.2\%$) mirrors the simulation trend.
 
 Under the freeze-leader fault, REIP maintains $63.5\%$ coverage---identical to its clean performance---with first detection at $8.8\,$s after fault injection. The self-injure condition (leader stops updating assignments and ceases movement) is detected in a mean of $3.3\,$s, with coverage of $61.6\%$. Both results confirm that the proactive trust model transfers from simulation to real hardware: fault-condition coverage is not measurably degraded relative to clean operation.
 
@@ -902,9 +923,9 @@ The theoretical bound (Eq.~\ref{eq:detection_bound}) predicts $n_{\text{detect}}
  & & \textbf{Sim} & \textbf{HW} \\
 \midrule
 Mean robot speed       & (mm/s) & ${\sim}500$ & ${\sim}45$ \\
-REIP clean coverage    & (\%)   & 71.4  & 63.5 \\
-Raft clean coverage    & (\%)   & 68.5  & 33.3 \\
-REIP--Raft gap (clean) & (pp)   & $+2.9$ & $+30.2$ \\
+REIP clean coverage    & (\%)   & 91.2  & 63.5 \\
+Raft clean coverage    & (\%)   & 86.4  & 33.3 \\
+REIP--Raft gap (clean) & (\%)   & $+4.8$ & $+30.2$ \\
 REIP coverage rate     & (cells/s) & 1.46  & 1.02 \\
 Raft coverage rate     & (cells/s) & 1.38  & 0.53 \\
 \bottomrule
@@ -913,7 +934,7 @@ Raft coverage rate     & (cells/s) & 1.38  & 0.53 \\
 
 Direct comparison of absolute coverage between simulation and hardware is misleading because hardware robots travel at ${\sim}45\,$mm/s versus ${\sim}500\,$mm/s in simulation---an $11\times$ speed reduction. A 120\,s hardware trial provides an effective travel budget equivalent to only ${\sim}11\,$s of simulation time.
 
-Table~\ref{tab:hw_norm} presents speed-normalized metrics. The \emph{coverage rate} (cells explored per second across all robots) shows that hardware REIP achieves $70\%$ of the simulation rate ($1.02$ vs.\ $1.46\,$cells/s) despite real-world noise, latency, and imperfect localization. More importantly, the \emph{relative} REIP advantage over Raft is preserved and amplified: $+30.2\,$pp on hardware versus $+2.9\,$pp in clean simulation. This widened gap reflects the compounding effect of real-world WiFi packet loss on Raft's leadership stability, reinforcing the core claim that trust-based governance outperforms heartbeat-only protocols under realistic conditions.
+Table~\ref{tab:hw_norm} presents speed-normalized metrics. The \emph{coverage rate} (cells explored per second across all robots) shows that hardware REIP achieves $70\%$ of the simulation rate ($1.02$ vs.\ $1.46\,$cells/s) despite real-world noise, latency, and imperfect localization. More importantly, the \emph{relative} REIP advantage over Raft is preserved and amplified: $+30.2\%$ on hardware versus $+4.8\%$ in clean simulation. This widened gap reflects the compounding effect of real-world WiFi packet loss on Raft's leadership stability, reinforcing the core claim that trust-based governance outperforms heartbeat-only protocols under realistic conditions.
 
 %=========================================================================
 \section{Discussion}
@@ -939,7 +960,7 @@ Table~\ref{tab:eng_req} summarises the key engineering requirements and their ve
 \midrule
 Detect compromised leader             & $< 2\,$s        & 0.21\,s med.\ \checkmark \\
 Impeach compromised leader            & $< 5\,$s        & 1.67\,s med.\ \checkmark \\
-Coverage under fault $\geq$ clean $-5$\,pp & $\leq 5$\,pp gap & 0.3\,pp gap \checkmark \\
+Coverage under fault $\geq$ clean $-5\%$ & $\leq 5\%$ gap & $0.3\%$ gap \checkmark \\
 False positives (clean trials)        & $< 1$ per trial  & 0.7 per trial \checkmark \\
 Detection rate (bad leader)           & $\geq 95\%$     & 97\% \checkmark \\
 No centralised oracle required        & ---             & \checkmark \\
@@ -951,7 +972,7 @@ Run on Pi Zero 2W at $\geq 5\,$Hz    & 5\,Hz           & \checkmark (HW) \\
 \subsection{Proactive Detection and Resilience}
 \label{sec:discussion_evolution}
 
-The proactive model provides a structural advantage over reactive detectors: detection speed scales with evidence quality, not sample size. Reactive detectors require $O(1/\epsilon^2)$ observations to distinguish a faulty leader from noise; the proactive bound is $\lceil \sigma / (w_{\text{tier}} - r) \rceil$---just 2~commands under Tier~1 ground-truth evidence. The practical consequence is fault-invariant performance: REIP's median coverage gap between clean and both fault conditions is $0.0\,$pp (Table~\ref{tab:mr_resilience}), and cumulative efficiency $\eta$ degrades by only $1.9\,$pp under bad-leader attack. This invariance holds across both immediate misbehavior (bad-leader) and gradual staleness (freeze-leader).
+The proactive model provides a structural advantage over reactive detectors: detection speed scales with evidence quality, not sample size. Reactive detectors require $O(1/\epsilon^2)$ observations to distinguish a faulty leader from noise; the proactive bound is $\lceil \sigma / (w_{\text{tier}} - r) \rceil$---just 2~commands under Tier~1 ground-truth evidence. The practical consequence is fault-invariant performance: REIP's median coverage gap between clean and both fault conditions is $0.0\%$ (Table~\ref{tab:mr_resilience}), and cumulative efficiency $\eta$ degrades by only $1.9\%$ under bad-leader attack. This invariance holds across both immediate misbehavior (bad-leader) and gradual staleness (freeze-leader).
 
 \subsection{Why Leadership Matters}
 
@@ -963,13 +984,13 @@ The No~Trust ablation collapses to $39.7\%$ coverage ($0\%$ detection)---worse t
 
 \subsection{Limitations}
 
-This study is limited to 2D environments, frontier-based exploration, and leader-centric fault models. Hardware validation uses a small arena with five homogeneous robots. The three-tier confidence weights are calibrated for this scale; larger deployments with higher broadcast latency may require adjusted peer weights. Simulation fault profiles are predetermined rather than live LLM-generated. Parameters are fixed rather than adaptively tuned.
+This study is limited to 2D environments, frontier-based exploration, and leader-centric fault models. The restriction to 2D means that the evidence tiers and detection bounds may not directly transfer to 3D volumetric exploration, where occlusion and vertical motion introduce qualitatively different verification challenges. Hardware validation uses a small arena with five homogeneous robots; the three-tier confidence weights are calibrated for this scale, and larger deployments with higher broadcast latency may require re-tuned peer weights to maintain the same false-positive rate. Simulation fault profiles are predetermined rather than dynamically generated, meaning adversarial strategies that adapt to the trust model in real time remain untested.
 
-Some seeds produce catastrophic trials for all controllers ($11/100$ for REIP under bad-leader), driven by initial position configurations that cause robots to wedge against walls. These failures are not governance-related but reflect limitations in the low-level path planner.
+Some seeds produce catastrophic trials for all controllers ($11/100$ for REIP under bad-leader), driven by initial position configurations that cause robots to wedge against walls. These failures are not governance-related but inflate variance, and a more sophisticated low-level path planner would likely eliminate them.
 
-We do not prove that REIP converges to a stable leader in all cases. Under pathological conditions (e.g., all agents equally faulty), the election mechanism may cycle. We mitigate this empirically with cooldown periods and the leader-failure counter in tie-breaking, and note that the worst-case detection bound (Eq.~\ref{eq:detection_bound}) holds regardless of convergence---each follower's detection is independent and bounded.
+We do not prove that REIP converges to a stable leader in all cases. Under pathological conditions (e.g., all agents equally faulty), the election mechanism may cycle, degrading coordination. We mitigate this empirically with cooldown periods and the leader-failure counter in tie-breaking, and note that the worst-case detection bound (Eq.~\ref{eq:detection_bound}) holds regardless of convergence---each follower's detection is independent and bounded.
 
-The hardware sample sizes remain small and uneven across conditions. That means the hardware results should be interpreted as embedded feasibility and transfer validation, not as a statistically complete replacement for the simulation campaign.
+The hardware sample sizes remain small and uneven across conditions ($N{=}1{-}5$), so the hardware results should be interpreted as embedded feasibility and transfer validation rather than a statistically complete replacement for the simulation campaign. Expanding these trials is a priority for future work.
 
 \subsection{Reproducibility}
 
@@ -979,7 +1000,7 @@ All raw data, deterministic seeds, experiment scripts, and \LaTeX{} source are p
 
 REIP's core insight---verifying leader \emph{quality}, not just leader \emph{liveness}---applies beyond multi-robot exploration to any leader--follower system where followers cannot independently verify the optimality of leader commands. Raft-family protocols detect crashed leaders via heartbeat timeout but assume that a live leader issues correct decisions; this assumption holds in log-replication systems (where entries are deterministically verifiable) but breaks in domains with partial observability and no ground-truth oracle.
 
-Autonomous vehicle platoons, federated learning coordinators, and multi-drone survey missions all share this structure: a coordinator issues task assignments that followers cannot fully verify against a known-correct answer. A platoon leader whose perception is degraded by sensor fouling, or a federated learning aggregator subtly poisoning gradient updates, would remain undetected by heartbeat monitoring. REIP's governance architecture---proactive per-follower verification against local knowledge, confidence-weighted suspicion accumulation, and democratic impeachment---provides a lightweight template for these domains, demonstrated here on hardware as constrained as a Raspberry Pi Zero~2W (\$15, 512\,MB RAM).
+Autonomous vehicle platoons, federated learning coordinators, and multi-drone survey missions all share this structure: a coordinator issues task assignments that followers cannot fully verify against a known-correct answer. A platoon leader whose perception is degraded by sensor fouling, or a federated learning aggregator subtly poisoning gradient updates, would remain undetected by heartbeat monitoring. REIP's governance architecture---proactive per-follower verification against local knowledge, confidence-weighted suspicion accumulation, and democratic impeachment---provides a template for these domains, offering sub-second detection with tunable sensitivity that adapts to mission-specific risk tolerance.
 
 \subsection{Future Work}
 \label{sec:future}
@@ -995,7 +1016,7 @@ Future work includes extending REIP to dynamic and zero-knowledge environments, 
 \label{fig:hybrid_future}
 \end{figure}
 
-\textbf{Command pattern analysis}: monitoring temporal patterns in commanded directions (e.g., angular rate, entropy of target sequences) could detect collectively harmful command sequences that pass individual verification; learned models trained on command histories could generalize beyond pre-specified fault types.
+\textbf{Command pattern analysis}: monitoring temporal patterns in commanded directions (e.g., angular rate, repetition of target sequences) could detect collectively harmful command sequences that pass individual verification; learned models trained on command histories could generalize beyond pre-specified fault types.
 
 \textbf{Map poisoning}: compromised robots broadcasting false visited cells could corrupt the shared belief map---REIP does not currently defend against decentralized data-plane attacks.
 
@@ -1018,7 +1039,7 @@ In multiroom experiments ($N{=}100$ per condition), REIP achieves:
 \begin{itemize}
     \item $100\%$ median coverage under both clean and adversarial conditions---fault-invariant performance;
     \item Median fault detection in $0.20\,$s, impeachment in $1.21\,$s (bad-leader) and $1.67\,$s (freeze-leader), with $97{-}99\%$ detection rate;
-    \item $+24.5\,$pp mean coverage advantage over Raft under Byzantine Assignment ($90.9\%$ vs.\ $66.4\%$) and $+32.2\,$pp under Freeze Leader ($96.1\%$ vs.\ $63.9\%$);
+    \item $+24.5\%$ mean coverage advantage over Raft under Byzantine Assignment ($90.9\%$ vs.\ $66.4\%$) and $+32.2\%$ under Freeze Leader ($96.1\%$ vs.\ $63.9\%$);
     \item Survival of two sequential Byzantine compromises in a single trial;
     \item Ablation confirmation that removing the trust model collapses coverage to $39.7\%$, confirming it is the primary mechanism.
 \end{itemize}

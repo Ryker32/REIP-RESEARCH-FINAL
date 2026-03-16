@@ -33,9 +33,14 @@ import hashlib
 import threading
 import random
 import os
+import signal
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
 from enum import Enum
+
+def _sigterm_handler(signum, frame):
+    raise KeyboardInterrupt
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if PROJECT_ROOT not in os.sys.path:
@@ -68,8 +73,8 @@ except ImportError:
     SIM_SENSOR_PORT = 6300
 
     class _ArenaGeometry:
-        width_mm = 1905; height_mm = 1500; cell_size_mm = 150
-        robot_radius_mm = 100; body_radius_mm = 77; body_half_width_mm = 64
+        width_mm = 2000; height_mm = 1500; cell_size_mm = 125
+        robot_radius_mm = 110.0; body_radius_mm = 77; body_half_width_mm = 64
         body_front_mm = 55; swept_radius_mm = int(_math.sqrt(77**2 + 64**2))
         tof_sensor_offset_mm = 55; avoid_distance_mm = 280; critical_distance_mm = 160
         interior_wall_x_left_mm = 1000; interior_wall_x_right_mm = 1036

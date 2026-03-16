@@ -1,0 +1,23 @@
+{
+  "trial_name": "raft_self_injure_leader_t5",
+  "controller": "raft",
+  "fault_type": "self_injure_leader",
+  "trial_num": 5,
+  "duration": 120,
+  "fault_time_1": 20,
+  "fault_time_2": 40,
+  "start_time": 1773634523.9971673,
+  "start_ts": "20260315_211523",
+  "active_robots": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "fault1_robot": 5,
+  "fault1_actual_time": 20.039842128753662,
+  "fault2_robot": 3,
+  "fault2_actual_time": 40.09404158592224,
+  "actual_duration": 120.21249961853027
+}

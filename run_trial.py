@@ -127,7 +127,7 @@ def _kill_one(rid, host):
     try:
         ssh = _ssh_connect(host)
         ssh.exec_command(
-            'pkill -f reip_node; pkill -f raft_node; sleep 0.5; '
+            'pkill -INT -f reip_node; pkill -INT -f raft_node; sleep 1; '
             'pkill -9 -f reip_node; pkill -9 -f raft_node; pkill -9 -f "python3.*node.py"'
         )
         ssh.close()
@@ -348,7 +348,7 @@ def find_leader(timeout=4.0):
             msg = json.loads(data.decode())
             if msg.get('type') == 'peer_state':
                 lid = msg.get('leader_id')
-                if lid and msg.get('leader_established', True):
+                if lid:
                     votes[lid] = votes.get(lid, 0) + 1
         except socket.timeout:
             pass

@@ -97,10 +97,21 @@ class Calibration:
     wall_y_end: int = 1200
 
     def arena_to_pixel(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
-        """Replicate the server's arena_to_pixel (floor-level → pixel)."""
+        """Convert floor-level arena coords to pixel coords."""
         if self.inv_homography is not None:
             wx = self.camera_center_x + (x_mm - self.camera_center_x) / self.floor_scale
             wy = self.camera_center_y + (y_mm - self.camera_center_y) / self.floor_scale
+            pt = np.array([[[wx, wy]]], dtype=np.float32)
+            px_pt = cv2.perspectiveTransform(pt, self.inv_homography)
+            return int(px_pt[0][0][0]), int(px_pt[0][0][1])
+        return int(x_mm), int(y_mm)
+
+    def arena_to_pixel_robot(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
+        """Convert robot-level arena coords to pixel coords.
+        Uses ROBOT_SCALE so the cell grid aligns with detected robot markers."""
+        if self.inv_homography is not None:
+            wx = self.camera_center_x + (x_mm - self.camera_center_x) / self.robot_scale
+            wy = self.camera_center_y + (y_mm - self.camera_center_y) / self.robot_scale
             pt = np.array([[[wx, wy]]], dtype=np.float32)
             px_pt = cv2.perspectiveTransform(pt, self.inv_homography)
             return int(px_pt[0][0][0]), int(px_pt[0][0][1])
@@ -147,7 +158,8 @@ def load_calibration(header: dict) -> Calibration:
 
 # ============== Cell polygon cache ==============
 def build_cell_cache(cal: Calibration):
-    """Pre-compute cell polygons in pixel space + wall status."""
+    """Pre-compute cell polygons in pixel space + wall status.
+    Uses robot-level projection so cells align with detected robot markers."""
     cells_x = int(cal.arena_w / cal.cell_size)
     cells_y = int(cal.arena_h / cal.cell_size)
     polys = []
@@ -157,7 +169,7 @@ def build_cell_cache(cal: Calibration):
             x0, y0 = cx * cal.cell_size, cy * cal.cell_size
             corners = [(x0, y0), (x0 + cal.cell_size, y0),
                        (x0 + cal.cell_size, y0 + cal.cell_size), (x0, y0 + cal.cell_size)]
-            pts = np.array([cal.arena_to_pixel(ax, ay) for ax, ay in corners],
+            pts = np.array([cal.arena_to_pixel_robot(ax, ay) for ax, ay in corners],
                            dtype=np.int32)
             is_wall = cal.is_wall_cell(cx, cy)
             polys.append(((cx, cy), pts, is_wall))

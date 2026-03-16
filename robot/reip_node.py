@@ -36,10 +36,15 @@ import hashlib
 import threading
 import random
 import os
+import signal
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Set, Tuple
 from enum import Enum
 from collections import deque
+
+def _sigterm_handler(signum, frame):
+    raise KeyboardInterrupt
+signal.signal(signal.SIGTERM, _sigterm_handler)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in os.sys.path:

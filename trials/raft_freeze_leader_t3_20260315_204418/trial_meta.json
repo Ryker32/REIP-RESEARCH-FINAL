@@ -1,0 +1,23 @@
+{
+  "trial_name": "raft_freeze_leader_t3",
+  "controller": "raft",
+  "fault_type": "freeze_leader",
+  "trial_num": 3,
+  "duration": 120,
+  "fault_time_1": 20,
+  "fault_time_2": 40,
+  "start_time": 1773632658.4281998,
+  "start_ts": "20260315_204418",
+  "active_robots": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "fault1_robot": 1,
+  "fault1_actual_time": 20.019688844680786,
+  "fault2_robot": 5,
+  "fault2_actual_time": 40.09250736236572,
+  "actual_duration": 120.18372750282288
+}

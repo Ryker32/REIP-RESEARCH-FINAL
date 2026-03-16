@@ -316,7 +316,7 @@ class PositionServer:
     ROBOT_SCALE = DEFAULT_ARUCO.robot_scale
 
     def pixel_to_arena(self, px: float, py: float) -> Tuple[float, float]:
-        """Convert pixel coords to arena coords (mm), corrected for floor plane."""
+        """Convert pixel coords to arena coords (mm), corrected for robot tag plane."""
         if self.homography is not None:
             pt = np.array([[[px, py]]], dtype=np.float32)
             transformed = cv2.perspectiveTransform(pt, self.homography)
@@ -488,8 +488,8 @@ class PositionServer:
     
     def arena_to_pixel(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
         """Convert floor-level arena coords to pixel coords for overlay drawing.
-        Undoes the floor correction (FLOOR_SCALE) to get wall-top coords,
-        then uses the inverse homography to get pixel coords."""
+        Inverse of pixel_to_arena: undoes the FLOOR_SCALE correction to get
+        wall-top (homography) coords, then applies the inverse homography."""
         if self.inv_homography is not None:
             wx = self.CAMERA_CENTER_X + (x_mm - self.CAMERA_CENTER_X) / self.FLOOR_SCALE
             wy = self.CAMERA_CENTER_Y + (y_mm - self.CAMERA_CENTER_Y) / self.FLOOR_SCALE
@@ -501,6 +501,17 @@ class PositionServer:
     def _is_wall_cell(self, cx: int, cy: int) -> bool:
         """Mirror of robot's _is_wall_cell for overlay rendering."""
         return DEFAULT_ARENA.is_wall_cell(cx, cy)
+
+    def _arena_to_pixel_robot(self, x_mm: float, y_mm: float) -> Tuple[int, int]:
+        """Convert robot-level arena coords to pixel coords.
+        Uses ROBOT_SCALE so the cell grid aligns with detected robot markers."""
+        if self.inv_homography is not None:
+            wx = self.CAMERA_CENTER_X + (x_mm - self.CAMERA_CENTER_X) / self.ROBOT_SCALE
+            wy = self.CAMERA_CENTER_Y + (y_mm - self.CAMERA_CENTER_Y) / self.ROBOT_SCALE
+            pt = np.array([[[wx, wy]]], dtype=np.float32)
+            px_pt = cv2.perspectiveTransform(pt, self.inv_homography)
+            return int(px_pt[0][0][0]), int(px_pt[0][0][1])
+        return int(x_mm * self.pixels_per_mm_x), int(self.origin_y - y_mm * self.pixels_per_mm_y)
 
     def _build_cell_cache(self):
         """Pre-compute cell pixel corners and wall status (called once when
@@ -516,7 +527,7 @@ class PositionServer:
                 x0, y0 = cx * CELL_SIZE, cy * CELL_SIZE
                 corners = [(x0, y0), (x0 + CELL_SIZE, y0),
                            (x0 + CELL_SIZE, y0 + CELL_SIZE), (x0, y0 + CELL_SIZE)]
-                pts = np.array([self.arena_to_pixel(ax, ay) for ax, ay in corners],
+                pts = np.array([self._arena_to_pixel_robot(ax, ay) for ax, ay in corners],
                                dtype=np.int32)
                 is_wall = self._is_wall_cell(cx, cy)
                 self._cell_polys.append(((cx, cy), pts, is_wall))

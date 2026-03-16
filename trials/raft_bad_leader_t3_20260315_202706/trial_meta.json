@@ -1,0 +1,23 @@
+{
+  "trial_name": "raft_bad_leader_t3",
+  "controller": "raft",
+  "fault_type": "bad_leader",
+  "trial_num": 3,
+  "duration": 120,
+  "fault_time_1": 20,
+  "fault_time_2": 40,
+  "start_time": 1773631626.3349373,
+  "start_ts": "20260315_202706",
+  "active_robots": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "fault1_robot": 4,
+  "fault1_actual_time": 20.042543411254883,
+  "fault2_robot": 2,
+  "fault2_actual_time": 40.07381463050842,
+  "actual_duration": 120.27890968322754
+}

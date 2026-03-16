@@ -1339,17 +1339,19 @@ class REIPNode:
         #   Oscillation attack Ω ≈ 2.5-3.0 (180° flips every cycle → Δθ ≈ π)
         #   Threshold 3π/4 ≈ 2.356 (135°) sits between these distributions.
         #   Suspicion scales linearly from 0 at threshold to OMEGA_WEIGHT at Ω=π.
-        OMEGA_DETECT_THRESHOLD = 3 * math.pi / 4  # ~2.356 rad (135°)
-        OMEGA_WEIGHT = 0.3  # Max suspicion per command at Ω=π
-        leader_tenure = time.time() - self._leader_tenure_start
-        if (len(self._omega_window) >= self._omega_window.maxlen
-                and omega >= OMEGA_DETECT_THRESHOLD
-                and leader_tenure >= self._OMEGA_GRACE_PERIOD):
-            # Scale suspicion by excess above threshold: 0 at threshold, OMEGA_WEIGHT at π
-            omega_excess = (omega - OMEGA_DETECT_THRESHOLD) / (math.pi - OMEGA_DETECT_THRESHOLD)
-            omega_suspicion = OMEGA_WEIGHT * min(omega_excess, 1.0)
-            suspicion_added += omega_suspicion
-            reasons.append(f"cmd_instability(omega={omega:.2f})")
+        # ===== ABLATION: no_instability - skip command instability check =====
+        if not getattr(self, '_ablation_no_instability', False):
+            OMEGA_DETECT_THRESHOLD = 3 * math.pi / 4  # ~2.356 rad (135°)
+            OMEGA_WEIGHT = 0.3  # Max suspicion per command at Ω=π
+            leader_tenure = time.time() - self._leader_tenure_start
+            if (len(self._omega_window) >= self._omega_window.maxlen
+                    and omega >= OMEGA_DETECT_THRESHOLD
+                    and leader_tenure >= self._OMEGA_GRACE_PERIOD):
+                # Scale suspicion by excess above threshold: 0 at threshold, OMEGA_WEIGHT at π
+                omega_excess = (omega - OMEGA_DETECT_THRESHOLD) / (math.pi - OMEGA_DETECT_THRESHOLD)
+                omega_suspicion = OMEGA_WEIGHT * min(omega_excess, 1.0)
+                suspicion_added += omega_suspicion
+                reasons.append(f"cmd_instability(omega={omega:.2f})")
         
         # ===== UPDATE SUSPICION =====
         if suspicion_added > 0:
@@ -3281,6 +3283,7 @@ if __name__ == "__main__":
         print("       no_trust      - Disable all trust assessment (no detection/impeachment)")
         print("       no_causality  - Set causality grace period to 0 (expect false positives)")
         print("       no_direction  - Disable MPC direction consistency check")
+        print("       no_instability - Disable command instability (omega) check")
         sys.exit(1)
     
     robot_id = int(sys.argv[1])
@@ -3303,7 +3306,7 @@ if __name__ == "__main__":
     if "--ablation" in sys.argv:
         idx = sys.argv.index("--ablation")
         ablation_mode = sys.argv[idx + 1]
-        valid_modes = ("no_trust", "no_causality", "no_direction")
+        valid_modes = ("no_trust", "no_causality", "no_direction", "no_instability")
         if ablation_mode not in valid_modes:
             print(f"ERROR: Unknown ablation mode '{ablation_mode}'. Valid: {valid_modes}")
             sys.exit(1)
@@ -3337,6 +3340,12 @@ if __name__ == "__main__":
         print(f"=== ABLATION: no_direction -- MPC direction check DISABLED ===")
     else:
         node._ablation_no_direction = False
+    
+    if ablation_mode == "no_instability":
+        node._ablation_no_instability = True
+        print(f"=== ABLATION: no_instability -- Command instability (omega) check DISABLED ===")
+    else:
+        node._ablation_no_instability = False
     
     if "--decentralized" in sys.argv:
         node.decentralized_mode = True

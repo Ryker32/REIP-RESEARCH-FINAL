@@ -2240,6 +2240,9 @@ ABLATION_CONDITIONS = [
     # No direction consistency check: only three-tier cell check
     # Expected: still detects bad_leader via Tier 1/3, but possibly slower
     ("Ablation_NoDirection_BL",    "reip", "bad_leader", 1, "no_direction"),
+    # No command instability check: disable omega (oscillation) detection
+    # Expected: still detects bad_leader via three-tier + direction, but misses oscillation attacks
+    ("Ablation_NoInstability_BL",  "reip", "bad_leader", 1, "no_instability"),
 ]
 
 

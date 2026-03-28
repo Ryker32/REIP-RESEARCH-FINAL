@@ -62,7 +62,7 @@ PLOT_H = 140
 GAP = 10
 MARGIN = 10
 NUM_ROBOTS = 5
-SPEED_MULTIPLIER = 2.5   # 2.5x real-time so judges don't wait forever
+SPEED_MULTIPLIER = 5.0   # 5x real-time so judges see results in ~15s
 REIP_COLOR = (0, 52, 204)
 RAFT_COLOR = (227, 30, 52)
 

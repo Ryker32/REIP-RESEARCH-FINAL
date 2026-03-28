@@ -198,7 +198,7 @@ class REIPSimulation:
             cmd_dir = math.atan2(target[1] - robot.y, target[0] - robot.x)
             
             # Find best alignment with ANY frontier
-            best_alignment = math.pi  # Start with worst (180°)
+            best_alignment = math.pi  # Start with worst (180 deg)
             for f in frontiers:
                 fp = self.cell_to_pos(f)
                 frontier_dir = math.atan2(fp[1] - robot.y, fp[0] - robot.x)
@@ -212,12 +212,12 @@ class REIPSimulation:
                     break
             
             # Only penalize if command isn't close to ANY frontier (severe mismatch)
-            SEVERE_THRESHOLD = math.pi * 3 / 4  # 135°
+            SEVERE_THRESHOLD = math.pi * 3 / 4  # 135 deg
             if best_alignment > SEVERE_THRESHOLD:
                 mpc_weight = 0.5 + (best_alignment - SEVERE_THRESHOLD) / (math.pi - SEVERE_THRESHOLD) * 0.3
                 weight += mpc_weight
                 bad = True
-                print(f"[MPC SEVERE] R{robot.robot_id}: No frontier within 135° of cmd!")
+                print(f"[MPC SEVERE] R{robot.robot_id}: No frontier within 135 deg of cmd!")
         
         if bad:
             robot.suspicion += weight

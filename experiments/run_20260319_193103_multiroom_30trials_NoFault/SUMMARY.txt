@@ -1,0 +1,20 @@
+REIP Experiment Run: run_20260319_193103_multiroom_30trials_NoFault
+Date: 2026-03-19 20:06
+Layouts: ['multiroom']
+Conditions: 3
+Trials per condition: 30
+Total experiments: 90
+Workers: 6
+
+
+====================================================================================================
+STATISTICAL SUMMARY  (mean +/- std)
+====================================================================================================
+Layout     Controller     Fault        Ablation          N        Coverage        T->50%        T->60%        T->80%   1st Suspicion     Impeachment   Det%    FP   Cov@90s
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+multiroom  decentralized  none         none             30     12.0+/-15.1   76.4+/-34.6    74.5+/-0.0           N/A             N/A             N/A     0%   0.0      11.1
+multiroom  raft           none         none             30     11.3+/-12.2    73.6+/-6.7   119.7+/-0.0           N/A             N/A             N/A     0%   6.8      10.8
+multiroom  reip           none         none             30     11.2+/-11.5   75.0+/-31.8           N/A           N/A             N/A             N/A     0%   1.1      10.8
+========================================================================================================================
+
+KEY COMPARISONS:

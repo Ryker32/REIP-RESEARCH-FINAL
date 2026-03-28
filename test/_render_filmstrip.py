@@ -37,8 +37,8 @@ ROBOT_COLORS = {
 }
 
 COL_SENSE   = '#7f8c8d'
-CMD_COL     = '#c0392b'       # dark red — leader command
-PRED_COL    = '#27ae60'       # green — agent belief / navigation
+CMD_COL     = '#c0392b'       # dark red - leader command
+PRED_COL    = '#27ae60'       # green - agent belief / navigation
 COL_LEADER  = 'gold'
 VEC_LW      = 2.2
 VEC_ALP     = 0.88
@@ -168,7 +168,7 @@ def render_frame(ax, frame, arena_w, arena_h, cell_size, walls,
                             fill=False, ls='dashed', lw=0.6, alpha=0.4,
                             zorder=6))
 
-        # Arrows — same logic as sim_environment.png
+        # Arrows - same logic as sim_environment.png
         cmd  = rdata.get('commanded_target') or rdata.get('target')
         pred = rdata.get('predicted_target')
         wp   = rdata.get('next_waypoint')
@@ -243,7 +243,7 @@ def render_frame(ax, frame, arena_w, arena_h, cell_size, walls,
         status_parts.append(f'Leader = R{leader_id}')
     if fault_time_1 and t >= fault_time_1:
         if fault_time_2 and t >= fault_time_2:
-            status_parts.append('FAULT ×2')
+            status_parts.append('FAULT x2')
         else:
             status_parts.append('FAULT')
 
@@ -335,7 +335,7 @@ def main():
     
     key_frames = [find_frame_at_time(frames, t) for t in target_times]
     
-    # Create filmstrip figure — 2×2 grid for better readability
+    # Create filmstrip figure - 2x2 grid for better readability
     fig, axes = plt.subplots(2, 2, figsize=(7.16, 5.4))
     axes = axes.flatten()
     
@@ -361,7 +361,7 @@ def main():
 
 
 def comparison():
-    """Generate REIP vs Raft comparison filmstrip — the key paper figure."""
+    """Generate REIP vs Raft comparison filmstrip - the key paper figure."""
     # Find output dir: last arg that is not --compare
     args = [a for a in sys.argv[1:] if a != '--compare']
     output_dir = args[0] if args else 'paper_docs/Ryker_Kollmyer___UPDATED_PAPER'
@@ -371,7 +371,7 @@ def comparison():
         'experiments/run_20260228_155656_multiroom_1trials_BadLeader/logs/multiroom_reip_BadLeader_t1/snapshots.json',
         'experiments/run_20260226_221118_multiroom_1trials_all/logs/multiroom_reip_BadLeader_t1/snapshots.json',
     ]
-    # Raft bad_leader (use older run — representative failure with 57% plateau)
+    # Raft bad_leader (use older run - representative failure with 57% plateau)
     raft_paths = [
         'experiments/run_20260226_221118_multiroom_1trials_all/logs/multiroom_raft_BadLeader_t1/snapshots.json',
         'experiments/run_20260228_155656_multiroom_1trials_BadLeader/logs/multiroom_raft_BadLeader_t1/snapshots.json',
@@ -401,7 +401,7 @@ def comparison():
     col_labels = ['Pre-fault\n(t = 8 s)', 'Fault active\n(t = 15 s)',
                   'Late trial\n(t = 60 s)']
 
-    # Layout: 2 rows (REIP, Raft) × 3 columns (timepoints)
+    # Layout: 2 rows (REIP, Raft) x 3 columns (timepoints)
     fig, axes = plt.subplots(2, 3, figsize=(7.16, 4.4))
 
     for col, t_target in enumerate(times):

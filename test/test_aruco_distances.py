@@ -18,7 +18,7 @@ import math
 import json
 import time
 
-# ── Config (must match aruco_position_server.py) ────────────────
+# -- Config (must match aruco_position_server.py) ----------------
 ARUCO_DICT = cv2.aruco.DICT_4X4_50
 CORNER_IDS = {40: "BL", 41: "BR", 42: "TR", 43: "TL"}
 ROBOT_IDS  = {1, 2, 3, 4, 5}
@@ -27,24 +27,24 @@ ROBOT_IDS  = {1, 2, 3, 4, 5}
 ARENA_W_MM = 2000
 ARENA_H_MM = 1500
 
-# Corner marker → real-world coordinate mapping (mm)
+# Corner marker -> real-world coordinate mapping (mm)
 # Arena origin (0,0) = inner bottom-left of the playable black surface.
 # Tags sit on the outer blue-tape border, offset only in X (not Y).
 CORNER_ARENA = {
-    40: (-115,     0),   # BL — 11.5 cm left  of origin,  level with y=0
-    41: (2110,     0),   # BR — 211  cm right of origin,  level with y=0
-    42: (2110,  1500),   # TR — 11   cm right of arena,   level with y=1500
-    43: (-113,  1500),   # TL — 11.3 cm left  of origin,  level with y=1500
+    40: (-115,     0),   # BL - 11.5 cm left  of origin,  level with y=0
+    41: (2110,     0),   # BR - 211  cm right of origin,  level with y=0
+    42: (2110,  1500),   # TR - 11   cm right of arena,   level with y=1500
+    43: (-113,  1500),   # TL - 11.3 cm left  of origin,  level with y=1500
 }
 
-# ── Colors (BGR) ────────────────────────────────────────────────
+# -- Colors (BGR) ------------------------------------------------
 GREEN   = (0, 255, 0)
 CYAN    = (255, 255, 0)
 WHITE   = (255, 255, 255)
 YELLOW  = (0, 255, 255)
 BLACK   = (0, 0, 0)
 
-# Robot ID → display colour
+# Robot ID -> display colour
 ROBOT_COLORS = {
     1: (0, 200, 255),   # orange-ish
     2: (255, 100, 100),  # blue-ish
@@ -87,11 +87,11 @@ def detect_markers(frame):
 
 
 def compute_homography(markers):
-    """Build pixel→mm homography from 4 corner markers."""
+    """Build pixel->mm homography from 4 corner markers."""
     found = [cid for cid in CORNER_IDS if cid in markers]
     if len(found) < 4:
         missing = [c for c in CORNER_IDS if c not in markers]
-        print(f"  WARNING: only {len(found)}/4 corner markers — missing {missing}")
+        print(f"  WARNING: only {len(found)}/4 corner markers - missing {missing}")
         return None
     src = np.array([markers[cid]['px'] for cid in [40, 41, 42, 43]],
                    dtype=np.float32)
@@ -111,7 +111,7 @@ def dist_mm(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
-# ── Deployment overlay (clean) ──────────────────────────────────
+# -- Deployment overlay (clean) ----------------------------------
 def annotate_clean(frame, markers, H):
     """Minimal deployment overlay: robot IDs + corner labels only."""
     out = frame.copy()
@@ -149,9 +149,9 @@ def annotate_clean(frame, markers, H):
         cv2.putText(out, label, (lx, ly),
                     FONT, 0.55, col, 2)
 
-        # No heading arrows — keep overlay minimal for deployment
+        # No heading arrows - keep overlay minimal for deployment
 
-    # Minimal HUD — centred at top so corner labels stay visible
+    # Minimal HUD - centred at top so corner labels stay visible
     n_corners = sum(1 for c in CORNER_IDS if c in markers)
     n_robots  = sum(1 for r in ROBOT_IDS if r in markers)
     mode = "HOMOGRAPHY" if has_H else "NO HOMOGRAPHY"
@@ -165,7 +165,7 @@ def annotate_clean(frame, markers, H):
     return out
 
 
-# ── JSON export ─────────────────────────────────────────────────
+# -- JSON export -------------------------------------------------
 def build_json(markers, H):
     """Build a dict with all positions, distances, headings for post-processing."""
     has_H = H is not None
@@ -282,7 +282,7 @@ def print_summary(data):
     print(f"{'='*55}\n")
 
 
-# ── Main ────────────────────────────────────────────────────────
+# -- Main --------------------------------------------------------
 def main():
     if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
         img_path = sys.argv[1]

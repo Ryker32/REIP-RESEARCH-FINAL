@@ -1,16 +1,16 @@
-"""Generate sim_environment.png — IEEE-quality two-panel comparison.
+"""Generate sim_environment.png - IEEE-quality two-panel comparison.
 
-Left:  Clean operation — coordinated exploration, aligned arrows
-Right: Byzantine fault active — leader commands vs agent beliefs diverge
+Left:  Clean operation - coordinated exploration, aligned arrows
+Right: Byzantine fault active - leader commands vs agent beliefs diverge
 
 Arrow logic:
   Clean panel:
     GREEN solid = next_waypoint (A*-routed, NEVER crosses walls)
-    No red arrows — everything is aligned in clean mode
+    No red arrows - everything is aligned in clean mode
 
   Fault panel:
-    RED  dashed = commanded_target  (bad leader's order → explored cells)
-    GREEN solid = predicted_target  (agent's own frontier belief → unexplored)
+    RED  dashed = commanded_target  (bad leader's order -> explored cells)
+    GREEN solid = predicted_target  (agent's own frontier belief -> unexplored)
     The visible divergence between these IS how REIP detects the fault.
 """
 
@@ -38,8 +38,8 @@ COL_FRONTIER = '#f1c40f'
 COL_LEADER   = 'gold'
 FOL_COLS     = ['#3498db', '#e74c3c', '#2ecc71', '#9b59b6', '#f39c12']
 COL_SENSE    = '#7f8c8d'
-CMD_COL      = '#c0392b'       # dark red  — leader command
-PRED_COL     = '#27ae60'       # green     — agent belief / navigation
+CMD_COL      = '#c0392b'       # dark red  - leader command
+PRED_COL     = '#27ae60'       # green     - agent belief / navigation
 GRID_COL     = '#cccccc'
 
 # Arrow/marker sizes
@@ -52,7 +52,7 @@ MUT_SC   = 14
 
 cmap_grid = ListedColormap([COL_OBSTACLE, COL_UNKNOWN, COL_FREE])
 
-MIN_ARROW_DIST = 20  # px — suppress arrows when agent is almost at target
+MIN_ARROW_DIST = 20  # px - suppress arrows when agent is almost at target
 
 
 # ============================================================
@@ -123,7 +123,7 @@ def pick_clean(data, t_min=3.0, t_max=8.0):
             continue
         sp = _bb_spread(r)
 
-        # Count agents with arrows visible — predicted_target or next_waypoint
+        # Count agents with arrows visible - predicted_target or next_waypoint
         n_with_arrow = 0
         for rd in r.values():
             rx, ry = rd['x'], rd['y']
@@ -321,11 +321,11 @@ def render_panel(ax, snap, frame, title, subtitle=None,
                                 walls=walls)
             elif mode == 'fault':
                 # Fault: red = commanded target, green = predicted target
-                # Red dashed — leader's order (to explored cell)
+                # Red dashed - leader's order (to explored cell)
                 if cmd:
                     _draw_arrow(ax, rx, ry, cmd[0], cmd[1],
                                 arrow_len, CMD_COL, 'dashed', 11)
-                # Green solid — agent's own belief (to frontier)
+                # Green solid - agent's own belief (to frontier)
                 if pred:
                     _draw_arrow(ax, rx, ry, pred[0], pred[1],
                                 arrow_len, PRED_COL, 'solid', 13)

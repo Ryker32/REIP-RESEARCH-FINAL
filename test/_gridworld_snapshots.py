@@ -70,17 +70,17 @@ FOLLOWER_SIZE = 150
 FONT_SIZE = 7
 
 # Vector arrow styles
-CMD_VECTOR_COLOR = '#c0392b'      # dark red — leader command
-PRED_VECTOR_COLOR = '#27ae60'     # green — robot's own belief
+CMD_VECTOR_COLOR = '#c0392b'      # dark red - leader command
+PRED_VECTOR_COLOR = '#27ae60'     # green - robot's own belief
 VECTOR_LW = 2.8
 VECTOR_ALPHA = 0.9
 ARROW_SCALE = 2.5                 # fraction of cell_size for arrow length
 
 # Trust contour styles
 TRUST_OK_ALPHA = 0.0             # no contour when trust is fine
-TRUST_WAVER_COLOR = '#f39c12'    # yellow — trust wavering
+TRUST_WAVER_COLOR = '#f39c12'    # yellow - trust wavering
 TRUST_WAVER_ALPHA = 0.35
-TRUST_CRITICAL_COLOR = '#e74c3c' # red — trust critical
+TRUST_CRITICAL_COLOR = '#e74c3c' # red - trust critical
 TRUST_CRITICAL_ALPHA = 0.45
 CONTOUR_RADIUS_MULT = 1.8        # radius multiplier vs robot marker
 
@@ -242,7 +242,7 @@ def draw_arena(ax, arena_w, arena_h, cell_size, walls, visited_cells,
         ax.scatter(rx, ry, c=[agent_color], s=msize, marker=marker,
                    edgecolors=edgecolor, linewidths=elw, zorder=10)
 
-        # ---- COMMAND VECTOR (RED) — what the leader told this robot ----
+        # ---- COMMAND VECTOR (RED) - what the leader told this robot ----
         cmd_vec = _compute_vector(rx, ry, commanded_target, cell_size)
         if cmd_vec and not is_leader:
             ax.annotate('', xy=(rx + cmd_vec[0], ry + cmd_vec[1]),
@@ -251,7 +251,7 @@ def draw_arena(ax, arena_w, arena_h, cell_size, walls, visited_cells,
                                         lw=VECTOR_LW, alpha=VECTOR_ALPHA),
                         zorder=9)
 
-        # ---- PREDICTED VECTOR (GREEN) — robot's own belief ----
+        # ---- PREDICTED VECTOR (GREEN) - robot's own belief ----
         pred_vec = _compute_vector(rx, ry, predicted_target, cell_size)
         if pred_vec and not is_leader:
             ax.annotate('', xy=(rx + pred_vec[0], ry + pred_vec[1]),
@@ -298,11 +298,11 @@ def draw_arena(ax, arena_w, arena_h, cell_size, walls, visited_cells,
 def generate_gallery(reip_data, raft_data, output_path,
                      reip_times=None, raft_times=None, reip_annotations=None,
                      raft_annotations=None):
-    """Generate the 2-row × 5-column gallery: WITH REIP (top) vs WITHOUT REIP (bottom).
+    """Generate the 2-row x 5-column gallery: WITH REIP (top) vs WITHOUT REIP (bottom).
 
     This matches the poster concept:
-      Top row (REIP):    fault → suspicion → impeach → election → recovery
-      Bottom row (RAFT): fault → stuck → stuck → stuck → stuck
+      Top row (REIP):    fault -> suspicion -> impeach -> election -> recovery
+      Bottom row (RAFT): fault -> stuck -> stuck -> stuck -> stuck
     """
     if reip_times is None:
         reip_times = [9, 11, 13, 32, 60]
@@ -312,7 +312,7 @@ def generate_gallery(reip_data, raft_data, output_path,
         reip_annotations = [
             "Pre-fault: vectors aligned",
             "Fault! Vectors diverge",
-            "Trust wavering → impeach",
+            "Trust wavering -> impeach",
             "New leader elected",
             "Recovery: full coverage",
         ]
@@ -453,7 +453,7 @@ def generate_filmstrip(data, snapshot_times, output_path, title_prefix=""):
 
     controller = data.get('controller', '?').upper()
     fault = data.get('fault_type', 'clean') or 'clean'
-    fig.suptitle(f"{controller} — {fault.replace('_', ' ').title()}  (seed {data.get('seed', '?')})",
+    fig.suptitle(f"{controller} - {fault.replace('_', ' ').title()}  (seed {data.get('seed', '?')})",
                  fontsize=11, fontweight='bold', y=1.02)
 
     plt.tight_layout()
@@ -495,7 +495,7 @@ def generate_comparison(snapshot_files, snapshot_times, output_path):
                        frame.get('visited_cells', []), frame, fault_times,
                        title_prefix=tp)
 
-    fig.suptitle("Gridworld Snapshots — REIP vs RAFT",
+    fig.suptitle("Gridworld Snapshots - REIP vs RAFT",
                  fontsize=12, fontweight='bold', y=1.01)
     plt.tight_layout()
     fig.savefig(output_path, dpi=300, bbox_inches='tight',
@@ -533,7 +533,7 @@ def main():
         rows = []
         for p in args.paths:
             data = load_snapshots(p)
-            label = f"{data.get('controller', '?').upper()} — " \
+            label = f"{data.get('controller', '?').upper()} - " \
                     f"{(data.get('fault_type') or 'clean').replace('_', ' ').title()}"
             rows.append((label, data))
         out = args.output or os.path.join(os.path.dirname(args.paths[0]),

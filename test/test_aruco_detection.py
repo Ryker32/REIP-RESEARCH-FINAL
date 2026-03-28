@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ArUco Detection Test — draws colored contours + labels on each marker.
+ArUco Detection Test - draws colored contours + labels on each marker.
 
 Usage:
     python test_aruco_detection.py <image_path>
@@ -17,7 +17,7 @@ import numpy as np
 import sys
 import os
 
-# ── Config ──────────────────────────────────────────────────────
+# -- Config ------------------------------------------------------
 ARUCO_DICT = cv2.aruco.DICT_4X4_50       # Must match your printed tags
 CORNER_IDS = {40, 41, 42, 43}
 ROBOT_IDS  = {1, 2, 3, 4, 5}
@@ -70,19 +70,19 @@ def annotate_frame(frame):
             pts = corners[i][0].astype(int)          # 4 corner points
             label, color = classify_marker(mid)
 
-            # ── Thick contour polygon ──
+            # -- Thick contour polygon --
             cv2.polylines(out, [pts], isClosed=True, color=color, thickness=3)
 
-            # ── Corner dots ──
+            # -- Corner dots --
             for p in pts:
                 cv2.circle(out, tuple(p), 5, RED, -1)
 
-            # ── Centre dot ──
+            # -- Centre dot --
             cx = int(np.mean(pts[:, 0]))
             cy = int(np.mean(pts[:, 1]))
             cv2.circle(out, (cx, cy), 6, color, -1)
 
-            # ── Heading arrow (top-left → top-right edge) ──
+            # -- Heading arrow (top-left -> top-right edge) --
             dx = pts[1][0] - pts[0][0]
             dy = pts[1][1] - pts[0][1]
             angle_deg = np.degrees(np.arctan2(-dy, dx))
@@ -91,7 +91,7 @@ def annotate_frame(frame):
             ay = int(cy + arrow_len * np.sin(np.radians(-angle_deg)))
             cv2.arrowedLine(out, (cx, cy), (ax, ay), WHITE, 2, tipLength=0.3)
 
-            # ── Label text ──
+            # -- Label text --
             # background rectangle for readability
             (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
             tx, ty = cx - tw // 2, cy - 25
@@ -100,12 +100,12 @@ def annotate_frame(frame):
             cv2.putText(out, label, (tx, ty),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
-            # ── Pixel coords under marker ──
+            # -- Pixel coords under marker --
             coord_str = f"({cx}, {cy})"
             cv2.putText(out, coord_str, (cx - 40, cy + 35),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, WHITE, 1)
 
-            # ── Stats ──
+            # -- Stats --
             if mid in CORNER_IDS:
                 stats["corners"].append(mid)
             elif mid in ROBOT_IDS:
@@ -113,12 +113,12 @@ def annotate_frame(frame):
             else:
                 stats["unknown"].append(mid)
 
-    # ── Rejected regions (faint) ──
+    # -- Rejected regions (faint) --
     for rej in (rejected or []):
         pts = rej[0].astype(int)
         cv2.polylines(out, [pts], True, (80, 80, 80), 1)
 
-    # ── HUD ──
+    # -- HUD --
     y0 = 30
     lines = [
         f"Detected: {stats['total']} markers",
@@ -154,10 +154,10 @@ def annotate_frame(frame):
     return out, stats
 
 
-# ── Main ────────────────────────────────────────────────────────
+# -- Main --------------------------------------------------------
 def main():
     if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
-        # ── Static image mode ──
+        # -- Static image mode --
         img_path = sys.argv[1]
         print(f"Loading image: {img_path}")
         img = cv2.imread(img_path)
@@ -190,7 +190,7 @@ def main():
         cv2.destroyAllWindows()
 
     else:
-        # ── Camera mode ──
+        # -- Camera mode --
         cam_id = int(sys.argv[1]) if len(sys.argv) > 1 else 0
         print(f"Opening camera {cam_id}... (press 'q' to quit)")
         cap = cv2.VideoCapture(cam_id)

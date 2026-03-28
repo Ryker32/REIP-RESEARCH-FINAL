@@ -35,9 +35,9 @@ ax.text(7, 9.5, 'Phase 1: Input Processing & Coverage Merging',
 
 # Input boxes
 inputs = [
-    ('Position\nServer', 1.5, 8.5, 'x, y, θ\nUDP 5100'),
+    ('Position\nServer', 1.5, 8.5, 'x, y, theta\nUDP 5100'),
     ('Peer\nBroadcasts', 4.5, 8.5, 'State messages\nUDP 5200'),
-    ('ToF\nSensors', 7.5, 8.5, '5× VL53L0X\nDistances'),
+    ('ToF\nSensors', 7.5, 8.5, '5x VL53L0X\nDistances'),
 ]
 
 for label, x, y, desc in inputs:
@@ -100,7 +100,7 @@ ax.text(11.75, 5.5, 'commanded_target: (x, y)', ha='center', va='center', fontsi
 # Three-tier checks
 tiers = [
     ('Tier 1 Check\ncell in\nmy_visited?\nvisited_time < cutoff?', 2.0, 4.5, 1.0),
-    ('Tier 2 Check\ndist ≤ 200mm AND\ncell in\ntof_obstacles?', 5.0, 4.5, 1.0),
+    ('Tier 2 Check\ndist <= 200mm AND\ncell in\ntof_obstacles?', 5.0, 4.5, 1.0),
     ('Tier 3 Check\ncell in\nknown_visited?\nknown_time < cutoff?', 8.0, 4.5, 0.3),
 ]
 
@@ -136,7 +136,7 @@ trust_box = FancyBboxPatch((5.5, 2.0), 3.0, 0.8,
                           boxstyle='round,pad=0.1', facecolor=color_output,
                           edgecolor='black', linewidth=1.5)
 ax.add_patch(trust_box)
-ax.text(7.0, 2.4, 'Trust Decay (if suspicion ≥ 1.5)', ha='center', va='center', 
+ax.text(7.0, 2.4, 'Trust Decay (if suspicion >= 1.5)', ha='center', va='center', 
         fontsize=9, weight='bold')
 ax.text(7.0, 2.0, 'trust -= 0.2, suspicion -= 1.5 (carry-over)', 
         ha='center', va='center', fontsize=7)
@@ -210,7 +210,7 @@ out_box = FancyBboxPatch((11.5, 0.3), 2.0, 1.0,
                         edgecolor='black', linewidth=1.5)
 ax.add_patch(out_box)
 ax.text(12.5, 0.9, 'Motor Output', ha='center', va='center', fontsize=9, weight='bold')
-ax.text(12.5, 0.5, 'left, right PWM\nUART → Pico', ha='center', va='center', fontsize=7)
+ax.text(12.5, 0.5, 'left, right PWM\nUART -> Pico', ha='center', va='center', fontsize=7)
 
 # Arrows Phase 3
 arrow = FancyArrowPatch((7.0, 2.0), (2.25, 1.3),

@@ -8,7 +8,7 @@ IEEE formatting rules (IEEEtran compliance):
   - Axes:          Thin (0.5 pt), ticks inward
   - Grid:          Horizontal only, very faint
   - Colors:        Muted, B&W-distinguishable (hatching required)
-  - No embedded figure titles — use LaTeX \\caption{}
+  - No embedded figure titles - use LaTeX \\caption{}
   - 300 DPI minimum for raster output
 
 Produces:
@@ -67,7 +67,7 @@ plt.rcParams.update({
 })
 
 # ====================================================================
-# Colour palette — muted, harmonious, B&W-safe via hatching/markers
+# Colour palette - muted, harmonious, B&W-safe via hatching/markers
 # ====================================================================
 CLR_CLEAN  = '#4a4a4a'   # dark grey
 CLR_BAD    = '#c44e52'   # muted red
@@ -95,6 +95,11 @@ MARKER_EVERY = 20
 IEEE_SINGLE = 3.5
 IEEE_DOUBLE = 7.16
 FAULT_INJECT_TIMES = [10, 30]
+RESILIENCE_FAULT_COLORS = {
+    'none': '#1a1a1a',
+    'bad_leader': '#e74c3c',
+    'freeze_leader': '#3498db',
+}
 
 DEFAULT_MAIN_DIR     = 'experiments/run_20260228_014625_multiroom_100trials_all'
 DEFAULT_FREEZE_DIR   = 'experiments/run_20260228_135632_multiroom_100trials_FreezeLeader'
@@ -117,9 +122,15 @@ def save_fig(fig, output_dir, name):
     print(f'  {name}')
 
 
-def _fault_vlines(ax):
-    for ft in FAULT_INJECT_TIMES:
-        ax.axvline(ft, color='#888', lw=0.4, ls='-.', alpha=0.45)
+def _fault_vlines(ax, add_labels=False, label_size=6.5):
+    labels = ['Fault 1', 'Fault 2']
+    for i, ft in enumerate(FAULT_INJECT_TIMES):
+        ax.axvline(ft, color='#888', lw=0.5, ls='-.', alpha=0.45)
+        if add_labels:
+            ax.text(ft, 102.0, labels[i], ha='center', va='bottom',
+                    fontsize=label_size, fontweight='bold', color='#444444',
+                    bbox=dict(boxstyle='round,pad=0.18', facecolor='white',
+                              edgecolor='#aaaaaa', linewidth=0.4, alpha=0.92))
 
 
 # ====================================================================
@@ -180,7 +191,7 @@ def resample(timeline, time_axis):
 
 
 # ====================================================================
-# Panel drawers — reused by both standalone and combined figures
+# Panel drawers - reused by both standalone and combined figures
 # ====================================================================
 T_MAX = 120.0
 DT = 0.5
@@ -195,7 +206,7 @@ FAN_LEGEND = [
 
 
 def _draw_convergence_panel(ax, ctrl, cond, time_axis, title=None):
-    """Mean ± 1σ convergence for one controller across fault conditions."""
+    """Mean +/- 1sigma convergence for one controller across fault conditions."""
     color = CTRL_COLORS[ctrl]
     for fault in ['none', 'bad_leader', 'freeze_leader']:
         if (ctrl, fault) not in cond:
@@ -218,7 +229,8 @@ def _draw_convergence_panel(ax, ctrl, cond, time_axis, title=None):
     ieee_grid(ax, 'both')
 
 
-def _draw_resilience_panel(ax, ctrl, cond, time_axis, title=None):
+def _draw_resilience_panel(ax, ctrl, cond, time_axis, title=None,
+                           show_legend=True, add_fault_labels=False):
     """Median + IQR shading for one controller across fault conditions."""
     for fault in ['none', 'bad_leader', 'freeze_leader']:
         if (ctrl, fault) not in cond:
@@ -227,21 +239,22 @@ def _draw_resilience_panel(ax, ctrl, cond, time_axis, title=None):
         med = np.median(arr, axis=0)
         q25 = np.percentile(arr, 25, axis=0)
         q75 = np.percentile(arr, 75, axis=0)
-        color = FAULT_COLORS[fault]
-        ax.plot(time_axis, med, ls=FAULT_STYLES[fault], color=color,
-                lw=1.2, marker=FAULT_MARKERS[fault],
-                markevery=MARKER_EVERY, markersize=3,
+        color = RESILIENCE_FAULT_COLORS[fault]
+        ax.plot(time_axis, med, ls='-', color=color,
+                lw=1.5, marker=FAULT_MARKERS[fault],
+                markevery=MARKER_EVERY, markersize=3.4,
                 label=FAULT_LABELS[fault], zorder=3)
-        ax.fill_between(time_axis, q25, q75, alpha=0.10, color=color,
+        ax.fill_between(time_axis, q25, q75, alpha=0.14, color=color,
                         linewidth=0)
-    _fault_vlines(ax)
-    ax.set_xlim(0, 120)
+    _fault_vlines(ax, add_labels=add_fault_labels, label_size=6.0)
+    ax.set_xlim(10, 50)
     ax.set_ylim(0, 105)
     ax.set_xlabel('Time (s)')
     if title:
         ax.set_title(title, fontsize=9, fontweight='bold')
-    ax.legend(fontsize=6, loc='lower right', framealpha=0.92,
-              edgecolor='#999')
+    if show_legend:
+        ax.legend(fontsize=6, loc='lower right', framealpha=0.92,
+                  edgecolor='#999')
     ieee_grid(ax, 'both')
 
 
@@ -348,7 +361,7 @@ def fig_coverage_bars(groups, output_dir):
 def fig_detection_timing(groups, output_dir):
     faults   = ['bad_leader', 'freeze_leader']
     f_labels = [FAULT_LABELS[f] for f in faults]
-    colors   = ['#1f4e79', '#8fb0cc']   # navy + light steel — clean two-tone
+    colors   = ['#1f4e79', '#8fb0cc']   # navy + light steel - clean two-tone
     hatches  = ['', '']                  # no hatching for detection bars
 
     sus_data, imp_data = [], []
@@ -488,7 +501,7 @@ def fig_resilience_contrast(timelines, output_dir):
         if not has_data:
             continue
         fig, ax = plt.subplots(figsize=(IEEE_SINGLE, 2.4))
-        _draw_resilience_panel(ax, ctrl, cond, time_axis)
+        _draw_resilience_panel(ax, ctrl, cond, time_axis, add_fault_labels=False)
         ax.set_ylabel('Coverage (%)')
         fig.tight_layout(pad=0.3)
         save_fig(fig, output_dir, f'resilience_{ctrl}')
@@ -498,8 +511,11 @@ def fig_resilience_contrast(timelines, output_dir):
     panel = ['(a)', '(b)']
     for ai, ctrl in enumerate(['reip', 'raft']):
         _draw_resilience_panel(axes[ai], ctrl, cond, time_axis,
-                               title=f'{panel[ai]} {CTRL_LABELS[ctrl]}')
+                               title=f'{panel[ai]} {CTRL_LABELS[ctrl]}',
+                               show_legend=True, add_fault_labels=False)
     axes[0].set_ylabel('Coverage (%)')
+    axes[1].set_ylabel('Coverage (%)')
+    axes[1].tick_params(axis='y', labelleft=True)
     fig.tight_layout(pad=0.4)
     save_fig(fig, output_dir, 'resilience_contrast')
 

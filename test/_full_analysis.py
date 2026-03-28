@@ -211,7 +211,7 @@ for ctrl, fault in CONDITIONS:
 
 # TABLE 6
 p("\n" + "=" * 130)
-p("TABLE 6: RESILIENCE GAP (coverage penalty from fault) — Mean and Median")
+p("TABLE 6: RESILIENCE GAP (coverage penalty from fault) - Mean and Median")
 p("=" * 160)
 p(f"{'Controller':<15} {'':>8} {'Clean':>10}  {'BadLeader':>10}  {'BadLdr Gap':>10}  {'Freeze':>10}  {'Frz Gap':>10}  {'Oscillate':>10}  {'Osc Gap':>10}  {'Spin':>10}  {'Spin Gap':>10}")
 p("-" * 200)

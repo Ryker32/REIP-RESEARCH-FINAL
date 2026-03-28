@@ -43,12 +43,16 @@ except ImportError:
 
 # ============== Configuration ==============
 NUM_ROBOTS = 5
-# Network - MUST MATCH robot/reip_node.py
+# Network - MUST MATCH robot/reip_node.py and robot/baselines/raft_node.py
 # Robots are spawned with --sim, so they use unique ports: base + robot_id
-# Simulator listens on base port (5200) to receive broadcasts and relay
-UDP_POSITION_PORT = 5100   # Sim sends to 5100+i
-UDP_PEER_PORT = 5200       # Sim listens on 5200, relays to 5200+i
-UDP_FAULT_PORT = 5300      # Sim sends to 5300+i
+# In sim mode, robots send ALL peer messages to SIM_PEER_RELAY_PORT.
+# The harness receives them, relays to each robot's peer port, and
+# extracts state for the visualization.
+UDP_POSITION_PORT = 5100          # Sim sends to base+i
+UDP_PEER_PORT = 5200              # Robot i listens on base+i
+UDP_FAULT_PORT = 5300             # Sim sends faults to base+i
+SIM_PEER_RELAY_PORT = 5500        # Robots send peer msgs here; harness relays
+SIM_SENSOR_PORT = 5600            # Sim sends ToF/encoder data to base+i
 
 ARENA_WIDTH = 2000
 ARENA_HEIGHT = 1500
@@ -64,8 +68,10 @@ ROBOT_SPEED = 25  # ~500mm/sec
 ARENA_LAYOUTS = {
     "open": [],  # No obstacles - baseline
     "multiroom": [
-        # Divider wall at x=1000, from y=0 to y=1200 (leaving 300mm passage at top)
+        # Real foam divider: 35.7mm thick, two faces from y=0 to y=1200
+        # (leaving 300mm passage at top)
         (1000, 0, 1000, 1200),
+        (1036, 0, 1036, 1200),
     ],
     "multiroom2": [
         # Two-room: wall at x=1000, passage at top
@@ -106,11 +112,11 @@ MARGIN = 60
 TITLE_HEIGHT = 40
 STATS_HEIGHT = 110
 
-# Colors — OG GridWorld matplotlib style
-COLOR_UNKNOWN = (158, 195, 230)    # Light blue — unexplored
-COLOR_EXPLORED = (255, 255, 255)   # White — explored/free
-COLOR_OBSTACLE = (34, 34, 34)      # Dark — obstacles
-COLOR_FRONTIER = (255, 230, 80)    # Yellow — frontier cells
+# Colors - OG GridWorld matplotlib style
+COLOR_UNKNOWN = (158, 195, 230)    # Light blue - unexplored
+COLOR_EXPLORED = (255, 255, 255)   # White - explored/free
+COLOR_OBSTACLE = (34, 34, 34)      # Dark - obstacles
+COLOR_FRONTIER = (255, 230, 80)    # Yellow - frontier cells
 COLOR_GRID_LINE = (190, 200, 210)  # Subtle gray grid lines
 COLOR_WALL = (50, 50, 55)          # Dark wall segments
 COLOR_BG = (158, 195, 230)         # Same as unknown (fills background)
@@ -133,6 +139,19 @@ COLOR_LEADER_GOLD = (255, 215, 0)
 COLOR_LOCAL_OBS = (51, 255, 51, 90)  # Translucent green for local observation
 COLOR_TRUST_LOW = (255, 165, 0)
 COLOR_TRUST_CRITICAL = (255, 80, 80)
+
+# ============== ToF Sensor Simulation ==============
+# Must match hardware_fidelity.py TOF_SENSOR_ANGLES_DEG
+TOF_SENSOR_ANGLES_DEG = {
+    "right": -75.0,
+    "front_right": -37.5,
+    "front": 0.0,
+    "front_left": 37.5,
+    "left": 75.0,
+}
+TOF_SENSOR_OFFSET_MM = 70.0   # Sensor origin distance from robot center
+TOF_RANGE_MM = 200.0           # Max sensor range
+BODY_RADIUS_MM = 77.0          # Peer body radius for ToF hits
 
 # ============== Simulated Robot ==============
 @dataclass
@@ -172,17 +191,58 @@ class RobotState:
 
 # ============== Visual Simulation ==============
 class VisualSimulation:
+    """Simulation harness with Pygame visualization.
+
+    Parameters
+    ----------
+    num_robots : int
+        Number of robot nodes to spawn.
+    layout : str
+        Arena layout name (key in ARENA_LAYOUTS).
+    start_preset : str | None
+        Named starting positions from START_PRESETS.
+    port_base : int
+        Offset added to ALL UDP port numbers.  Allows two independent
+        instances on the same machine (e.g. 0 for REIP, 2000 for Raft).
+    robot_script : str | None
+        Path to robot node script.  Defaults to ``robot/reip_node.py``.
+    start_positions : dict | None
+        Explicit {robot_id: (x, y, theta)} start positions.  Overrides
+        start_preset and layout defaults.
+    embedded : bool
+        If True, do NOT create a Pygame display or call pygame.init().
+        Instead render to an internal Surface of WINDOW_WIDTH x
+        WINDOW_HEIGHT.  The caller owns the display and blits the
+        surface wherever it likes.
+    """
+
     def __init__(self, num_robots: int = NUM_ROBOTS, layout: str = "open",
-                 start_preset: Optional[str] = None):
+                 start_preset: Optional[str] = None, *,
+                 port_base: int = 0,
+                 robot_script: Optional[str] = None,
+                 start_positions: Optional[Dict[int, Tuple[float, float, float]]] = None,
+                 embedded: bool = False):
         self.num_robots = num_robots
         self.walls = ARENA_LAYOUTS.get(layout, [])
         self.layout_name = layout
         self.start_preset = start_preset
-        
-        # Pygame
-        pygame.init()
-        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption(f"REIP GridWorld Simulation — {layout}")
+        self.port_base = port_base
+        self.robot_script = robot_script or "robot/reip_node.py"
+        self.embedded = embedded
+
+        # Pygame -- always ensure full init so fonts/display are ready
+        if not embedded:
+            pygame.init()
+            self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+            pygame.display.set_caption(f"REIP GridWorld Simulation - {layout}")
+        else:
+            # Caller owns the display, but we NEED font + video subsystems
+            if not pygame.get_init():
+                pygame.init()
+            if not pygame.font.get_init():
+                pygame.font.init()
+            self.screen = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+
         self.font = pygame.font.SysFont('consolas', 13)
         self.font_id = pygame.font.SysFont('arial', 11, bold=True)
         self.font_large = pygame.font.SysFont('consolas', 16, bold=True)
@@ -191,28 +251,33 @@ class VisualSimulation:
         self.start_time = time.time()
         self.election_count = 0
         self._last_known_leader = None
-        
-        # Coordinate transform — leave room for title bar on top and stats at bottom
-        draw_area_h = WINDOW_HEIGHT - TITLE_HEIGHT - STATS_HEIGHT
-        self.scale = min(
-            (WINDOW_WIDTH - 2 * MARGIN) / ARENA_WIDTH,
-            (draw_area_h - 2 * 10) / ARENA_HEIGHT
-        )
-        self.offset_x = MARGIN
-        self.offset_y = TITLE_HEIGHT + 10
-        
-        # Simulated robots (for position generation)
-        # Start with NO target - robots wait for first leader assignment
-        # This prevents startup race condition where robots explore randomly
-        # before the leader can coordinate them
+
+        # Coordinate transform -- in embedded mode skip chrome for bigger grid
+        if embedded:
+            pad = 8
+            draw_area_h = WINDOW_HEIGHT - 2 * pad
+            self.scale = min(
+                (WINDOW_WIDTH - 2 * pad) / ARENA_WIDTH,
+                (draw_area_h) / ARENA_HEIGHT
+            )
+            self.offset_x = pad
+            self.offset_y = pad
+        else:
+            draw_area_h = WINDOW_HEIGHT - TITLE_HEIGHT - STATS_HEIGHT
+            self.scale = min(
+                (WINDOW_WIDTH - 2 * MARGIN) / ARENA_WIDTH,
+                (draw_area_h - 2 * 10) / ARENA_HEIGHT
+            )
+            self.offset_x = MARGIN
+            self.offset_y = TITLE_HEIGHT + 10
+
+        # Simulated robots
         self.sim_robots: Dict[int, SimRobot] = {}
-        preset_starts = START_PRESETS.get(start_preset, {})
+        explicit = start_positions or START_PRESETS.get(start_preset, {})
         for i in range(1, num_robots + 1):
-            if i in preset_starts:
-                start_x, start_y, start_theta = preset_starts[i]
+            if i in explicit:
+                start_x, start_y, start_theta = explicit[i]
             elif layout in ("multiroom", "multiroom2"):
-                # Cluster all robots in Room A (left room, x < 1000)
-                # This is critical for demonstrating leader coordination advantage
                 col = (i - 1) % 2
                 row = (i - 1) // 2
                 start_x = 200 + col * 250
@@ -224,37 +289,46 @@ class VisualSimulation:
                 start_theta = 0
             self.sim_robots[i] = SimRobot(
                 robot_id=i,
-                x=start_x,
-                y=start_y,
-                theta=start_theta,
-                target_x=start_x,  # Stay in place until assigned
-                target_y=start_y,
-                prev_x=start_x,
-                prev_y=start_y
+                x=start_x, y=start_y, theta=start_theta,
+                target_x=start_x, target_y=start_y,
+                prev_x=start_x, prev_y=start_y
             )
-        
-        # Received states (from reip_node broadcasts)
+
+        # Received states (from robot node broadcasts)
         self.robot_states: Dict[int, RobotState] = {}
-        
+
         # Coverage tracking
         self.visited_cells: Set[tuple] = set()
         self.current_leader_id = None
-        
-        # Sockets
+
+        # Sockets (port_base offsets every port)
         self.pos_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.pos_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        
+
+        # Bind to the relay port -- robots send ALL sim-mode peer messages here.
         self.state_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.state_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.state_socket.bind(('', UDP_PEER_PORT))
+        self.state_socket.bind(('127.0.0.1', SIM_PEER_RELAY_PORT + port_base))
         self.state_socket.setblocking(False)
-        
+
         self.fault_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.fault_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        
+
+        self.sensor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sensor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        # Build full wall segment list for ToF ray-casting (arena bounds + layout walls)
+        self._tof_wall_segments = [
+            (0.0, 0.0, ARENA_WIDTH, 0.0),
+            (ARENA_WIDTH, 0.0, ARENA_WIDTH, ARENA_HEIGHT),
+            (ARENA_WIDTH, ARENA_HEIGHT, 0.0, ARENA_HEIGHT),
+            (0.0, ARENA_HEIGHT, 0.0, 0.0),
+        ] + [(float(x1), float(y1), float(x2), float(y2)) for x1, y1, x2, y2 in self.walls]
+
         # Robot processes
         self.robot_processes: List[subprocess.Popen] = []
-        
+        self.log_files: List = []
+
         self.running = False
     
     def arena_to_screen(self, x: float, y: float) -> Tuple[int, int]:
@@ -264,7 +338,7 @@ class VisualSimulation:
     
     def _line_circle_collision(self, x1, y1, x2, y2, cx, cy, r):
         """Check if circle (cx,cy,r) overlaps line segment (x1,y1)-(x2,y2).
-        Tangent contact (distance == radius) is NOT collision — this prevents
+        Tangent contact (distance == radius) is NOT collision - this prevents
         robots from deadlocking when sliding along a wall."""
         dx, dy = x2 - x1, y2 - y1
         fx, fy = x1 - cx, y1 - cy
@@ -385,36 +459,222 @@ class VisualSimulation:
         return smoothed
 
     def start_robot_processes(self):
-        """Start reip_node.py as subprocesses"""
-        print("Starting robot processes...")
-        
-        # Create logs directory for robot output
-        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+        """Start robot node scripts as subprocesses."""
+        script = self.robot_script
+        tag = os.path.splitext(os.path.basename(script))[0]
+        print(f"Starting {tag} processes (port_base={self.port_base})...")
+
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        log_dir = os.path.join(project_root, "logs", f"{tag}_pb{self.port_base}")
         os.makedirs(log_dir, exist_ok=True)
-        
+
         for i in range(1, self.num_robots + 1):
-            # Write robot output to log file so we can see faults/trust
-            log_file = open(os.path.join(log_dir, f"robot_{i}_console.log"), 'w')
+            log_file = open(os.path.join(log_dir, f"robot_{i}.log"), 'w')
+            cmd = [sys.executable, "-u", script, str(i), "--sim"]
+            if self.port_base > 0:
+                cmd += ["--port-base", str(self.port_base)]
             proc = subprocess.Popen(
-                [sys.executable, "-u", "robot/reip_node.py", str(i), "--sim"],
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+                cmd, stdout=log_file, stderr=subprocess.STDOUT,
+                cwd=project_root)
             self.robot_processes.append(proc)
-            print(f"  Robot {i}: PID {proc.pid} (log: logs/robot_{i}_console.log)")
+            self.log_files.append(log_file)
+            print(f"  Robot {i}: PID {proc.pid}")
         time.sleep(1)  # Let them initialize
     
     def stop_robot_processes(self):
         """Stop all robot processes"""
         for proc in self.robot_processes:
-            proc.terminate()
+            try:
+                proc.terminate()
+            except Exception:
+                pass
         for proc in self.robot_processes:
-            proc.wait(timeout=2)
-        self.robot_processes = []
+            try:
+                proc.wait(timeout=3)
+            except Exception:
+                proc.kill()
+        for lf in self.log_files:
+            try:
+                lf.close()
+            except Exception:
+                pass
+        self.robot_processes.clear()
+        self.log_files.clear()
+
+    def close_sockets(self):
+        """Close all UDP sockets."""
+        for s in (self.pos_socket, self.state_socket, self.fault_socket,
+                  self.sensor_socket):
+            try:
+                s.close()
+            except Exception:
+                pass
+
+    def reset(self, start_positions: Optional[Dict[int, Tuple[float, float, float]]] = None):
+        """Kill processes, wipe state, respawn.  Used by live demo restart."""
+        self.stop_robot_processes()
+
+        # Re-init sim robots to starting positions
+        explicit = start_positions or START_PRESETS.get(self.start_preset, {})
+        for i in range(1, self.num_robots + 1):
+            r = self.sim_robots[i]
+            if i in explicit:
+                r.x, r.y, r.theta = explicit[i]
+            elif self.layout_name in ("multiroom", "multiroom2"):
+                col = (i - 1) % 2
+                row = (i - 1) // 2
+                r.x, r.y, r.theta = 200 + col * 250, 200 + row * 300, 0
+            else:
+                r.x, r.y, r.theta = 200 + (i - 1) * 300, ARENA_HEIGHT / 2, 0
+            r.target_x, r.target_y = r.x, r.y
+            r.prev_x, r.prev_y = r.x, r.y
+            r.motor_fault = None
+            r.is_bad_leader = False
+            r.stuck_counter = 0
+            r.stuck_override = None
+            r.path_waypoints = None
+            r.path_target_key = None
+
+        # Clear tracking
+        self.robot_states.clear()
+        self.visited_cells.clear()
+        self.current_leader_id = None
+        self._last_known_leader = None
+        self.election_count = 0
+        self.start_time = time.time()
+
+        # Drain stale UDP
+        try:
+            while True:
+                self.state_socket.recvfrom(8192)
+        except (BlockingIOError, OSError):
+            pass
+
+        # Respawn
+        self.start_robot_processes()
     
+    def send_start(self):
+        """Send the 'start' command to every robot node so they begin exploring.
+        Nodes gate motor output on trial_started, which is set by this message."""
+        for rid in range(1, self.num_robots + 1):
+            msg = {
+                'type': 'fault_inject',
+                'robot_id': 0,
+                'fault': 'start',
+                'timestamp': time.time(),
+            }
+            port = UDP_FAULT_PORT + self.port_base + rid
+            try:
+                self.fault_socket.sendto(
+                    json.dumps(msg).encode(), ('127.0.0.1', port))
+            except Exception:
+                pass
+        # Send twice for reliability
+        time.sleep(0.05)
+        for rid in range(1, self.num_robots + 1):
+            msg = {
+                'type': 'fault_inject',
+                'robot_id': 0,
+                'fault': 'start',
+                'timestamp': time.time(),
+            }
+            port = UDP_FAULT_PORT + self.port_base + rid
+            try:
+                self.fault_socket.sendto(
+                    json.dumps(msg).encode(), ('127.0.0.1', port))
+            except Exception:
+                pass
+
+    # -------------------- ToF Sensor Simulation --------------------
+    @staticmethod
+    def _ray_segment_distance(ox, oy, dx, dy, x1, y1, x2, y2):
+        """Distance from ray origin (ox,oy)+t*(dx,dy) to segment (x1,y1)-(x2,y2).
+        Returns t >= 0 if hit, else None."""
+        rx = x2 - x1
+        ry = y2 - y1
+        denom = dx * ry - dy * rx
+        if abs(denom) < 1e-9:
+            return None
+        qx = x1 - ox
+        qy = y1 - oy
+        t = (qx * ry - qy * rx) / denom
+        u = (qx * dy - qy * dx) / denom
+        if t >= 0.0 and 0.0 <= u <= 1.0:
+            return t
+        return None
+
+    @staticmethod
+    def _ray_circle_distance(ox, oy, dx, dy, cx, cy, radius):
+        """Distance from ray origin to circle surface.  Returns nearest t >= 0 or None."""
+        fx = ox - cx
+        fy = oy - cy
+        a = dx * dx + dy * dy
+        b = 2.0 * (fx * dx + fy * dy)
+        c = fx * fx + fy * fy - radius * radius
+        disc = b * b - 4.0 * a * c
+        if disc < 0.0:
+            return None
+        sqrt_disc = math.sqrt(disc)
+        t1 = (-b - sqrt_disc) / (2.0 * a)
+        t2 = (-b + sqrt_disc) / (2.0 * a)
+        hits = [t for t in (t1, t2) if t >= 0.0]
+        return min(hits) if hits else None
+
+    def _compute_tof_for_robot(self, rid: int) -> Dict[str, int]:
+        """Cast rays from robot *rid* through the arena and return simulated
+        VL53L0X ToF readings (mm) for each sensor direction."""
+        robot = self.sim_robots[rid]
+        readings: Dict[str, int] = {}
+        for sensor_name, rel_deg in TOF_SENSOR_ANGLES_DEG.items():
+            angle = robot.theta + math.radians(rel_deg)
+            ox = robot.x + TOF_SENSOR_OFFSET_MM * math.cos(angle)
+            oy = robot.y + TOF_SENSOR_OFFSET_MM * math.sin(angle)
+            dx = math.cos(angle)
+            dy = math.sin(angle)
+            best = TOF_RANGE_MM + 1.0
+            # Walls (arena bounds + layout walls)
+            for seg in self._tof_wall_segments:
+                dist = self._ray_segment_distance(ox, oy, dx, dy, *seg)
+                if dist is not None and dist < best:
+                    best = dist
+            # Other robots
+            for other_id, other in self.sim_robots.items():
+                if other_id == rid:
+                    continue
+                dist = self._ray_circle_distance(
+                    ox, oy, dx, dy, other.x, other.y, BODY_RADIUS_MM)
+                if dist is not None and dist < best:
+                    best = dist
+            readings[sensor_name] = int(round(best)) if best <= TOF_RANGE_MM else 9999
+        return readings
+
+    def send_sensor_feedback(self):
+        """Send simulated ToF + encoder data to each robot node.
+
+        Mirrors isef_experiments.py so robot nodes get the same local-sensor
+        stream they expect in --sim mode.  Encoders are zeroed because the
+        visual sim drives motion externally (encoder-based dead reckoning is
+        not used in sim).
+        """
+        now = time.time()
+        for rid in self.sim_robots:
+            msg = {
+                'type': 'sim_sensor',
+                'robot_id': rid,
+                'tof': self._compute_tof_for_robot(rid),
+                'encoders': [0, 0],
+                'timestamp': now,
+            }
+            port = SIM_SENSOR_PORT + self.port_base + rid
+            try:
+                self.sensor_socket.sendto(
+                    json.dumps(msg).encode(), ('127.0.0.1', port))
+            except Exception:
+                pass
+
     def send_positions(self):
         """Send mock positions to robots"""
+        now = time.time()
         for rid, robot in self.sim_robots.items():
             msg = {
                 'type': 'position',
@@ -422,11 +682,10 @@ class VisualSimulation:
                 'x': robot.x,
                 'y': robot.y,
                 'theta': robot.theta,
-                'timestamp': time.time()
+                'timestamp': now
             }
             data = json.dumps(msg).encode()
-            # Each robot has unique position port: 5003 + robot_id
-            robot_pos_port = UDP_POSITION_PORT + rid
+            robot_pos_port = UDP_POSITION_PORT + self.port_base + rid
             try:
                 self.pos_socket.sendto(data, ('127.0.0.1', robot_pos_port))
             except Exception as e:
@@ -460,7 +719,7 @@ class VisualSimulation:
         STUCK_THRESHOLD frames, override its target with the nearest
         reachable unexplored cell."""
         STUCK_THRESHOLD = 20  # frames (~1 sec at 20 FPS)
-        STUCK_MOVE_EPS = 15   # mm — less movement than this = stuck
+        STUCK_MOVE_EPS = 15   # mm - less movement than this = stuck
         OVERRIDE_ARRIVE_DIST = 60  # close enough to release override lock
 
         for rid, robot in self.sim_robots.items():
@@ -494,7 +753,7 @@ class VisualSimulation:
                 if robot.stuck_counter >= STUCK_THRESHOLD:
                     # Only override if robot is FAR from target (wall wedge).
                     # If robot arrived at target and sits there, that's not
-                    # stuck — it's following orders.  Only REIP's trust model
+                    # stuck - it's following orders.  Only REIP's trust model
                     # can recover from a bad command, not a physics hack.
                     target_dist = math.sqrt((robot.target_x - robot.x)**2 +
                                             (robot.target_y - robot.y)**2)
@@ -576,60 +835,72 @@ class VisualSimulation:
             self.visited_cells.add(cell)
     
     def receive_states(self):
-        """Receive state broadcasts from robots and update targets.
-        
-        KEY: Each robot broadcasts its navigation_target — the position
-        it actually decided to go to.  For a trusting follower this is
-        the leader's assignment.  For a distrusting follower this is
-        its local fallback frontier.  The visual sim drives physics
-        based on this, so the display faithfully reflects REIP decisions.
+        """Receive robot broadcasts from the relay port, relay them to every
+        other robot's individual peer port, and extract state for the display.
+
+        In sim mode, all robot messages go to SIM_PEER_RELAY_PORT.  The harness
+        must relay them so that robots can hear each other.
+
+        KEY: Each robot broadcasts its navigation_target -- the position it
+        actually decided to go to.  For a trusting follower this is the
+        leader's assignment.  For a distrusting follower this is its local
+        fallback frontier.  The visual sim drives physics based on this, so
+        the display faithfully reflects REIP/Raft decisions.
         """
         try:
-            while True:
+            for _ in range(200):  # drain up to 200 msgs per tick
                 data, _ = self.state_socket.recvfrom(8192)
                 msg = json.loads(data.decode())
-                if msg.get('type') == 'peer_state':
+                msg_type = msg.get('type')
+                src = (msg.get('robot_id') or msg.get('voter_id')
+                       or msg.get('leader_id') or msg.get('candidate_id'))
+
+                # ---- Relay to every other robot's individual peer port ----
+                for peer_id in range(1, self.num_robots + 1):
+                    if peer_id == src:
+                        continue
+                    try:
+                        self.state_socket.sendto(
+                            data, ('127.0.0.1',
+                                   UDP_PEER_PORT + self.port_base + peer_id))
+                    except Exception:
+                        pass
+
+                # ---- Extract display state from peer_state messages ----
+                if msg_type == 'peer_state':
                     rid = msg.get('robot_id')
-                    if rid:
-                        if rid not in self.robot_states:
-                            self.robot_states[rid] = RobotState(robot_id=rid)
-                        
-                        state = self.robot_states[rid]
-                        state.x = msg.get('x', 0)
-                        state.y = msg.get('y', 0)
-                        state.theta = msg.get('theta', 0)
-                        state.state = msg.get('state', 'idle')
-                        state.leader_id = msg.get('leader_id')
-                        state.trust_in_leader = msg.get('trust_in_leader', 1.0)
-                        state.suspicion = msg.get('suspicion', 0.0)
-                        state.coverage_count = msg.get('coverage_count', 0)
-                        state.last_update = time.time()
-                        
-                        for cell in msg.get('visited_cells', []):
-                            state.visited_cells.add(tuple(cell))
-                            self.visited_cells.add(tuple(cell))
-                        
-                        # Track leader
-                        if msg.get('state') == 'leader':
-                            self.current_leader_id = rid
-                        
-                        # Use the robot's ACTUAL navigation target to drive sim physics.
-                        # This correctly reflects trust decisions: a follower that
-                        # drops trust and goes autonomous will report its local
-                        # fallback target, not the leader's bad assignment.
-                        # BUT: don't overwrite if the harness has a stuck-override locked.
-                        nav = msg.get('navigation_target')
-                        if nav and rid in self.sim_robots:
-                            robot = self.sim_robots[rid]
-                            if not robot.stuck_override:
-                                robot.target_x = nav[0]
-                                robot.target_y = nav[1]
-        except BlockingIOError:
+                    if not rid:
+                        continue
+                    if rid not in self.robot_states:
+                        self.robot_states[rid] = RobotState(robot_id=rid)
+
+                    state = self.robot_states[rid]
+                    state.x = msg.get('x', 0)
+                    state.y = msg.get('y', 0)
+                    state.theta = msg.get('theta', 0)
+                    state.state = msg.get('state', 'idle')
+                    state.leader_id = msg.get('leader_id')
+                    state.trust_in_leader = msg.get('trust_in_leader', 1.0)
+                    state.suspicion = msg.get('suspicion', 0.0)
+                    state.coverage_count = msg.get('coverage_count', 0)
+                    state.last_update = time.time()
+
+                    for cell in msg.get('visited_cells', []):
+                        state.visited_cells.add(tuple(cell))
+                        self.visited_cells.add(tuple(cell))
+
+                    if msg.get('state') == 'leader':
+                        self.current_leader_id = rid
+
+                    # Drive physics from the node's actual navigation target.
+                    nav = msg.get('navigation_target')
+                    if nav and rid in self.sim_robots:
+                        robot = self.sim_robots[rid]
+                        if not robot.stuck_override:
+                            robot.target_x = nav[0]
+                            robot.target_y = nav[1]
+        except (BlockingIOError, ConnectionResetError, OSError):
             pass
-        
-        # NOTE: No relay needed — in sim mode each robot sends directly to every
-        # other robot's unique peer port via broadcast_state().  The sim only
-        # needs to *observe* messages on the base port (5200) for visualization.
     
     def inject_fault(self, robot_id: int, fault_type: str):
         """Inject fault"""
@@ -645,17 +916,16 @@ class VisualSimulation:
                 self.sim_robots[robot_id].motor_fault = fault_type
                 self.sim_robots[robot_id].is_bad_leader = False
         
-        # Send to reip_node
+        # Send to robot node
         msg = {
             'type': 'fault_inject',
             'robot_id': robot_id,
             'fault': fault_type,
             'timestamp': time.time()
         }
-        # Each robot has unique fault port: 5005 + robot_id
-        robot_fault_port = UDP_FAULT_PORT + robot_id
+        robot_fault_port = UDP_FAULT_PORT + self.port_base + robot_id
         self.fault_socket.sendto(json.dumps(msg).encode(), ('127.0.0.1', robot_fault_port))
-        print(f"Fault: {fault_type} on Robot {robot_id}")
+        print(f"Fault: {fault_type} on Robot {robot_id} (port_base={self.port_base})")
     
     def clear_all_faults(self):
         """Clear all faults"""
@@ -693,7 +963,12 @@ class VisualSimulation:
         return frontiers
 
     def draw(self):
-        """Draw the GridWorld — OG matplotlib-style visualization."""
+        """Draw the GridWorld visualization.
+
+        In standalone mode: full chrome (title bar, stats panel, controls).
+        In embedded mode: just the grid + walls + robots (no chrome) so the
+        caller can overlay its own clean HUD.
+        """
         cells_x = int(ARENA_WIDTH / CELL_SIZE)
         cells_y = int(ARENA_HEIGHT / CELL_SIZE)
         elapsed = time.time() - self.start_time
@@ -712,52 +987,43 @@ class VisualSimulation:
         if current_leader is not None:
             self._last_known_leader = current_leader
 
-        # ---- Avg trust ----
+        # ---- Avg trust (expose for caller) ----
         trusts = [s.trust_in_leader for s in self.robot_states.values()
                   if s.state != 'leader']
-        avg_trust = sum(trusts) / len(trusts) if trusts else 1.0
+        self._avg_trust = sum(trusts) / len(trusts) if trusts else 1.0
 
-        # ===================== TITLE BAR =====================
-        pygame.draw.rect(self.screen, (245, 245, 245), (0, 0, WINDOW_WIDTH, TITLE_HEIGHT))
-        pygame.draw.line(self.screen, (180, 180, 180),
-                         (0, TITLE_HEIGHT - 1), (WINDOW_WIDTH, TITLE_HEIGHT - 1), 1)
-        title_parts = [
-            f"t={elapsed:.0f}",
-            f"N={self.num_robots}",
-            f"Leader={current_leader or '?'}",
-            f"Trust={avg_trust:.2f}",
-            f"Elections={self.election_count}",
-            f"Layout={self.layout_name}",
-        ]
-        title_str = "  |  ".join(title_parts)
-        title_surf = self.font_title.render(title_str, True, (30, 30, 30))
-        self.screen.blit(title_surf,
-                         (WINDOW_WIDTH // 2 - title_surf.get_width() // 2,
-                          TITLE_HEIGHT // 2 - title_surf.get_height() // 2))
+        # ===================== BACKGROUND =====================
+        self.screen.fill(COLOR_PANEL_BG)
+
+        # ===================== TITLE BAR (standalone only) =====================
+        if not self.embedded:
+            pygame.draw.rect(self.screen, (245, 245, 245),
+                             (0, 0, WINDOW_WIDTH, TITLE_HEIGHT))
+            pygame.draw.line(self.screen, (180, 180, 180),
+                             (0, TITLE_HEIGHT - 1), (WINDOW_WIDTH, TITLE_HEIGHT - 1), 1)
+            title_parts = [
+                f"t={elapsed:.0f}",
+                f"N={self.num_robots}",
+                f"Leader={current_leader or '?'}",
+                f"Trust={self._avg_trust:.2f}",
+                f"Elections={self.election_count}",
+                f"Layout={self.layout_name}",
+            ]
+            title_str = "  |  ".join(title_parts)
+            title_surf = self.font_title.render(title_str, True, (30, 30, 30))
+            self.screen.blit(title_surf,
+                             (WINDOW_WIDTH // 2 - title_surf.get_width() // 2,
+                              TITLE_HEIGHT // 2 - title_surf.get_height() // 2))
 
         # ===================== GRID WORLD =====================
-        # Fill arena area with unknown color (light blue)
         arena_x1, arena_y1_top = self.arena_to_screen(0, ARENA_HEIGHT)
         arena_x2, arena_y2_bot = self.arena_to_screen(ARENA_WIDTH, 0)
         arena_rect = pygame.Rect(arena_x1, arena_y1_top,
                                  arena_x2 - arena_x1, arena_y2_bot - arena_y1_top)
-        # Draw background around arena
-        self.screen.fill(COLOR_PANEL_BG)
-        # Title bar
-        pygame.draw.rect(self.screen, (245, 245, 245), (0, 0, WINDOW_WIDTH, TITLE_HEIGHT))
-        pygame.draw.line(self.screen, (180, 180, 180),
-                         (0, TITLE_HEIGHT - 1), (WINDOW_WIDTH, TITLE_HEIGHT - 1), 1)
-        self.screen.blit(title_surf,
-                         (WINDOW_WIDTH // 2 - title_surf.get_width() // 2,
-                          TITLE_HEIGHT // 2 - title_surf.get_height() // 2))
-
-        # Arena background: light blue (unknown)
         pygame.draw.rect(self.screen, COLOR_UNKNOWN, arena_rect)
 
-        # ---- Frontier detection ----
         frontier_cells = self._get_frontier_cells()
 
-        # ---- Draw cells ----
         for cx in range(cells_x):
             for cy in range(cells_y):
                 sx1, sy1 = self.arena_to_screen(cx * CELL_SIZE, (cy + 1) * CELL_SIZE)
@@ -765,42 +1031,39 @@ class VisualSimulation:
                 w = sx2 - sx1
                 h = sy2 - sy1
                 rect = pygame.Rect(sx1, sy1, w, h)
-
                 if (cx, cy) in self.visited_cells:
                     pygame.draw.rect(self.screen, COLOR_EXPLORED, rect)
                 elif (cx, cy) in frontier_cells:
                     pygame.draw.rect(self.screen, COLOR_FRONTIER, rect)
-                # else: stays unknown light blue
-
-                # Grid line
                 pygame.draw.rect(self.screen, COLOR_GRID_LINE, rect, 1)
 
-        # ---- Arena border ----
         pygame.draw.rect(self.screen, (80, 80, 80), arena_rect, 2)
 
-        # ---- Draw walls ----
-        for wx1, wy1, wx2, wy2 in self.walls:
-            p1 = self.arena_to_screen(wx1, wy1)
-            p2 = self.arena_to_screen(wx2, wy2)
-            pygame.draw.line(self.screen, COLOR_WALL, p1, p2, 5)
-
-        # ===================== LOCAL OBSERVATION OVERLAY =====================
-        # Translucent green around each robot's local observation area
-        obs_radius_px = int(3 * CELL_SIZE * self.scale)  # ~3 cells sensing radius
-        obs_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
-        for rid in range(1, self.num_robots + 1):
-            if rid in self.sim_robots:
-                sim = self.sim_robots[rid]
-                pos = self.arena_to_screen(sim.x, sim.y)
-                color = AGENT_COLORS[(rid - 1) % len(AGENT_COLORS)]
-                pygame.draw.circle(obs_surface, (color[0], color[1], color[2], 30),
-                                   pos, obs_radius_px)
-        self.screen.blit(obs_surface, (0, 0))
+        # ---- Walls ----
+        drawn_walls = set()
+        for i, (wx1, wy1, wx2, wy2) in enumerate(self.walls):
+            if i in drawn_walls:
+                continue
+            for j, (bx1, by1, bx2, by2) in enumerate(self.walls):
+                if j <= i or j in drawn_walls:
+                    continue
+                if wy1 == by1 and wy2 == by2 and abs(wx1 - bx1) < 100:
+                    tl = self.arena_to_screen(min(wx1, bx1), max(wy2, by2))
+                    br = self.arena_to_screen(max(wx1, bx1), min(wy1, by1))
+                    wr = pygame.Rect(tl[0], tl[1],
+                                     max(4, br[0] - tl[0]),
+                                     max(4, br[1] - tl[1]))
+                    pygame.draw.rect(self.screen, COLOR_WALL, wr)
+                    drawn_walls.update((i, j))
+                    break
+            else:
+                p1 = self.arena_to_screen(wx1, wy1)
+                p2 = self.arena_to_screen(wx2, wy2)
+                pygame.draw.line(self.screen, COLOR_WALL, p1, p2, 5)
 
         # ===================== AGENTS =====================
         for rid in range(1, self.num_robots + 1):
             state = self.robot_states.get(rid, RobotState(robot_id=rid))
-
             if rid in self.sim_robots:
                 sim = self.sim_robots[rid]
                 x, y, theta = sim.x, sim.y, sim.theta
@@ -811,149 +1074,126 @@ class VisualSimulation:
             color = AGENT_COLORS[(rid - 1) % len(AGENT_COLORS)]
             is_leader = (state.state == 'leader') or (current_leader == rid)
 
-            # ---- Dashed sensing/comm radius (matplotlib-style) ----
-            comm_radius_px = int(5 * CELL_SIZE * self.scale)
-            self._draw_dashed_circle(self.screen, (*color, ), pos,
-                                     comm_radius_px, width=1, dash_len=6)
-
-            # ---- Green field-of-view circle (solid, thin) ----
-            fov_radius_px = int(2 * CELL_SIZE * self.scale)
-            pygame.draw.circle(self.screen, (60, 180, 60), pos, fov_radius_px, 1)
-
-            # ---- Gold leader halo ----
+            # Gold leader halo
             if is_leader:
                 pygame.draw.circle(self.screen, COLOR_LEADER_GOLD, pos, 20, 3)
-                # Thicker outer ring
                 pygame.draw.circle(self.screen, (255, 200, 0, 180), pos, 24, 2)
 
-            # ---- Trust warning ring ----
+            # Trust warning ring
             if not is_leader and state.trust_in_leader < 0.6:
-                if state.trust_in_leader < 0.3:
-                    ring_col = COLOR_TRUST_CRITICAL
-                else:
-                    ring_col = COLOR_TRUST_LOW
+                ring_col = COLOR_TRUST_CRITICAL if state.trust_in_leader < 0.3 \
+                    else COLOR_TRUST_LOW
                 pygame.draw.circle(self.screen, ring_col, pos, 22, 3)
 
-            # ---- Robot body (filled circle + black edge) ----
+            # Robot body
             marker_size = 14 if is_leader else 11
             marker_color = COLOR_LEADER_GOLD if is_leader else color
             pygame.draw.circle(self.screen, marker_color, pos, marker_size)
             pygame.draw.circle(self.screen, (0, 0, 0), pos, marker_size, 2)
 
-            # ---- Heading line ----
+            # Heading line
             hx = int(pos[0] + (marker_size + 10) * math.cos(theta))
             hy = int(pos[1] - (marker_size + 10) * math.sin(theta))
             pygame.draw.line(self.screen, (0, 0, 0), pos, (hx, hy), 2)
 
-            # ---- Target line (thin, towards target) ----
+            # Target line
             if rid in self.sim_robots:
                 sr = self.sim_robots[rid]
                 tp = self.arena_to_screen(sr.target_x, sr.target_y)
                 target_color = (200, 50, 50) if is_leader else (80, 80, 80)
                 pygame.draw.line(self.screen, target_color, pos, tp, 1)
 
-            # ---- ID label (white box behind number, like matplotlib) ----
+            # ID label
             id_surf = self.font_id.render(str(rid), True, (0, 0, 0))
             id_w, id_h = id_surf.get_size()
             label_x = pos[0] + marker_size + 2
             label_y = pos[1] - id_h - 2
-            # White background box
             bg_rect = pygame.Rect(label_x - 2, label_y - 1, id_w + 4, id_h + 2)
             pygame.draw.rect(self.screen, (255, 255, 255), bg_rect)
             pygame.draw.rect(self.screen, (0, 0, 0), bg_rect, 1)
             self.screen.blit(id_surf, (label_x, label_y))
 
-            # ---- Fault indicator (red badge) ----
+            # Fault indicator (red badge)
             if rid in self.sim_robots:
                 sr = self.sim_robots[rid]
                 if sr.motor_fault or sr.is_bad_leader:
-                    fault_label = "BAD_LEADER" if sr.is_bad_leader else sr.motor_fault.upper()
+                    fault_label = "BAD" if sr.is_bad_leader else sr.motor_fault.upper()
                     ft = self.font.render(fault_label, True, (255, 255, 255))
                     fw, fh = ft.get_size()
                     badge_rect = pygame.Rect(pos[0] - fw // 2 - 3, pos[1] - 38,
                                             fw + 6, fh + 2)
-                    pygame.draw.rect(self.screen, (200, 40, 40), badge_rect, border_radius=3)
+                    pygame.draw.rect(self.screen, (200, 40, 40),
+                                     badge_rect, border_radius=3)
                     self.screen.blit(ft, (pos[0] - fw // 2, pos[1] - 37))
 
-        # ===================== STATS PANEL (bottom) =====================
-        panel_y = WINDOW_HEIGHT - STATS_HEIGHT
-        pygame.draw.rect(self.screen, COLOR_PANEL_BG,
-                         (0, panel_y, WINDOW_WIDTH, STATS_HEIGHT))
-        pygame.draw.line(self.screen, (180, 180, 180),
-                         (0, panel_y), (WINDOW_WIDTH, panel_y), 2)
+        # ===================== STATS PANEL (standalone only) =====================
+        if not self.embedded:
+            panel_y = WINDOW_HEIGHT - STATS_HEIGHT
+            pygame.draw.rect(self.screen, COLOR_PANEL_BG,
+                             (0, panel_y, WINDOW_WIDTH, STATS_HEIGHT))
+            pygame.draw.line(self.screen, (180, 180, 180),
+                             (0, panel_y), (WINDOW_WIDTH, panel_y), 2)
 
-        y = panel_y + 8
+            y = panel_y + 8
+            total_cells = cells_x * cells_y
+            cov_pct = len(self.visited_cells) / total_cells * 100
+            cov_str = f"Coverage: {len(self.visited_cells)}/{total_cells} ({cov_pct:.1f}%)"
+            cov_surf = self.font_large.render(cov_str, True, COLOR_TEXT)
+            self.screen.blit(cov_surf, (20, y))
 
-        # Coverage bar
-        total_cells = cells_x * cells_y
-        cov_pct = len(self.visited_cells) / total_cells * 100
-        cov_str = f"Coverage: {len(self.visited_cells)}/{total_cells} ({cov_pct:.1f}%)"
-        cov_surf = self.font_large.render(cov_str, True, COLOR_TEXT)
-        self.screen.blit(cov_surf, (20, y))
+            bar_x, bar_w, bar_h = 350, 300, 16
+            pygame.draw.rect(self.screen, (200, 200, 200),
+                             (bar_x, y + 2, bar_w, bar_h), border_radius=3)
+            fill_w = int(bar_w * min(cov_pct / 100.0, 1.0))
+            bar_color = (44, 160, 44) if cov_pct > 50 else (255, 165, 0)
+            if fill_w > 0:
+                pygame.draw.rect(self.screen, bar_color,
+                                 (bar_x, y + 2, fill_w, bar_h), border_radius=3)
+            pygame.draw.rect(self.screen, (100, 100, 100),
+                             (bar_x, y + 2, bar_w, bar_h), 1, border_radius=3)
 
-        # Coverage bar visual
-        bar_x, bar_w, bar_h = 350, 300, 16
-        pygame.draw.rect(self.screen, (200, 200, 200),
-                         (bar_x, y + 2, bar_w, bar_h), border_radius=3)
-        fill_w = int(bar_w * min(cov_pct / 100.0, 1.0))
-        bar_color = (44, 160, 44) if cov_pct > 50 else (255, 165, 0)
-        if fill_w > 0:
-            pygame.draw.rect(self.screen, bar_color,
-                             (bar_x, y + 2, fill_w, bar_h), border_radius=3)
-        pygame.draw.rect(self.screen, (100, 100, 100),
-                         (bar_x, y + 2, bar_w, bar_h), 1, border_radius=3)
+            fr_str = f"Frontiers: {len(frontier_cells)}"
+            fr_surf = self.font.render(fr_str, True, (120, 120, 0))
+            self.screen.blit(fr_surf, (bar_x + bar_w + 15, y + 2))
+            y += 28
 
-        # Frontiers count
-        fr_str = f"Frontiers: {len(frontier_cells)}"
-        fr_surf = self.font.render(fr_str, True, (120, 120, 0))
-        self.screen.blit(fr_surf, (bar_x + bar_w + 15, y + 2))
+            x_pos = 20
+            for rid in sorted(self.robot_states.keys()):
+                st = self.robot_states[rid]
+                color = AGENT_COLORS[(rid - 1) % len(AGENT_COLORS)]
+                is_ldr = (st.state == 'leader') or (current_leader == rid)
+                pygame.draw.circle(self.screen, color, (x_pos + 6, y + 8), 6)
+                pygame.draw.circle(self.screen, (0, 0, 0), (x_pos + 6, y + 8), 6, 1)
+                trust_color = COLOR_TEXT
+                if st.trust_in_leader < 0.3:
+                    trust_color = COLOR_TRUST_CRITICAL
+                elif st.trust_in_leader < 0.6:
+                    trust_color = COLOR_TRUST_LOW
+                label = f"R{rid}: T={st.trust_in_leader:.2f}"
+                if is_ldr:
+                    label += " [L]"
+                t_surf = self.font.render(label, True, trust_color)
+                self.screen.blit(t_surf, (x_pos + 16, y))
+                x_pos += 160
+            y += 22
 
-        y += 28
+            x_pos = 20
+            for rid in sorted(self.robot_states.keys()):
+                st = self.robot_states[rid]
+                if st.suspicion > 0.01:
+                    sus_color = COLOR_TRUST_CRITICAL if st.suspicion > 1.0 else (180, 120, 0)
+                    sus_surf = self.font.render(
+                        f"R{rid} sus={st.suspicion:.2f}", True, sus_color)
+                    self.screen.blit(sus_surf, (x_pos, y))
+                    x_pos += 140
+            y += 18
 
-        # Per-robot trust status
-        x_pos = 20
-        for rid in sorted(self.robot_states.keys()):
-            st = self.robot_states[rid]
-            color = AGENT_COLORS[(rid - 1) % len(AGENT_COLORS)]
-            is_ldr = (st.state == 'leader') or (current_leader == rid)
+            ctrl_surf = self.font.render(
+                "1-5: bad_leader   SHIFT+1-5: spin   C: clear   Q: quit",
+                True, (140, 140, 140))
+            self.screen.blit(ctrl_surf, (20, y))
 
-            # Color dot
-            pygame.draw.circle(self.screen, color, (x_pos + 6, y + 8), 6)
-            pygame.draw.circle(self.screen, (0, 0, 0), (x_pos + 6, y + 8), 6, 1)
-
-            # Trust value
-            trust_color = COLOR_TEXT
-            if st.trust_in_leader < 0.3:
-                trust_color = COLOR_TRUST_CRITICAL
-            elif st.trust_in_leader < 0.6:
-                trust_color = COLOR_TRUST_LOW
-            label = f"R{rid}: T={st.trust_in_leader:.2f}"
-            if is_ldr:
-                label += " [L]"
-            t_surf = self.font.render(label, True, trust_color)
-            self.screen.blit(t_surf, (x_pos + 16, y))
-            x_pos += 160
-
-        y += 22
-
-        # Suspicion status
-        x_pos = 20
-        for rid in sorted(self.robot_states.keys()):
-            st = self.robot_states[rid]
-            if st.suspicion > 0.01:
-                sus_color = COLOR_TRUST_CRITICAL if st.suspicion > 1.0 else (180, 120, 0)
-                sus_surf = self.font.render(f"R{rid} sus={st.suspicion:.2f}", True, sus_color)
-                self.screen.blit(sus_surf, (x_pos, y))
-                x_pos += 140
-
-        y += 18
-        # Controls
-        ctrl_surf = self.font.render(
-            "1-5: bad_leader   SHIFT+1-5: spin   C: clear   Q: quit",
-            True, (140, 140, 140))
-        self.screen.blit(ctrl_surf, (20, y))
-
-        pygame.display.flip()
+            pygame.display.flip()
     
     def handle_events(self) -> bool:
         """Handle keyboard input, return False to quit"""
@@ -983,6 +1223,12 @@ class VisualSimulation:
         """Main loop"""
         self.running = True
         self.start_robot_processes()
+        # Bootstrap positions + sensor data then unlock motor output
+        for _ in range(30):
+            self.send_positions()
+            self.send_sensor_feedback()
+            time.sleep(0.05)
+        self.send_start()
         
         print("\nVisual simulation running!")
         print("Keys: 1-5 = DENSE_EXPLORED (send to visited cells)")
@@ -998,6 +1244,7 @@ class VisualSimulation:
                 # Update simulation
                 self.update_sim_robots()
                 self.send_positions()
+                self.send_sensor_feedback()
                 self.receive_states()
                 
                 # Draw

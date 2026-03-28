@@ -83,9 +83,9 @@ ABLATION_LABELS = {
     'no_direction': 'No Direction',
 }
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Data loaders
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def load_results_json(results_dir: str) -> list:
     """Load the main results JSON (final metrics per experiment)."""
@@ -162,9 +162,9 @@ def style_axis(ax, xlabel: str, ylabel: str, xlim=None, ylim=None):
     ax.tick_params(direction='out', length=3, width=0.8)
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Graph 1: Convergence plot (HERO FIGURE)
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def graph_convergence(timelines: dict, output_dir: str):
     """Coverage-over-time with one standalone figure per fault condition."""
@@ -178,7 +178,7 @@ def graph_convergence(timelines: dict, output_dir: str):
     for fault_key, panel_title in fault_panels:
         has_any_traces = any(tl_groups.get((ctrl, fault_key), []) for ctrl in controllers)
         if not has_any_traces:
-            print(f"  [SKIP] convergence_{FAULT_LABELS[fault_key]} — no timeline data")
+            print(f"  [SKIP] convergence_{FAULT_LABELS[fault_key]} - no timeline data")
             continue
 
         fig, ax = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
@@ -236,9 +236,9 @@ def graph_convergence(timelines: dict, output_dir: str):
         save_figure(fig, output_dir, f"convergence_{FAULT_LABELS[fault_key]}")
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Graph 2: Time-to-50% box plot
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def graph_time_to_50(results: list, output_dir: str):
     """Standalone box plots comparing time-to-50% for each fault."""
@@ -248,7 +248,7 @@ def graph_time_to_50(results: list, output_dir: str):
     for fkey, flabel in faults:
         has_any_trials = any(groups.get((ctrl, fkey), []) for ctrl in controllers)
         if not has_any_trials:
-            print(f"  [SKIP] time_to_50_{FAULT_LABELS[fkey]} — no results")
+            print(f"  [SKIP] time_to_50_{FAULT_LABELS[fkey]} - no results")
             continue
 
         fig, ax = plt.subplots(figsize=(IEEE_SINGLE_COL_W, IEEE_MED_H))
@@ -276,9 +276,9 @@ def graph_time_to_50(results: list, output_dir: str):
         save_figure(fig, output_dir, f"time_to_50_{FAULT_LABELS[fkey]}")
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Graph 3: Detection latency
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def graph_detection_latency(results: list, output_dir: str):
     """Bar chart: REIP detection latency under bad_leader."""
@@ -286,7 +286,7 @@ def graph_detection_latency(results: list, output_dir: str):
 
     reip_bl = groups.get(('reip', 'bad_leader'), [])
     if not reip_bl:
-        print("  [SKIP] detection_latency_bad_leader — no REIP bad-leader data")
+        print("  [SKIP] detection_latency_bad_leader - no REIP bad-leader data")
         return
 
     suspicion_times = [r['time_to_first_suspicion']
@@ -341,9 +341,9 @@ def graph_detection_latency(results: list, output_dir: str):
     save_figure(fig, output_dir, 'detection_latency_bad_leader')
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Graph 4: Final coverage comparison (bar chart)
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def graph_coverage_bars(results: list, output_dir: str):
     """Grouped bar chart: final coverage by controller and fault."""
@@ -353,7 +353,7 @@ def graph_coverage_bars(results: list, output_dir: str):
     faults = [(fkey, flabel) for fkey, flabel in all_faults
               if any(groups.get((ctrl, fkey), []) for ctrl in controllers)]
     if not faults:
-        print("  [SKIP] coverage_bars — no coverage results")
+        print("  [SKIP] coverage_bars - no coverage results")
         return
 
     fig, ax = plt.subplots(figsize=(IEEE_DOUBLE_COL_W, IEEE_MED_H))
@@ -381,9 +381,9 @@ def graph_coverage_bars(results: list, output_dir: str):
     save_figure(fig, output_dir, 'coverage_bars')
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Graph 5: Three-tier trust model diagram
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def graph_three_tier_trust(output_dir: str):
     """Visual explanation of three-tier trust model."""
@@ -399,7 +399,7 @@ def graph_three_tier_trust(output_dir: str):
          'Direct obstacle verification'),
         ([(3.5, 3), (6.5, 3), (5, 1)], (3.5, 1), COLORS['success'],
          'Tier 1: Personal Experience', '"I was there"', 'Weight: 1.0',
-         'Ground truth — physically visited'),
+         'Ground truth - physically visited'),
     ]
 
     for verts, _, color, title, quote, weight, note in tier_data:
@@ -410,7 +410,7 @@ def graph_three_tier_trust(output_dir: str):
         cy = np.mean([v[1] for v in verts])
         ax.text(cx, cy + 0.15, title, ha='center', va='center',
                 fontsize=13, fontweight='bold')
-        ax.text(cx, cy - 0.35, f'{quote}  —  {weight}',
+        ax.text(cx, cy - 0.35, f'{quote}  -  {weight}',
                 ha='center', va='center', fontsize=11, style='italic')
 
     ax.set_xlim(0, 10)
@@ -429,7 +429,7 @@ def graph_ablation(results: list, output_dir: str):
     """Standalone ablation figures for bad-leader coverage and false positives."""
     ablation_results = [r for r in results if r.get('ablation')]
     if not ablation_results:
-        print("  [SKIP] ablation figures — no ablation data")
+        print("  [SKIP] ablation figures - no ablation data")
         return
 
     baseline_bl = [
@@ -470,9 +470,9 @@ def graph_ablation(results: list, output_dir: str):
     save_figure(fig_fp, output_dir, 'ablation_false_positives')
 
 
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 # Main
-# ──────────────────────────────────────────────────
+# --------------------------------------------------
 
 def main():
     if len(sys.argv) < 2:
@@ -496,7 +496,7 @@ def main():
     if timelines:
         graph_convergence(timelines, output_dir)
     else:
-        print("  [SKIP] convergence_plot — no timeline data (re-run experiments)")
+        print("  [SKIP] convergence_plot - no timeline data (re-run experiments)")
 
     if results:
         graph_time_to_50(results, output_dir)

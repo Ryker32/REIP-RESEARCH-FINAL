@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ISEF Experimental Data Collection — Rigorous Comparison Suite
+ISEF Experimental Data Collection - Rigorous Comparison Suite
 
 Runs systematic experiments comparing REIP vs RAFT vs Decentralized baselines
 under various fault conditions with statistical rigor:
@@ -28,7 +28,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
-from typing import Iterable, List, Dict, Optional, Tuple
+from typing import Any, Iterable, List, Dict, Optional, Tuple
 from collections import defaultdict
 import heapq
 
@@ -37,6 +37,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from hardware_fidelity import (
+    
     DEFAULT_ARENA,
     DEFAULT_ARUCO,
     HARDWARE_CLONE_STARTS,
@@ -45,7 +46,7 @@ from hardware_fidelity import (
     SIM_SENSOR_PORT,
     TOF_SENSOR_ANGLES_DEG,
 )
-
+from adversary_agent import AdaptiveAdversary, AdversaryAction
 # ==================== Configuration ====================
 REIP_SCRIPT = "robot/reip_node.py"
 RAFT_SCRIPT = "robot/baselines/raft_node.py"
@@ -147,6 +148,8 @@ class ExperimentResult:
     false_positives: int                   # leader changes between settle and fault
     coverage_at_90s: Optional[float]       # coverage at 90s mark
     coverage_timeline: List[Tuple[float, float]] = field(default_factory=list)
+    fault_schedule_name: Optional[str] = None
+    fault_events: List[Dict[str, Any]] = field(default_factory=list)
     ablation: Optional[str] = None        # 'no_trust', 'no_causality', 'no_direction', or None
     leader_settle_time: Optional[float] = None
     divider_crossing_time: Optional[float] = None
@@ -194,6 +197,15 @@ class ImpairmentProfile:
     turn_position_loss_prob: float = 0.0
     turn_position_noise_mm: float = 0.0
     turn_heading_noise_rad: float = 0.0
+
+
+@dataclass(frozen=True)
+class FaultEventSpec:
+    time_s: float
+    fault_type: str
+    target_mode: str = "fixed_robot"   # fixed_robot | current_leader
+    robot_id: Optional[int] = None
+    label: Optional[str] = None
 
 
 @dataclass
@@ -316,7 +328,124 @@ IMPAIRMENT_PRESETS = {
         turn_position_noise_mm=20.0,
         turn_heading_noise_rad=math.radians(5.0),
     ),
+    "hardware_clone_blackout": ImpairmentProfile(
+        name="hardware_clone_blackout",
+        startup_blind_s=DEFAULT_ARUCO.stable_corner_frames / DEFAULT_ARUCO.position_rate_hz + 0.35,
+        position_delay_s=0.05,
+        position_jitter_s=0.03,
+        position_loss_prob=0.12,
+        position_burst_prob=0.12,
+        position_burst_len=(4, 9),
+        position_noise_mm=9.0,
+        heading_noise_rad=math.radians(4.0),
+        radial_bias_scale=1.004,
+        divider_occlusion=True,
+        peer_delay_s=0.16,
+        peer_jitter_s=0.08,
+        peer_loss_prob=0.22,
+        peer_burst_prob=0.10,
+        peer_burst_len=(4, 10),
+        fault_delay_s=0.06,
+        fault_jitter_s=0.02,
+        fault_loss_prob=0.02,
+        divider_queue_half_width_mm=320.0,
+        divider_queue_depth_mm=360.0,
+        divider_queue_drag=0.46,
+        crowd_range_mm=360.0,
+        crowd_position_noise_mm=42.0,
+        crowd_heading_noise_rad=math.radians(7.5),
+        crowd_position_pull=0.95,
+        crowd_occlusion_prob=0.28,
+        peer_tof_mask_prob=0.14,
+        peer_tof_inflate_mm=40.0,
+        base_drive_scale=0.77,
+        turn_drive_drag=0.66,
+        wall_drive_drag=0.28,
+        turn_position_loss_prob=0.18,
+        turn_position_noise_mm=24.0,
+        turn_heading_noise_rad=math.radians(6.0),
+    ),
 }
+
+
+FAULT_SCHEDULE_CHOICES = ("default", "cyber_burst", "adaptive")
+
+
+def build_fault_schedule(
+    fault_type: Optional[str],
+    fault_robot: int,
+    fault_schedule_name: Optional[str],
+) -> List[FaultEventSpec]:
+    """Build the timed fault events for a trial.
+
+    `default` reproduces the historical behavior:
+      - one injection at 10s for all non-clean faults
+      - a second injection at 30s on the current leader for leader-centric faults
+
+    `cyber_burst` applies repeated attacks every 3 seconds after the initial hit,
+    targeting the currently active leader to model sustained adversarial pressure.
+    """
+    if fault_type in (None, "", "none", "clear"):
+        return []
+
+    schedule_name = (fault_schedule_name or "default").lower()
+    if schedule_name not in FAULT_SCHEDULE_CHOICES:
+        raise ValueError(
+            f"Unsupported fault schedule '{fault_schedule_name}'. "
+            f"Choose from {', '.join(FAULT_SCHEDULE_CHOICES)}."
+        )
+
+    events = [
+        FaultEventSpec(
+            time_s=FAULT_INJECT_TIME,
+            fault_type=fault_type,
+            target_mode="fixed_robot",
+            robot_id=fault_robot,
+            label="Fault 1",
+        )
+    ]
+
+    if schedule_name == "default":
+        if fault_type in ("bad_leader", "freeze_leader"):
+            events.append(FaultEventSpec(
+                time_s=FAULT_INJECT_TIME_2,
+                fault_type=fault_type,
+                target_mode="current_leader",
+                label="Fault 2",
+            ))
+        return events
+
+    for idx, event_t in enumerate((13.0, 16.0, 19.0, 22.0, 25.0, 28.0, 31.0, 34.0), start=2):
+        events.append(FaultEventSpec(
+            time_s=event_t,
+            fault_type=fault_type,
+            target_mode="current_leader",
+            label=f"Burst {idx - 1}",
+        ))
+    return events
+
+
+def _schedule_to_metadata(events: List[FaultEventSpec]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "time_s": ev.time_s,
+            "fault_type": ev.fault_type,
+            "target_mode": ev.target_mode,
+            "robot_id": ev.robot_id,
+            "label": ev.label,
+        }
+        for ev in events
+    ]
+
+
+def _schedule_summary(events: List[FaultEventSpec]) -> str:
+    if not events:
+        return "none"
+    return ", ".join(
+        f"{ev.time_s:.0f}s:{ev.fault_type}@"
+        f"{'leader' if ev.target_mode == 'current_leader' else f'R{ev.robot_id}'}"
+        for ev in events
+    )
 
 
 # ==================== Experiment Runner ====================
@@ -904,7 +1033,7 @@ class ExperimentRunner:
         sc = (max(0, min(cols - 1, int(x / CELL_SIZE))),
               max(0, min(rows - 1, int(y / CELL_SIZE))))
 
-        # BFS from robot cell — returns cells in order of path distance
+        # BFS from robot cell - returns cells in order of path distance
         from collections import deque
         queue = deque([sc])
         visited_bfs = {sc}
@@ -922,7 +1051,7 @@ class ExperimentRunner:
                     visited_bfs.add((nx, ny))
                     queue.append((nx, ny))
 
-        # Absolute fallback — pick any unexplored cell
+        # Absolute fallback - pick any unexplored cell
         for cx in range(cols):
             for cy in range(rows):
                 if (cx, cy) not in self.visited_cells:
@@ -1313,7 +1442,7 @@ class ExperimentRunner:
             return
         """Update simulated positions based on each robot's decided target.
 
-        Uses navigation_target from each robot's broadcast — this is the
+        Uses navigation_target from each robot's broadcast - this is the
         position the robot actually chose to go to (leader assignment if
         trusting, local fallback if not).  Includes wall collision,
         wall-following, and stuck detection with locked override.
@@ -1323,7 +1452,7 @@ class ExperimentRunner:
         """
         SPEED_PER_SEC = 500       # pixels/sec (~robot body length per second)
         STUCK_TIME = 1.5          # seconds stuck before override fires
-        STUCK_MOVE_EPS = 15       # pixels — less than this = stuck
+        STUCK_MOVE_EPS = 15       # pixels - less than this = stuck
         OVERRIDE_ARRIVE_DIST = 60 # close enough to release override lock
         WALL_RADIUS = 75          # collision radius used in _collides_with_wall
         MAX_STEP = WALL_RADIUS * 0.8  # Max step per sub-tick to prevent tunneling
@@ -1336,10 +1465,10 @@ class ExperimentRunner:
             # ---- Motor fault simulation (matches visual_sim.py) ----
             motor_fault = self.motor_faults.get(rid)
             if motor_fault == 'stop':
-                # Robot is frozen — don't move, don't count coverage
+                # Robot is frozen - don't move, don't count coverage
                 continue
             elif motor_fault == 'spin':
-                # Robot spins in place — only theta changes, no position change
+                # Robot spins in place - only theta changes, no position change
                 theta += 0.2 * (dt / 0.05)  # scale by dt so rotation is time-consistent
                 self.sim_positions[rid] = (x, y, theta)
                 # Still count the cell it's sitting on
@@ -1398,7 +1527,7 @@ class ExperimentRunner:
             # ---- Override target if stuck for too long ----
             # IMPORTANT: Only fire when robot is FAR from its target but can't
             # move (wall wedge).  If the robot arrived at its target and is
-            # sitting there, that's not "stuck" — it successfully followed its
+            # sitting there, that's not "stuck" - it successfully followed its
             # command.  On real hardware a robot told to go to an explored cell
             # would just stay there; only REIP's trust model can recover.
             # Without this guard, stuck detection acts as an oracle that rescues
@@ -1448,7 +1577,7 @@ class ExperimentRunner:
                     dist = math.sqrt(dx*dx + dy*dy)
 
                     if dist <= 20 and len(wps) <= 1:
-                        # Arrived — clear stale target so we pick up the
+                        # Arrived - clear stale target so we pick up the
                         # robot's next broadcast target instead of looping
                         # on the same arrived position forever.
                         self.last_targets[rid] = None
@@ -1534,6 +1663,7 @@ class ExperimentRunner:
         controller: str,
         fault_type: Optional[str] = None,
         fault_robot: int = 1,
+        fault_schedule_name: Optional[str] = None,
         trial_num: int = 1,
         seed: int = 42,
         save_snapshots: bool = False,
@@ -1545,6 +1675,10 @@ class ExperimentRunner:
         print(f"Experiment: {name}  (trial {trial_num}, seed {seed})")
         print(f"  Controller: {controller}, Layout: {self.layout}")
         print(f"  Fault: {fault_type or 'none'} on Robot {fault_robot}")
+        fault_schedule = build_fault_schedule(fault_type, fault_robot, fault_schedule_name)
+        if fault_schedule:
+            print(f"  Fault schedule: {fault_schedule_name or 'default'} "
+                  f"({_schedule_summary(fault_schedule)})")
         if ablation:
             print(f"  Ablation: {ablation}")
         print(f"{'='*60}")
@@ -1666,9 +1800,12 @@ class ExperimentRunner:
         start_time = time.time()
         fault_injected = False
         fault_inject_actual_time = None
-        fault2_injected = False           # Second bad_leader injection
+        fault2_injected = False
         fault2_inject_time = None
-        fault2_robot = None               # Who got the second fault
+        fault2_robot = None
+        first_fault_robot = None
+        fault_plan_idx = 0
+        injected_fault_events: List[Dict[str, Any]] = []
         time_to_detection = None          # Fault -> leader change (impeachment)
         time_to_first_suspicion = None    # Fault -> first trust decay
         time_to_detection_2 = None        # Second fault -> second impeachment
@@ -1688,41 +1825,78 @@ class ExperimentRunner:
         pre_fault_trust: Dict[int, float] = {}  # rid -> trust at fault time
         last_states: Dict[int, dict] = {}  # most recent state per robot
 
+                # ---- Set up adversary agent (if using adaptive schedule) ----
+        adversary_agent = None
+        _adversary_prev_leader = None
+        if fault_schedule_name == "adaptive" and fault_type:
+            adversary_agent = AdaptiveAdversary(fault_type=fault_type)
+            fault_schedule = []  # agent handles injections, not static schedule
+            print(f"  Adversary agent: AdaptiveAdversary (budget=4, cooldown=12s)")
+ 
         self._last_tick_time = time.time()
         try:
             while time.time() - start_time < EXPERIMENT_DURATION:
                 elapsed = time.time() - start_time
 
-                # ---- Inject fault at scheduled time ----
-                if fault_type not in (None, "", "none", "clear") and not fault_injected and elapsed >= FAULT_INJECT_TIME:
-                    print(f"  [t={elapsed:.1f}s] Injecting {fault_type} on Robot {fault_robot}")
-                    self.inject_fault(fault_robot, fault_type)
-                    fault_injected = True
-                    fault_inject_actual_time = time.time()
-                    # Snapshot trust levels at fault injection for decay detection
-                    for rid, st in last_states.items():
-                        pre_fault_trust[rid] = st.get('trust_in_leader', 1.0)
+                # ---- Inject any due scheduled fault events ----
+                while fault_plan_idx < len(fault_schedule) and elapsed >= fault_schedule[fault_plan_idx].time_s:
+                    event = fault_schedule[fault_plan_idx]
+                    target_robot = event.robot_id if event.target_mode == "fixed_robot" else self._get_current_leader()
+                    print(f"  [t={elapsed:.1f}s] Injecting {event.fault_type} on Robot "
+                          f"{target_robot} ({event.label or f'event {fault_plan_idx + 1}'})")
+                    self.inject_fault(target_robot, event.fault_type)
+                    inject_wall_time = time.time()
+                    injected_fault_events.append({
+                        "index": fault_plan_idx + 1,
+                        "scheduled_time_s": event.time_s,
+                        "actual_elapsed_s": elapsed,
+                        "fault_type": event.fault_type,
+                        "target_mode": event.target_mode,
+                        "target_robot": target_robot,
+                        "label": event.label,
+                    })
+                    if not fault_injected:
+                        fault_injected = True
+                        first_fault_robot = target_robot
+                        fault_inject_actual_time = inject_wall_time
+                        for rid, st in last_states.items():
+                            pre_fault_trust[rid] = st.get('trust_in_leader', 1.0)
+                    elif not fault2_injected:
+                        fault2_injected = True
+                        fault2_robot = target_robot
+                        fault2_inject_time = inject_wall_time
+                    fault_plan_idx += 1
 
-                # ---- Second leadership fault injection at FAULT_INJECT_TIME_2 ----
-                # Targets whoever is currently leader (tests repeated attack survival)
-                if (fault_type in ('bad_leader', 'freeze_leader') and fault_injected
-                        and not fault2_injected and elapsed >= FAULT_INJECT_TIME_2):
-                    current_leader = self._get_current_leader()
-                    fault2_robot = current_leader
-                    if current_leader != fault_robot or controller == 'raft':
-                        # REIP: new leader after impeachment; RAFT: same robot
-                        print(f"  [t={elapsed:.1f}s] SECOND FAULT: {fault_type} on "
-                              f"Robot {current_leader} (current leader)")
-                        self.inject_fault(current_leader, fault_type)
-                    else:
-                        print(f"  [t={elapsed:.1f}s] SECOND FAULT: Robot {fault_robot} "
-                              f"still leader (re-injecting {fault_type})")
-                        self.inject_fault(fault_robot, fault_type)
-                        fault2_robot = fault_robot
-                    fault2_injected = True
-                    fault2_inject_time = time.time()
-
+                 
+                # ---- Adversary agent decision ----
+                if adversary_agent is not None:
+                    cur_leader = self._get_current_leader()
+                    leader_changed = (_adversary_prev_leader is not None
+                                      and cur_leader != _adversary_prev_leader)
+                    _adversary_prev_leader = cur_leader
+                    action = adversary_agent.decide(elapsed, cur_leader, leader_changed)
+                    if action is not None:
+                        print(f"  [t={elapsed:.1f}s] ADVERSARY: {action.label} "
+                              f"-> Robot {action.target_robot}")
+                        self.inject_fault(action.target_robot, action.fault_type)
+                        injected_fault_events.append({
+                            "index": adversary_agent.compromises_used,
+                            "scheduled_time_s": elapsed,
+                            "actual_elapsed_s": elapsed,
+                            "fault_type": action.fault_type,
+                            "target_mode": "adversary_agent",
+                            "target_robot": action.target_robot,
+                            "label": action.label,
+                        })
+                        if not fault_injected:
+                            fault_injected = True
+                            first_fault_robot = action.target_robot
+                            fault_inject_actual_time = time.time()
+                            for rid, st in last_states.items():
+                                pre_fault_trust[rid] = st.get('trust_in_leader', 1.0)
+ 
                 # ---- Simulation step (time-based movement) ----
+ 
                 now = time.time()
                 dt = now - self._last_tick_time if hasattr(self, '_last_tick_time') else 0.05
                 dt = min(dt, 0.15)  # Cap dt to prevent huge jumps after stalls
@@ -1745,7 +1919,7 @@ class ExperimentRunner:
                         num_leader_changes += 1
 
                         # Was the first fault robot deposed?
-                        if fault_injected and prev_leader == fault_robot and \
+                        if fault_injected and first_fault_robot is not None and prev_leader == first_fault_robot and \
                                 time_to_detection is None:
                             time_to_detection = time.time() - fault_inject_actual_time
                             print(f"  [t={elapsed:.1f}s] IMPEACHED: Robot {rid} saw "
@@ -1909,6 +2083,8 @@ class ExperimentRunner:
             false_positives=false_positives,
             coverage_at_90s=coverage_at_90s,
             coverage_timeline=self.coverage_history,
+            fault_schedule_name=fault_schedule_name or ("default" if fault_schedule else None),
+            fault_events=injected_fault_events,
             ablation=ablation,
             leader_settle_time=leader_settle_time,
             divider_crossing_time=divider_crossing_time,
@@ -1928,8 +2104,11 @@ class ExperimentRunner:
                         'name': name, 'controller': controller,
                         'fault_type': fault_type, 'layout': self.layout,
                         'trial': trial_num, 'seed': seed,
-                        'fault_time_1': FAULT_INJECT_TIME,
-                        'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'freeze_leader') else None,
+                        'fault_schedule_name': fault_schedule_name or ("default" if fault_schedule else None),
+                        'fault_schedule': _schedule_to_metadata(fault_schedule),
+                        'fault_events': injected_fault_events,
+                        'fault_time_1': fault_schedule[0].time_s if len(fault_schedule) >= 1 else None,
+                        'fault_time_2': fault_schedule[1].time_s if len(fault_schedule) >= 2 else None,
                         'timeline': self.coverage_history
                     }, f)
             except Exception:
@@ -1950,8 +2129,11 @@ class ExperimentRunner:
                             'walls': self.geometry.wall_segments() if self.sim_mode == "hardware_clone" and self.layout == "multiroom" else self.walls,
                             'sim_mode': self.sim_mode,
                             'impairment_preset': self.impairment.name,
-                            'fault_time_1': FAULT_INJECT_TIME,
-                            'fault_time_2': FAULT_INJECT_TIME_2 if fault_type in ('bad_leader', 'freeze_leader') else None,
+                            'fault_schedule_name': fault_schedule_name or ("default" if fault_schedule else None),
+                            'fault_schedule': _schedule_to_metadata(fault_schedule),
+                            'fault_events': injected_fault_events,
+                            'fault_time_1': fault_schedule[0].time_s if len(fault_schedule) >= 1 else None,
+                            'fault_time_2': fault_schedule[1].time_s if len(fault_schedule) >= 2 else None,
                             'frames': snapshot_frames,
                         }, f)
                     print(f"  Saved {len(snapshot_frames)} snapshots to {snap_path}")
@@ -2160,7 +2342,7 @@ def print_statistics(results: List[ExperimentResult]):
 
         if reip and raft:
             delta = reip['coverage_mean'] - raft['coverage_mean']
-            print(f"\n  [{layout}] Bad Leader — REIP vs RAFT:")
+            print(f"\n  [{layout}] Bad Leader - REIP vs RAFT:")
             print(f"    Coverage: REIP {reip['coverage_mean']:.1f}% vs RAFT {raft['coverage_mean']:.1f}% "
                   f"(+{delta:.1f}pp advantage)")
             if reip['suspicion_mean'] is not None:
@@ -2232,6 +2414,8 @@ ABLATION_CONDITIONS = [
     # No trust assessment: REIP with elections but no detection/impeachment
     # Expected: plateaus like RAFT under bad_leader (proves trust IS the contribution)
     ("Ablation_NoTrust_BL",    "reip", "bad_leader", 1, "no_trust"),
+    # Under clean: should reveal baseline coordination cost without trust logic
+    ("Ablation_NoTrust_Clean", "reip", None,         1, "no_trust"),
     # No causality grace: CAUSALITY_GRACE_PERIOD=0
     # Under clean: expect false positives (unnecessary impeachments)
     ("Ablation_NoCausality_Clean", "reip", None,         1, "no_causality"),
@@ -2240,18 +2424,26 @@ ABLATION_CONDITIONS = [
     # No direction consistency check: only three-tier cell check
     # Expected: still detects bad_leader via Tier 1/3, but possibly slower
     ("Ablation_NoDirection_BL",    "reip", "bad_leader", 1, "no_direction"),
+    # Under clean: should show baseline cost of removing direction-consistency checks
+    ("Ablation_NoDirection_Clean", "reip", None,         1, "no_direction"),
     # No command instability check: disable omega (oscillation) detection
     # Expected: still detects bad_leader via three-tier + direction, but misses oscillation attacks
     ("Ablation_NoInstability_BL",  "reip", "bad_leader", 1, "no_instability"),
 ]
 
+ADVERSARY_CONDITIONS = [
+    ("Adversary_Adaptive_BL", "reip",          "bad_leader", 1, None),
+    ("Adversary_Adaptive_BL", "raft",          "bad_leader", 1, None),
+    ("Adversary_Adaptive_BL", "decentralized", "bad_leader", 1, None),
+]
+ 
 
 # ==================== Parallel Worker (module-level for pickling) ===========
 def _run_worker(args_tuple):
     """Run a sequence of experiments on one worker with one port offset.
 
     args_tuple: (worker_id, job_list, output_dir, sim_mode, impairment_preset)
-      job_list: [(name, layout, controller, fault_type, fault_robot, trial, seed, ablation), ...]
+      job_list: [(name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fault_schedule_name), ...]
     """
     worker_id, job_list, output_dir, sim_mode, impairment_preset = args_tuple
     port_offset = SIM_PORT_OFFSET_BASE * (worker_id + 1)
@@ -2264,11 +2456,12 @@ def _run_worker(args_tuple):
     )
 
     for job in job_list:
-        if len(job) == 9:
-            name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fixed_positions = job
+        if len(job) == 10:
+            name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fixed_positions, fault_schedule_name = job
         else:
             name, layout, controller, fault_type, fault_robot, trial, seed, ablation = job[:8]
             fixed_positions = None
+            fault_schedule_name = None
         
         runner.set_layout(layout)
         try:
@@ -2277,6 +2470,7 @@ def _run_worker(args_tuple):
             r = runner.run_experiment(
                 name=name, controller=controller,
                 fault_type=fault_type, fault_robot=fault_robot,
+                fault_schedule_name=fault_schedule_name,
                 trial_num=trial, seed=seed, ablation=ablation)
             results.append(asdict(r))
         except Exception as e:
@@ -2733,7 +2927,7 @@ def validate_sim_hardware(sim_results: List[ExperimentResult], hardware_json: st
             passed = False
             all_passed = False
         
-        status = "✓ PASS" if passed else "✗ FAIL"
+        status = "PASS PASS" if passed else "FAIL FAIL"
         report_lines.append(f"  {status} {key}:")
         report_lines.append(f"    Coverage: Sim {sim_cov:.1f}% vs HW {hw_cov:.1f}% (diff: {cov_diff:.1f}%)")
         if sim_det_mean is not None and hw_det_mean is not None:
@@ -2759,10 +2953,10 @@ def validate_sim_hardware(sim_results: List[ExperimentResult], hardware_json: st
     report_lines.append("=" * 80)
     if all_passed:
         report_lines.append("VALIDATION PASSED: Simulation matches hardware within tolerances")
-        report_lines.append("  → Safe to use 100-trial sim results for paper")
+        report_lines.append("  -> Safe to use 100-trial sim results for paper")
     else:
         report_lines.append("VALIDATION FAILED: Significant differences detected")
-        report_lines.append("  → Fix simulation physics before using results")
+        report_lines.append("  -> Fix simulation physics before using results")
     report_lines.append("=" * 80)
     
     return all_passed, "\n".join(report_lines)
@@ -2799,6 +2993,11 @@ def main():
     parser.add_argument("--impairment-preset", choices=sorted(IMPAIRMENT_PRESETS.keys()),
                         default="hardware_clone_clean",
                         help="Sensor/network impairment preset for hardware_clone mode")
+    parser.add_argument("--adversary", action="store_true",
+                        help="Run adaptive adversary attack conditions")
+    parser.add_argument("--fault-schedule", choices=FAULT_SCHEDULE_CHOICES,
+                        default="default",
+                        help="Timed fault schedule to apply to non-clean conditions")
     args = parser.parse_args()
     globals()["EXPERIMENT_DURATION"] = args.duration
 
@@ -2832,12 +3031,15 @@ def main():
         conditions = ABLATION_CONDITIONS
     else:
         conditions = EXPERIMENT_CONDITIONS
+    if args.adversary:
+        conditions = ADVERSARY_CONDITIONS
     if args.condition and args.condition.lower() != "all":
         conditions = [c for c in conditions if args.condition.lower() in c[0].lower()
                       or args.condition.lower() in c[1].lower()]
 
     # Build the full job list
-    # Each job: (name, layout, controller, fault_type, fault_robot, trial, seed, ablation)
+    # Each job: (name, layout, controller, fault_type, fault_robot, trial, seed,
+    #            ablation, fixed_positions, fault_schedule_name)
     jobs = []
     for layout in layouts:
         for trial in range(1, n_trials + 1):
@@ -2846,7 +3048,13 @@ def main():
                 name = f"{layout}_{controller}_{cond_tag}_t{trial}"
                 # Use fixed positions if provided (only for first trial for validation)
                 use_fixed = fixed_positions if (fixed_positions and trial == 1) else None
-                jobs.append((name, layout, controller, fault_type, fault_robot, trial, seed, ablation, use_fixed))
+                if "Adversary_Adaptive" in cond_tag:
+                    schedule_name = "adaptive"
+                elif fault_type not in (None, "", "none", "clear"):
+                    schedule_name = args.fault_schedule
+                else:
+                    schedule_name = None
+                jobs.append((name, layout, controller, fault_type, fault_robot, trial, seed, ablation, use_fixed, schedule_name))
 
     total = len(jobs)
     if total == 0:
@@ -2899,13 +3107,14 @@ def main():
         )
         all_results: List[ExperimentResult] = []
         for i, job in enumerate(jobs):
-            name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fixed_positions = job
+            name, layout, controller, fault_type, fault_robot, trial, seed, ablation, fixed_positions, fault_schedule_name = job
             print(f"\n>>> Experiment {i+1}/{total}: {name}")
             runner.set_layout(layout)
             runner._fixed_positions_for_next_trial = fixed_positions
             result = runner.run_experiment(
                 name=name, controller=controller,
                 fault_type=fault_type, fault_robot=fault_robot,
+                fault_schedule_name=fault_schedule_name,
                 trial_num=trial, seed=seed,
                 save_snapshots=args.snapshots,
                 ablation=ablation,
@@ -2993,9 +3202,9 @@ def main():
 
     print(f"\nDone! {len(all_results)} experiments completed.")
     print(f"Results dir: {output_dir}/")
-    print(f"  results_final_*.json  — raw data")
-    print(f"  SUMMARY.txt           — human-readable stats")
-    print(f"  logs/                 — per-experiment robot logs")
+    print(f"  results_final_*.json  - raw data")
+    print(f"  SUMMARY.txt           - human-readable stats")
+    print(f"  logs/                 - per-experiment robot logs")
     print(f"\nGenerate graphs:")
     print(f"  python test/generate_poster_graphs.py {output_dir}/results_final_*.json")
 

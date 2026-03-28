@@ -1,0 +1,10700 @@
+[
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t3",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 3,
+    "seed": 3000,
+    "final_coverage": 44.26229508196721,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 7.923650741577148,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 5,
+    "false_positives": 0,
+    "coverage_at_90s": 43.44262295081967,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.048743486404419,
+        "actual_elapsed_s": 10.048743486404419,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 5,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.060847759246826,
+        "actual_elapsed_s": 22.060847759246826,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 2/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 32,
+    "min_peer_separation_mm": 141.59412292287612,
+    "min_wall_clearance_mm": 64.00070169151195,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        1,
+        7
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t7",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 7,
+    "seed": 7000,
+    "final_coverage": 49.18032786885246,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 105.71996736526489,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 5,
+    "false_positives": 0,
+    "coverage_at_90s": 45.90163934426229,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.036594152450562,
+        "actual_elapsed_s": 10.036594152450562,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 115.80746006965637,
+        "actual_elapsed_s": 115.80746006965637,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 2/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 110.78340911865234,
+    "mission_complete_time": null,
+    "peer_emergency_count": 33,
+    "min_peer_separation_mm": 141.54807103645817,
+    "min_wall_clearance_mm": 100.44997452190752,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        10
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t4",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 4,
+    "seed": 4000,
+    "final_coverage": 50.81967213114754,
+    "time_to_50": 92.54121708869934,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 18.4597749710083,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 17,
+    "false_positives": 0,
+    "coverage_at_90s": 48.36065573770492,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.04736328125,
+        "actual_elapsed_s": 10.04736328125,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 28.660582065582275,
+        "actual_elapsed_s": 28.660582065582275,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 65.83161854743958,
+        "actual_elapsed_s": 65.83161854743958,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 77.84823870658875,
+        "actual_elapsed_s": 77.84823870658875,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 34,
+    "min_peer_separation_mm": 141.3204098781831,
+    "min_wall_clearance_mm": 85.5965144871169,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        3
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t8",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 8,
+    "seed": 8000,
+    "final_coverage": 54.91803278688525,
+    "time_to_50": 69.92943382263184,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 98.8689980506897,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 39,
+    "false_positives": 0,
+    "coverage_at_90s": 51.63934426229508,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.040186882019043,
+        "actual_elapsed_s": 10.040186882019043,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 109.16542267799377,
+        "actual_elapsed_s": 109.16542267799377,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 2/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 19.515458345413208,
+    "mission_complete_time": null,
+    "peer_emergency_count": 31,
+    "min_peer_separation_mm": 141.55007412282382,
+    "min_wall_clearance_mm": 64.00074139466847,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        10
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t3",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 3,
+    "seed": 3000,
+    "final_coverage": 62.295081967213115,
+    "time_to_50": 66.6469898223877,
+    "time_to_60": 111.83564710617065,
+    "time_to_80": null,
+    "time_to_detection": 2.49,
+    "time_to_first_suspicion": 0.21,
+    "time_to_detection_2": null,
+    "num_leader_changes": 26,
+    "false_positives": 0,
+    "coverage_at_90s": 51.63934426229508,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.042406797409058,
+        "actual_elapsed_s": 10.042406797409058,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.064934015274048,
+        "actual_elapsed_s": 22.064934015274048,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.104164123535156,
+        "actual_elapsed_s": 34.104164123535156,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.13064408302307,
+        "actual_elapsed_s": 46.13064408302307,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 51.80654335021973,
+    "mission_complete_time": null,
+    "peer_emergency_count": 13,
+    "min_peer_separation_mm": 210.6525670854156,
+    "min_wall_clearance_mm": 97.27012606707069,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        9,
+        4
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t7",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 7,
+    "seed": 7000,
+    "final_coverage": 48.36065573770492,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 2.09,
+    "time_to_first_suspicion": 0.2,
+    "time_to_detection_2": null,
+    "num_leader_changes": 27,
+    "false_positives": 0,
+    "coverage_at_90s": 46.72131147540984,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.037863731384277,
+        "actual_elapsed_s": 10.037863731384277,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.079689025878906,
+        "actual_elapsed_s": 22.079689025878906,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.10364484786987,
+        "actual_elapsed_s": 34.10364484786987,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.141321420669556,
+        "actual_elapsed_s": 46.141321420669556,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 5,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": 59.09455871582031,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 141.70144855392917,
+    "min_wall_clearance_mm": 64.00035416306662,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        8
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t4",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 4,
+    "seed": 4000,
+    "final_coverage": 59.01639344262295,
+    "time_to_50": 92.36699724197388,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 2.65,
+    "time_to_first_suspicion": 0.16,
+    "time_to_detection_2": null,
+    "num_leader_changes": 23,
+    "false_positives": 0,
+    "coverage_at_90s": 48.36065573770492,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.04887843132019,
+        "actual_elapsed_s": 10.04887843132019,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.083492755889893,
+        "actual_elapsed_s": 22.083492755889893,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.12525963783264,
+        "actual_elapsed_s": 34.12525963783264,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.158533573150635,
+        "actual_elapsed_s": 46.158533573150635,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 89.91359496116638,
+    "mission_complete_time": null,
+    "peer_emergency_count": 13,
+    "min_peer_separation_mm": 141.77507714261426,
+    "min_wall_clearance_mm": 99.33342812759088,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t8",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 8,
+    "seed": 8000,
+    "final_coverage": 73.77049180327869,
+    "time_to_50": 64.20208930969238,
+    "time_to_60": 86.1377215385437,
+    "time_to_80": null,
+    "time_to_detection": 1.91,
+    "time_to_first_suspicion": 0.15,
+    "time_to_detection_2": null,
+    "num_leader_changes": 26,
+    "false_positives": 0,
+    "coverage_at_90s": 62.295081967213115,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.025671482086182,
+        "actual_elapsed_s": 10.025671482086182,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.063518047332764,
+        "actual_elapsed_s": 22.063518047332764,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.09811496734619,
+        "actual_elapsed_s": 34.09811496734619,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.13414549827576,
+        "actual_elapsed_s": 46.13414549827576,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 5,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 52.38904285430908,
+    "mission_complete_time": null,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 171.3398836828482,
+    "min_wall_clearance_mm": 85.69666390494956,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        14,
+        6
+      ],
+      [
+        13,
+        5
+      ],
+      [
+        13,
+        4
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        13,
+        2
+      ],
+      [
+        13,
+        1
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        9,
+        5
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t3",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 3,
+    "seed": 3000,
+    "final_coverage": 71.31147540983606,
+    "time_to_50": 71.13146209716797,
+    "time_to_60": 101.77750849723816,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 58.19672131147541,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.015716791152954,
+        "actual_elapsed_s": 10.015716791152954,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 35.17167139053345,
+    "mission_complete_time": null,
+    "peer_emergency_count": 13,
+    "min_peer_separation_mm": 151.57347253172708,
+    "min_wall_clearance_mm": 64.00052965052828,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        11,
+        3
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        11,
+        4
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        13,
+        4
+      ],
+      [
+        13,
+        8
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t7",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 7,
+    "seed": 7000,
+    "final_coverage": 63.114754098360656,
+    "time_to_50": 86.39952564239502,
+    "time_to_60": 115.10705995559692,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 51.63934426229508,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.029791593551636,
+        "actual_elapsed_s": 10.029791593551636,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 76.11716222763062,
+    "mission_complete_time": null,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 167.67907148381607,
+    "min_wall_clearance_mm": 100.00706767908383,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        11,
+        5
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        9,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t4",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 4,
+    "seed": 4000,
+    "final_coverage": 75.40983606557377,
+    "time_to_50": 60.91635060310364,
+    "time_to_60": 93.72683072090149,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 57.377049180327866,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.024147033691406,
+        "actual_elapsed_s": 10.024147033691406,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 31.745370388031006,
+    "mission_complete_time": null,
+    "peer_emergency_count": 13,
+    "min_peer_separation_mm": 145.9167466633505,
+    "min_wall_clearance_mm": 86.28721660705298,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        11,
+        4
+      ],
+      [
+        11,
+        3
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        11,
+        5
+      ],
+      [
+        14,
+        6
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t8",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 8,
+    "seed": 8000,
+    "final_coverage": 79.50819672131148,
+    "time_to_50": 51.16204833984375,
+    "time_to_60": 73.17967486381531,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 70.49180327868852,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.031216859817505,
+        "actual_elapsed_s": 10.031216859817505,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 33.14775252342224,
+    "mission_complete_time": null,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 141.48103233211626,
+    "min_wall_clearance_mm": 100.00182917554507,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        12,
+        7
+      ],
+      [
+        12,
+        6
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        12,
+        5
+      ],
+      [
+        13,
+        5
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        11,
+        4
+      ],
+      [
+        11,
+        3
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        12,
+        8
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        14,
+        6
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        14,
+        5
+      ],
+      [
+        14,
+        4
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        14,
+        3
+      ],
+      [
+        13,
+        2
+      ],
+      [
+        13,
+        1
+      ],
+      [
+        14,
+        2
+      ],
+      [
+        14,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t1",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 48.36065573770492,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 30.75310230255127,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 39,
+    "false_positives": 9,
+    "coverage_at_90s": 47.540983606557376,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.04982042312622,
+        "actual_elapsed_s": 10.04982042312622,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 40.956624031066895,
+        "actual_elapsed_s": 40.956624031066895,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 52.997584104537964,
+        "actual_elapsed_s": 52.997584104537964,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 92.37885546684265,
+        "actual_elapsed_s": 92.37885546684265,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 30,
+    "min_peer_separation_mm": 143.855277057439,
+    "min_wall_clearance_mm": 64.00107576934067,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        7
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t5",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 5,
+    "seed": 5000,
+    "final_coverage": 54.91803278688525,
+    "time_to_50": 73.38572478294373,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 54.09836065573771,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.024846076965332,
+        "actual_elapsed_s": 10.024846076965332,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 19.493422031402588,
+    "mission_complete_time": null,
+    "peer_emergency_count": 34,
+    "min_peer_separation_mm": 141.41684930231744,
+    "min_wall_clearance_mm": 100.00048040511864,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        4
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t9",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 9,
+    "seed": 9000,
+    "final_coverage": 48.36065573770492,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 45.16387319564819,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 24,
+    "false_positives": 0,
+    "coverage_at_90s": 47.540983606557376,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.028515815734863,
+        "actual_elapsed_s": 10.028515815734863,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 55.50055527687073,
+        "actual_elapsed_s": 55.50055527687073,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 67.52772879600525,
+        "actual_elapsed_s": 67.52772879600525,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 22,
+    "min_peer_separation_mm": 141.01835141910303,
+    "min_wall_clearance_mm": 64.00039918925575,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t2",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 2,
+    "seed": 2000,
+    "final_coverage": 48.36065573770492,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 17.76327919960022,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 10,
+    "false_positives": 0,
+    "coverage_at_90s": 47.540983606557376,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.047590732574463,
+        "actual_elapsed_s": 10.047590732574463,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 27.913037061691284,
+        "actual_elapsed_s": 27.913037061691284,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 5,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 78.3825011253357,
+        "actual_elapsed_s": 78.3825011253357,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 3/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 32,
+    "min_peer_separation_mm": 140.9472072536385,
+    "min_wall_clearance_mm": 64.000083518829,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t6",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 6,
+    "seed": 6000,
+    "final_coverage": 50.0,
+    "time_to_50": 93.91504716873169,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 0.2067873477935791,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 25,
+    "false_positives": 13,
+    "coverage_at_90s": 49.18032786885246,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.034257173538208,
+        "actual_elapsed_s": 10.034257173538208,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.07905411720276,
+        "actual_elapsed_s": 22.07905411720276,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 2/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 17.111668348312378,
+    "mission_complete_time": null,
+    "peer_emergency_count": 33,
+    "min_peer_separation_mm": 145.17484524039077,
+    "min_wall_clearance_mm": 64.0010705494185,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        4,
+        4
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_raft_Adversary_Adaptive_BL_t10",
+    "controller": "raft",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 10,
+    "seed": 10000,
+    "final_coverage": 48.36065573770492,
+    "time_to_50": null,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 17,
+    "false_positives": 0,
+    "coverage_at_90s": 45.90163934426229,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.027409315109253,
+        "actual_elapsed_s": 10.027409315109253,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": null,
+    "mission_complete_time": null,
+    "peer_emergency_count": 38,
+    "min_peer_separation_mm": 141.51262355202238,
+    "min_wall_clearance_mm": 64.00080639559042,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        2,
+        9
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t2",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 2,
+    "seed": 2000,
+    "final_coverage": 65.57377049180327,
+    "time_to_50": 77.52038025856018,
+    "time_to_60": 109.25109720230103,
+    "time_to_80": null,
+    "time_to_detection": 1.86,
+    "time_to_first_suspicion": 0.2,
+    "time_to_detection_2": null,
+    "num_leader_changes": 33,
+    "false_positives": 0,
+    "coverage_at_90s": 53.278688524590166,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.001383304595947,
+        "actual_elapsed_s": 10.001383304595947,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.028351068496704,
+        "actual_elapsed_s": 22.028351068496704,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.04314947128296,
+        "actual_elapsed_s": 34.04314947128296,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.06515884399414,
+        "actual_elapsed_s": 46.06515884399414,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 72.91868996620178,
+    "mission_complete_time": null,
+    "peer_emergency_count": 14,
+    "min_peer_separation_mm": 143.4702642724941,
+    "min_wall_clearance_mm": 66.90112512801113,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        12,
+        6
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        14,
+        6
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        13,
+        8
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t6",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 6,
+    "seed": 6000,
+    "final_coverage": 77.04918032786885,
+    "time_to_50": 62.02682137489319,
+    "time_to_60": 85.8178219795227,
+    "time_to_80": null,
+    "time_to_detection": 1.8,
+    "time_to_first_suspicion": 0.2,
+    "time_to_detection_2": null,
+    "num_leader_changes": 27,
+    "false_positives": 0,
+    "coverage_at_90s": 62.295081967213115,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.031971216201782,
+        "actual_elapsed_s": 10.031971216201782,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.063864946365356,
+        "actual_elapsed_s": 22.063864946365356,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.084529638290405,
+        "actual_elapsed_s": 34.084529638290405,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.10840559005737,
+        "actual_elapsed_s": 46.10840559005737,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 55.680543661117554,
+    "mission_complete_time": null,
+    "peer_emergency_count": 22,
+    "min_peer_separation_mm": 143.6286397203189,
+    "min_wall_clearance_mm": 64.01099375693536,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        12,
+        7
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        12,
+        6
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        13,
+        5
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        14,
+        5
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        11,
+        4
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        14,
+        4
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        13,
+        4
+      ],
+      [
+        13,
+        3
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t10",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 10,
+    "seed": 10000,
+    "final_coverage": 60.65573770491803,
+    "time_to_50": 90.31244015693665,
+    "time_to_60": 119.1164276599884,
+    "time_to_80": null,
+    "time_to_detection": 1.49,
+    "time_to_first_suspicion": 0.16,
+    "time_to_detection_2": null,
+    "num_leader_changes": 29,
+    "false_positives": 0,
+    "coverage_at_90s": 49.18032786885246,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.029122829437256,
+        "actual_elapsed_s": 10.029122829437256,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.044087886810303,
+        "actual_elapsed_s": 22.044087886810303,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.083367586135864,
+        "actual_elapsed_s": 34.083367586135864,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.10297441482544,
+        "actual_elapsed_s": 46.10297441482544,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 88.31727433204651,
+    "mission_complete_time": null,
+    "peer_emergency_count": 14,
+    "min_peer_separation_mm": 143.20465586720323,
+    "min_wall_clearance_mm": 110.0001680004275,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        13,
+        6
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t1",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 62.295081967213115,
+    "time_to_50": 79.58907794952393,
+    "time_to_60": 108.49012613296509,
+    "time_to_80": null,
+    "time_to_detection": 1.15,
+    "time_to_first_suspicion": 0.2,
+    "time_to_detection_2": null,
+    "num_leader_changes": 25,
+    "false_positives": 0,
+    "coverage_at_90s": 53.278688524590166,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.039458513259888,
+        "actual_elapsed_s": 10.039458513259888,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.059468269348145,
+        "actual_elapsed_s": 22.059468269348145,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.07848834991455,
+        "actual_elapsed_s": 34.07848834991455,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.11555075645447,
+        "actual_elapsed_s": 46.11555075645447,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 69.14343738555908,
+    "mission_complete_time": 58.34728121757507,
+    "peer_emergency_count": 15,
+    "min_peer_separation_mm": 143.10481916937937,
+    "min_wall_clearance_mm": 110.00105495136472,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        12,
+        7
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t5",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 5,
+    "seed": 5000,
+    "final_coverage": 71.31147540983606,
+    "time_to_50": 55.471951961517334,
+    "time_to_60": 81.37227940559387,
+    "time_to_80": null,
+    "time_to_detection": 1.39,
+    "time_to_first_suspicion": 0.2,
+    "time_to_detection_2": null,
+    "num_leader_changes": 23,
+    "false_positives": 0,
+    "coverage_at_90s": 62.295081967213115,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.029168844223022,
+        "actual_elapsed_s": 10.029168844223022,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.06452250480652,
+        "actual_elapsed_s": 22.06452250480652,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.08681535720825,
+        "actual_elapsed_s": 34.08681535720825,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 82.95811152458191,
+        "actual_elapsed_s": 82.95811152458191,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 48.10287547111511,
+    "mission_complete_time": null,
+    "peer_emergency_count": 26,
+    "min_peer_separation_mm": 193.24623111933215,
+    "min_wall_clearance_mm": 107.22929992947354,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        12,
+        7
+      ],
+      [
+        12,
+        6
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        11,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        12,
+        5
+      ],
+      [
+        13,
+        6
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_reip_Adversary_Adaptive_BL_t9",
+    "controller": "reip",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 9,
+    "seed": 9000,
+    "final_coverage": 58.19672131147541,
+    "time_to_50": 71.33427238464355,
+    "time_to_60": null,
+    "time_to_80": null,
+    "time_to_detection": 2.09,
+    "time_to_first_suspicion": 0.16,
+    "time_to_detection_2": null,
+    "num_leader_changes": 23,
+    "false_positives": 1,
+    "coverage_at_90s": 55.73770491803278,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.02692174911499,
+        "actual_elapsed_s": 10.02692174911499,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      },
+      {
+        "index": 2,
+        "scheduled_time_s": 22.048595666885376,
+        "actual_elapsed_s": 22.048595666885376,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 2,
+        "label": "Adaptive strike 2/4"
+      },
+      {
+        "index": 3,
+        "scheduled_time_s": 34.095282554626465,
+        "actual_elapsed_s": 34.095282554626465,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 3,
+        "label": "Adaptive strike 3/4"
+      },
+      {
+        "index": 4,
+        "scheduled_time_s": 46.12297296524048,
+        "actual_elapsed_s": 46.12297296524048,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 4,
+        "label": "Adaptive strike 4/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": 0.0,
+    "divider_crossing_time": 22.150742530822754,
+    "mission_complete_time": 41.1808066368103,
+    "peer_emergency_count": 14,
+    "min_peer_separation_mm": 174.47658555420387,
+    "min_wall_clearance_mm": 100.00015971349113,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        11,
+        8
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t2",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 2,
+    "seed": 2000,
+    "final_coverage": 74.59016393442623,
+    "time_to_50": 66.53446388244629,
+    "time_to_60": 93.84697890281677,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 59.01639344262295,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.021611452102661,
+        "actual_elapsed_s": 10.021611452102661,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 61.934436559677124,
+    "mission_complete_time": null,
+    "peer_emergency_count": 13,
+    "min_peer_separation_mm": 143.8814370723369,
+    "min_wall_clearance_mm": 110.00051689806062,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        13,
+        7
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        12,
+        6
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t6",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 6,
+    "seed": 6000,
+    "final_coverage": 77.8688524590164,
+    "time_to_50": 53.402392864227295,
+    "time_to_60": 88.70376563072205,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 61.47540983606557,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.027700424194336,
+        "actual_elapsed_s": 10.027700424194336,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 32.17748761177063,
+    "mission_complete_time": null,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 141.63062780493613,
+    "min_wall_clearance_mm": 64.00021081329032,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        12,
+        8
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        12,
+        7
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        11,
+        5
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        3
+      ],
+      [
+        12,
+        5
+      ],
+      [
+        14,
+        9
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t10",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 10,
+    "seed": 10000,
+    "final_coverage": 69.67213114754098,
+    "time_to_50": 74.6989631652832,
+    "time_to_60": 98.71007823944092,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 54.91803278688525,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.029677867889404,
+        "actual_elapsed_s": 10.029677867889404,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 66.86671185493469,
+    "mission_complete_time": null,
+    "peer_emergency_count": 15,
+    "min_peer_separation_mm": 162.9288136721839,
+    "min_wall_clearance_mm": 100.00267727323249,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        10,
+        2
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        14,
+        10
+      ],
+      [
+        14,
+        9
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        11,
+        7
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        11,
+        2
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t1",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 1,
+    "seed": 1000,
+    "final_coverage": 63.934426229508205,
+    "time_to_50": 85.73047614097595,
+    "time_to_60": 114.33383083343506,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 50.81967213114754,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.021708965301514,
+        "actual_elapsed_s": 10.021708965301514,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 84.19714188575745,
+    "mission_complete_time": null,
+    "peer_emergency_count": 15,
+    "min_peer_separation_mm": 143.66675006765877,
+    "min_wall_clearance_mm": 78.61782100153198,
+    "coverage_order": [
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        9,
+        3
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t5",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 5,
+    "seed": 5000,
+    "final_coverage": 84.42622950819673,
+    "time_to_50": 39.39986181259155,
+    "time_to_60": 76.98492646217346,
+    "time_to_80": 106.93385100364685,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 68.85245901639344,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.028778076171875,
+        "actual_elapsed_s": 10.028778076171875,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 29.927236080169678,
+    "mission_complete_time": null,
+    "peer_emergency_count": 18,
+    "min_peer_separation_mm": 199.69183216408732,
+    "min_wall_clearance_mm": 74.86661772967796,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        11,
+        8
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        11,
+        10
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        13,
+        10
+      ],
+      [
+        13,
+        9
+      ],
+      [
+        10,
+        6
+      ],
+      [
+        12,
+        9
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        11,
+        5
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        13,
+        8
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        2,
+        9
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        14,
+        8
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        14,
+        7
+      ],
+      [
+        14,
+        6
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        9,
+        3
+      ],
+      [
+        9,
+        2
+      ],
+      [
+        14,
+        5
+      ],
+      [
+        13,
+        5
+      ],
+      [
+        13,
+        6
+      ],
+      [
+        12,
+        5
+      ],
+      [
+        9,
+        1
+      ],
+      [
+        12,
+        4
+      ],
+      [
+        10,
+        1
+      ],
+      [
+        11,
+        4
+      ],
+      [
+        11,
+        3
+      ],
+      [
+        12,
+        3
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        13,
+        2
+      ],
+      [
+        14,
+        3
+      ],
+      [
+        12,
+        1
+      ]
+    ]
+  },
+  {
+    "name": "multiroom_decentralized_Adversary_Adaptive_BL_t9",
+    "controller": "decentralized",
+    "fault_type": "bad_leader",
+    "fault_robot": 1,
+    "layout": "multiroom",
+    "trial": 9,
+    "seed": 9000,
+    "final_coverage": 63.114754098360656,
+    "time_to_50": 73.46683526039124,
+    "time_to_60": 113.90299987792969,
+    "time_to_80": null,
+    "time_to_detection": null,
+    "time_to_first_suspicion": null,
+    "time_to_detection_2": null,
+    "num_leader_changes": 0,
+    "false_positives": 0,
+    "coverage_at_90s": 53.278688524590166,
+    "coverage_timeline": [],
+    "fault_schedule_name": "adaptive",
+    "fault_events": [
+      {
+        "index": 1,
+        "scheduled_time_s": 10.027068853378296,
+        "actual_elapsed_s": 10.027068853378296,
+        "fault_type": "bad_leader",
+        "target_mode": "adversary_agent",
+        "target_robot": 1,
+        "label": "Adaptive strike 1/4"
+      }
+    ],
+    "ablation": null,
+    "leader_settle_time": null,
+    "divider_crossing_time": 59.63283109664917,
+    "mission_complete_time": null,
+    "peer_emergency_count": 15,
+    "min_peer_separation_mm": 198.41307642324315,
+    "min_wall_clearance_mm": 100.00022253480199,
+    "coverage_order": [
+      [
+        1,
+        3
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        5,
+        8
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        3,
+        6
+      ],
+      [
+        5,
+        9
+      ],
+      [
+        1,
+        9
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        1,
+        10
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        5,
+        2
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        6,
+        10
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        5,
+        1
+      ],
+      [
+        3,
+        9
+      ],
+      [
+        2,
+        10
+      ],
+      [
+        4,
+        9
+      ],
+      [
+        3,
+        10
+      ],
+      [
+        7,
+        10
+      ],
+      [
+        4,
+        10
+      ],
+      [
+        5,
+        10
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        8,
+        10
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        6
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        9,
+        5
+      ],
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        4
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        11,
+        3
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        11,
+        1
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        12,
+        1
+      ],
+      [
+        12,
+        2
+      ],
+      [
+        13,
+        1
+      ],
+      [
+        13,
+        2
+      ],
+      [
+        13,
+        3
+      ],
+      [
+        10,
+        10
+      ]
+    ]
+  }
+]

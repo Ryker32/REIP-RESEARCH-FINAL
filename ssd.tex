@@ -1,0 +1,1074 @@
+\documentclass[a4paper,oneside,titlepage,11pt]{report}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{stfloats}
+\usepackage{placeins}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{amsthm}
+\usepackage[caption=false, font=footnotesize]{subfig}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator{\atanTwo}{atan2}
+
+\newcommand{\Ind}{\mathbb{I}}
+\newcommand{\norm}[1]{\lVert #1\rVert}
+\newcommand{\clip}[1]{\left[#1\right]_+}
+\newcommand{\defeq}{\coloneqq}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[hidelinks]{hyperref}
+\usepackage[nottoc]{tocbibind}
+\usepackage[tablegrid,nochapter]{vhistory}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5\baselineskip}
+
+\def\Institute{\textit{Olympia High School, Olympia, Washington, USA}}
+\def\Course{\textit{Independent Research / System Design Documentation}}
+\def\Module{\textit{Resilient Election and Impeachment Policy (REIP)}}
+\def\Docent{\textit{Advisor: Avi Soval}}
+\def\Assistant{\textit{Author: William R. Kollmyer}}
+
+\def\BoldTitle{System Design Document}
+\def\Subtitle{The Resilient Election and Impeachment Policy (REIP) \\ for \\ Democracy in Robots: Proactive Trust-Based Detection and Impeachment of Compromised Leaders in Multi-Robot Exploration}
+\def\Authors{Prepared by William R. Kollmyer}
+
+\title{
+    \vspace*{3cm}
+    \textbf{\BoldTitle}\\[0.7cm]
+    \Subtitle
+}
+
+\author{
+    \Authors\\[2cm]
+    \Institute\\
+    \Course\\
+    \Module\\
+    \Docent\\
+    \Assistant
+}
+
+\date{\vfill \today}
+
+\hypersetup{
+    pdftitle={REIP System Design Document},
+    pdfauthor={William R. Kollmyer},
+    pdfsubject={System design documentation for REIP}
+}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\clearpage
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+
+\chapter*{Revision History}
+\addcontentsline{toc}{chapter}{Revision History}
+\begin{versionhistory}
+  \vhEntry{0.1}{2026-03-13}{WRK}{Initial report template created}
+  \vhEntry{0.2}{2026-03-13}{WRK}{Structured around REIP hardware and software architecture}
+  \vhEntry{0.3}{2026-03-13}{WRK}{Populated with extracted platform, network, sensing, and governance specifications}
+  \vhEntry{0.4}{2026-03-14}{WRK}{Added some images to the system doc.}
+\end{versionhistory}
+\clearpage
+
+\pagenumbering{arabic}
+
+\chapter{Introduction}
+\label{ch:intro}
+
+\section{Purpose}
+This document defines the hardware and software system design of the Resilient Election and Impeachment Policy (REIP) platform. It describes the robot hardware, sensing stack, localization infrastructure, communication architecture, runtime software modules, trust model, election logic, deployment procedure, and validation-oriented design constraints.
+
+\section{Intended Audience}
+This document is intended for technical reviewers, mentors, collaborators, and future developers who need an implementation-level understanding of how the REIP platform is built and how its subsystems interact during experiments.
+
+\section{Intended Use}
+This document is a system design reference. It is intended to complement the research paper by capturing hardware, software, networking, runtime, and deployment details that are too detailed for an IEEE-style manuscript.
+
+\section{System Scope}
+The documented platform includes five custom-built differential-drive robots, an external ArUco-based localization system, UDP-based peer communication, frontier exploration logic, and the REIP governance mechanisms for trust-based leader verification, impeachment, election, and recovery.
+
+\section{Document Organization}
+Chapter~\ref{ch:overview} presents the overall system overview. Chapter~\ref{ch:hardware} documents the robot hardware. Chapter~\ref{ch:software} documents the software architecture and governance logic. Chapter~\ref{ch:interfaces} documents interfaces, messages, and data flow. Chapter~\ref{ch:deployment} describes deployment and operating procedures. Chapter~\ref{ch:verification} summarizes design decisions that support validation and reproducibility.
+
+\chapter{Overall System Overview}
+\label{ch:overview}
+
+\section{System Context}
+REIP operates as a governance layer on top of a leader-follower frontier exploration system. Each robot receives pose updates from an external localization service, updates its local and peer-derived map state, follows or issues assignments depending on leadership status, and continuously evaluates leader behavior against locally available evidence.
+
+\section{Operational Pipeline}
+The runtime operational pipeline is:
+\begin{enumerate}
+    \item The overhead camera system estimates each robot pose and broadcasts position updates.
+    \item Each robot updates local state, including visited cells, peer-derived map belief, and peer state information.
+    \item The current leader computes frontier assignments.
+    \item Followers verify assignments against personal map evidence, direct ToF sensor evidence, and peer-reported evidence.
+    \item Suspicion accumulates when commanded targets conflict with local evidence or direction checks.
+    \item If trust drops below the impeachment threshold, a distributed vote is triggered and a new leader is elected.
+    \item During trust degradation or leadership transitions, governed fallback maintains safe local exploration behavior.
+\end{enumerate}
+
+\section{Layered Architecture}
+The system is organized into four interacting layers:
+\begin{enumerate}
+    \item \textbf{Knowledge layer}: local visited-cell state, peer-derived known-visited state, frontier information, coverage history, and peer occupancy.
+    \item \textbf{Communication layer}: UDP position reception, peer-state broadcast, leader acknowledgments, and fault-injection control messages.
+    \item \textbf{Governance layer}: trust verification, suspicion accumulation, causality gating, command-direction checks, impeachment, election, and peer anomaly monitoring.
+    \item \textbf{Motion/control layer}: target tracking, emergency obstacle reactions, peer avoidance, stuck recovery, escape maneuvers, and motor command output.
+\end{enumerate}
+
+\section{Top-Level System Figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{system_overview.png}
+    \caption{Top-level REIP system overview showing robots, localization service, broadcast communication, and governance loop.}
+    \label{fig:system_overview}
+\end{figure}
+
+\chapter{Hardware System Design}
+\label{ch:hardware}
+
+\section{Platform Summary}
+The hardware platform consists of five custom-built differential-drive robots. Each robot uses a Raspberry Pi Zero 2 W for high-level autonomy and a Raspberry Pi Pico H for low-level motor and encoder interaction. Obstacle sensing is provided by five VL53L0X time-of-flight sensors routed through a TCA9548A I2C multiplexer. Global localization is provided externally by an overhead Logitech C922 camera and an ArUco-based pose-estimation server.
+
+\section{Mechanical Specifications}
+\begin{table}[H]
+\centering
+\caption{Robot mechanical specifications}
+\label{tab:mech_specs}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Chassis dimensions & 147 mm $\times$ 128 mm $\times$ \textasciitilde 42 mm \\
+Wheelbase & 86.5 mm \\
+Wheel diameter & 43 mm \\
+Body half-width & 64 mm \\
+ArUco center to front bumper & 70 mm \\
+ArUco center to rear edge & 77 mm \\
+Bounding radius & 110 mm \\
+Swept radius during in-place rotation & 100 mm \\
+Robot mass & \textasciitilde 217 g \\
+Drive type & Differential drive \\
+Motors & 2 $\times$ N20, 100:1, magnetic encoders \\
+Rear support & Pololu 1/2'' ball caster \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Mechanical Layout}
+The axle passes through the ArUco marker center. The body front extent is 70 mm forward of the ArUco center and the rear extent is 77 mm behind it. The geometry used by the software stack is therefore referenced to the ArUco coordinate frame rather than to the geometric body center. This simplifies localization-to-control conversion and allows the configuration-space planner to use physically meaningful front, rear, and swept-radius margins.
+
+\begin{figure*}[h]
+    \centering
+    % Row 1
+    \subfloat[Top-down view of robot 3]{\includegraphics[width=0.45\textwidth]{robotpics/robotop.jpg}}
+    \hfil
+    \subfloat[Front facing view. \textbf{Note}: the grounds and VCCs were connected in single points]{\includegraphics[width=0.45\textwidth]{robotpics/robofront.jpg}}
+    
+    \vspace{0.5cm} % Vertical space between rows
+    
+    % Row 2
+    \subfloat[View of the robot's internal circuitry with the Raspberry Pi Zero 2W at the leftmost side and the ToF sensors on the rightmost side.]{\includegraphics[width=0.45\textwidth]{robotpics/robocircuit.jpg}}
+    \hfil
+    \subfloat[A bottom view of the pocketed robot body.]{\includegraphics[width=0.45\textwidth]{robotpics/robobottom.jpg}}
+    
+    \caption{A quad gallery showing four angles of robot 3. All Images by author.}
+    \label{fig:quad_gallery}
+\end{figure*}
+\newpage
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\textwidth]{CAD/rightside.png}
+    \caption{Right view of the wire-frame robot render. Image generated by author in Fusion 360.}
+    \label{fig:mech_overview}
+\end{figure}
+
+\begin{figure*}[h]
+    \centering
+    % Row 1
+    \subfloat[Back view of robot wireframe.]{\includegraphics[width=0.5\textwidth]{CAD/back.png}}
+    \hfil
+    \subfloat[Top down view of robot wireframe showing measurements
+    ]{\includegraphics[width=0.5\textwidth]{CAD/topdown.png}}
+    
+    \vspace{0.2cm} % Vertical space between rows
+    
+    % Row 2
+    \subfloat[View of the robot's internal circuitry with the Raspberry Pi Zero 2W at the leftmost side and the ToF sensors on the rightmost side.]{\includegraphics[width=0.5\textwidth]{CAD/rightside.png}}
+    \hfil
+    \subfloat[A bottom view of the pocketed robot body.]{\includegraphics[width=0.5\textwidth]{robotpics/robot_diagram.png}}
+    
+    \caption{A quad gallery showing four angles of robot wireframe render. All Images generated by author in Fusion 360.}
+    \label{fig:quad_gallery}
+\end{figure*}
+
+
+\section{Compute Architecture}
+\begin{table}[H]
+\centering
+\caption{Compute architecture summary}
+\label{tab:compute_arch}
+\begin{tabular}{ll}
+\toprule
+\textbf{Component} & \textbf{Specification} \\
+\midrule
+Primary compute & Raspberry Pi Zero 2 W \\
+Motor / encoder controller & Raspberry Pi Pico H \\
+Operating system & Raspberry Pi OS (Debian-based) \\
+Username & pi \\
+WiFi subnet & 192.168.20.0/24 \\
+UART device & /dev/serial0 \\
+UART baud rate & 115200 \\
+UART timeout & 0.1 s \\
+Pico watchdog & 500 ms motor auto-stop if UART command absent \\
+Concurrency protection & UART access protected by mutex \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{UART Protocol}
+Communication between the Pi Zero 2 W and the Pico H uses an ASCII newline-delimited protocol.
+
+\begin{table}[H]
+\centering
+\caption{UART command protocol}
+\label{tab:uart_protocol}
+\begin{tabular}{lll}
+\toprule
+\textbf{Command} & \textbf{Wire format} & \textbf{Response} \\
+\midrule
+Ping & \texttt{PING\textbackslash n} & \texttt{PONG} \\
+Set motors & \texttt{MOT,<left>,<right>\textbackslash n} & --- \\
+Stop motors & \texttt{STOP\textbackslash n} & --- \\
+Read encoders & \texttt{ENC\textbackslash n} & \texttt{<left>,<right>} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Power Architecture}
+The platform is powered by a 2S LiPo battery rated at 7.4 V and 1000 mAh. A Pololu D30V30F5 5 V regulator powers the Raspberry Pi Zero 2 W and the low-voltage electronics, including the Raspberry Pi Pico H. Motor actuation is provided by a DRV8833 driver connected to the drivetrain motors.
+
+\section{Electronics Architecture}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{electrionicflow.png}
+    \caption{Electronics block diagram showing power, compute, sensing, and actuation subsystems. Diagram made by author in Lucid Chart.}
+    \label{fig:electronics_block}
+\end{figure}
+
+\section{Bill of Materials}
+\begin{table}[H]
+\centering
+\caption{Per-robot bill of materials}
+\label{tab:bom}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Component} & \textbf{Qty} & \textbf{Unit \$} \\
+\midrule
+Raspberry Pi Zero 2W          & 1 & 15.00 \\
+Raspberry Pi Pico H           & 1 &  5.00 \\
+N20 Motor w/ Encoder (1:100)  & 2 &  4.50 \\
+DRV8833                       & 1 &  4.99 \\
+Pololu D30V30F5 5V Regulator  & 1 & 14.95 \\
+VL53L0X ToF Sensor            & 5 &  2.60 \\
+TCA9548A I2C Multiplexer      & 1 &  1.67 \\
+Pololu 1/2'' Ball Caster      & 1 &  2.95 \\
+N20 Rubber Wheels (43 mm D)   & 2 &  2.00 \\
+2S LiPo 7.4V 1000 mAh         & 1 &  8.50 \\
+16GB microSD Card             & 1 &  6.99 \\
+3D-Printed Chassis            & 1 &  3.00 \\
+\midrule
+\textbf{Per robot}            &   & \textbf{\$89.55} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{robotpics/robot_diagram.png}
+    \caption{Annotated robot assembly.
+(1)~N20 motor encoder,
+(2)~DRV8833 motor driver,
+(3)~Raspberry Pi Pico h,
+(4)~Raspberry Pi Zero~2W,
+(5)~N20 Motor,
+(6)~VL53L0X ToF sensor,
+(7)~TCA9548A I2C multiplexer,
+(8)~43\,mm rubber wheel,
+(9)~3D-printed chassis,
+(10)~ball caster. 
+\newline
+\textbf{Note}: Not pictured: Pololu D30V30F5 5V regulator and 2S LiPo 7.4V battery.
+\newline
+ Image generated by author in Fusion 360.}
+    \label{fig:data_flow}
+\end{figure}
+
+
+\section{Sensor Suite}
+Each robot carries five STMicro VL53L0X laser range sensors. All five sensors are mounted 70 mm ahead of the ArUco center and distributed across a forward-facing arc. Sensors are connected through a TCA9548A multiplexer at I2C address 0x70.
+
+\begin{table}[H]
+\centering
+\caption{ToF sensor configuration}
+\label{tab:tof_config}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Mux channel} & \textbf{Name} & \textbf{Angle (deg)} & \textbf{Angle (rad)} \\
+\midrule
+0 & right & -75.0 & $-\pi/2.4$ \\
+1 & front\_right & -37.5 & $-\pi/4.8$ \\
+2 & front & 0.0 & 0.0 \\
+3 & front\_left & +37.5 & $+\pi/4.8$ \\
+4 & left & +75.0 & $+\pi/2.4$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The effective range used by the software is 200 mm. Readings below 30 mm or above 200 mm are discarded. A full five-sensor sweep is I/O-limited and yields an effective sensing rate of approximately 8--10 Hz.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{sensor_layout.png}
+    \caption{Top-down sensor layout and forward sensing arc. Image rendered by author in Fusion 360.}
+    \label{fig:sensor_layout}
+\end{figure}
+
+\section{Localization Infrastructure}
+Global localization is performed externally using a Logitech C922 camera mounted approximately 2190 mm above the arena floor and operated at 1280 $\times$ 720 resolution and 30 FPS. Each robot carries a DICT\_4X4\_50 ArUco tag. Robot marker IDs are 1 through 5. Corner calibration markers are IDs 40 through 43. A four-corner homography is estimated and locked after 20 stable frames.
+
+\begin{table}[H]
+\centering
+\caption{Localization system parameters}
+\label{tab:localization_params}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Camera & Logitech C922 \\
+Resolution & 1280 $\times$ 720 \\
+Frame rate & 30 FPS \\
+Camera height & 2190 mm \\
+Robot tag height & 80 mm \\
+Corner tag height & 152 mm \\
+Robot marker IDs & 1--5 \\
+Corner marker IDs & 40 (BL), 41 (BR), 42 (TR), 43 (TL) \\
+Position update rate & 30 Hz \\
+Stable calibration requirement & 20 frames \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Corner marker destination coordinates in arena frame}
+\label{tab:corner_coords}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Marker ID} & \textbf{Corner} & \textbf{Position (x, y) mm} \\
+\midrule
+40 & Bottom-left & (-115.0, 0.0) \\
+41 & Bottom-right & (2110.0, 0.0) \\
+42 & Top-right & (2110.0, 1500.0) \\
+43 & Top-left & (-113.0, 1500.0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{arenapic/nwisometric.png}
+    \caption{Arena and localization setup with overhead camera and ArUco markers. Image rendered in Fusion 360 by author.}
+    \label{fig:arenalocalization}
+\end{figure}
+
+\section{Robot Network Addresses}
+\begin{table}[H]
+\centering
+\caption{Robot network addresses}
+\label{tab:robot_ips}
+\begin{tabular}{cc}
+\toprule
+\textbf{Robot ID} & \textbf{IP address} \\
+\midrule
+R1 & 192.168.20.16 \\
+R2 & 192.168.20.15 \\
+R3 & 192.168.20.112 \\
+R4 & 192.168.20.22 \\
+R5 & 192.168.20.18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\chapter{Software System Design}
+\label{ch:software}
+
+\section{Software Stack Summary}
+The Pi Zero 2 W runs the main REIP node. This node is responsible for pose ingestion, local and peer map maintenance, frontier extraction, assignment generation, trust verification, impeachment, election, peer anomaly detection, motion decisions, fault handling, and logging. The Pico H executes motor and encoder I/O under a safety watchdog.
+
+\section{Runtime Modules}
+The primary runtime modules are:
+\begin{itemize}
+    \item pose ingestion
+    \item local visited-cell update
+    \item peer-state merge
+    \item frontier extraction and target selection
+    \item leader assignment broadcast
+    \item three-tier evidence verification
+    \item direction consistency and instability checks
+    \item suspicion and trust update
+    \item impeachment and election
+    \item peer anomaly detection
+    \item fallback autonomy
+    \item motor command synthesis and safety overrides
+    \item JSONL logging
+\end{itemize}
+
+\section{Threading Model}
+Each robot node runs three concurrent threads.
+
+\begin{table}[H]
+\centering
+\caption{Robot threading model}
+\label{tab:robot_threads}
+\begin{tabular}{lll}
+\toprule
+\textbf{Thread} & \textbf{Rate} & \textbf{Purpose} \\
+\midrule
+Main / control & 10 Hz & Elections, trust, navigation, motor commands, logging \\
+Network & continuous & Position RX, peer RX/TX, fault RX \\
+Sensor & \textasciitilde 8--10 Hz & ToF sensor polling \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The position server runs three threads: camera processing, state eavesdropping, and background recording.
+
+\section{Communication Model}
+Position updates are received from the external camera server. Peer state is broadcast over UDP. Leader acknowledgment packets provide convergence support. Fault injection messages are also delivered over UDP.
+
+\begin{table}[H]
+\centering
+\caption{UDP port allocation}
+\label{tab:udp_ports}
+\begin{tabular}{cll}
+\toprule
+\textbf{Port} & \textbf{Service} & \textbf{Direction} \\
+\midrule
+5100 & Position updates & PC $\rightarrow$ robots \\
+5200 & Peer state broadcasts & robot $\leftrightarrow$ robot \\
+5300 & Fault injection / trial control & PC $\rightarrow$ robots \\
+5400 & Sim motor commands & robot $\rightarrow$ simulator \\
+5500 & Sim peer relay & robot $\leftrightarrow$ simulator \\
+5600 & Sim sensor feedback & simulator $\rightarrow$ robot \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Broadcast address is 192.168.20.255. In hardware mode, all robots share the same service ports and filter by robot ID. In simulation mode, ports are offset by robot ID to avoid localhost conflicts.
+
+\section{Control and Broadcast Rates}
+\begin{table}[H]
+\centering
+\caption{System rates and timeouts}
+\label{tab:rates_timeouts}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Position broadcast rate & 30 Hz \\
+Peer state broadcast rate & 5 Hz \\
+Control loop rate & 10 Hz \\
+ToF sensor rate (effective) & \textasciitilde 8--10 Hz \\
+State logging rate & 5 Hz \\
+Position freshness threshold & 1.0 s \\
+Position stop timeout & 2.0 s \\
+Peer timeout & 3.0 s \\
+Leader ACK stale threshold & 1.5 s \\
+Assignment stale timeout & 5.0 s \\
+Causality grace period & 0.5 s \\
+Max RX messages per tick & 32 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Peer State Message Fields}
+Peer state broadcasts include robot pose, behavior state, trust in leader, suspicion, term, vote, coverage, visited cells, leader identity, leader digest, navigation targets, commanded targets, predicted targets, assignment dictionary, and timing fields. All messages are serialized as JSON over UDP.
+
+\section{REIP Trust Model}
+REIP evaluates leader behavior using multiple evidence sources and a bounded suspicion-to-trust state machine.
+
+\subsection{Evidence Weights}
+\begin{table}[H]
+\centering
+\caption{Evidence weights}
+\label{tab:evidence_weights}
+\begin{tabular}{ll}
+\toprule
+\textbf{Source} & \textbf{Weight} \\
+\midrule
+Personal visited cell & 1.0 \\
+ToF obstacle detection & 1.0 \\
+Peer-reported cell & 0.3 \\
+Peer safety / occupied bubble & 0.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Suspicion and Trust Parameters}
+\begin{table}[H]
+\centering
+\caption{Trust-state parameters}
+\label{tab:trust_params}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Suspicion threshold & 1.5 \\
+Recovery rate & 0.1 \\
+Trust decay per threshold crossing & 0.2 \\
+Minimum trust & 0.1 \\
+Voting trust threshold & 0.5 \\
+Impeachment threshold & 0.3 \\
+Causality grace period & 0.5 s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Detection Bounds}
+The design uses the following worst-case detection bounds:
+\begin{itemize}
+    \item first trust decay under personal evidence: 2 commands
+    \item first trust decay under peer-reported evidence only: 8 commands
+    \item full impeachment under all Tier 1 evidence: 8 commands
+    \item full impeachment under all Tier 3 evidence: 32 commands
+\end{itemize}
+
+\subsection{Direction Check and Instability Metric}
+REIP includes a direction-consistency check comparing commanded direction to the nearest unexplored frontier direction. Severe disagreement begins at 135$^{\circ}$ and moderate disagreement begins at 90$^{\circ}$. REIP also computes an instability metric $\Omega$ over recent command-direction changes. A threshold of $3\pi/4$ rad separates normal from oscillatory command patterns.
+
+\subsection{Peer Behavior Assessment}
+Non-leader peers are monitored for stuck, spinning, and coverage-stall behavior. Stuck, spinning, and zero-progress conditions reduce peer trust by 0.02 per event, while normal behavior recovers trust at 0.005 per update.
+
+\section{Leader Election}
+Election uses a filtered candidate set containing active robots seen within peer timeout and with trust above 0.5. Candidates are ranked by trust, leadership-failure count, and robot ID. The first three elections use a fast 0.5 s interval; later elections use a 2.0 s interval. A majority quorum is required.
+
+\section{Baseline Raft Configuration}
+For comparison, the Raft baseline uses heartbeat-based failover only. Heartbeat interval is 0.5 s, heartbeat timeout is 2.0 s, and election timeout is randomized between 1.0 s and 2.0 s. Unlike REIP, Raft does not use trust, performance checks, or impeachment.
+
+\section{Navigation and Motor Control}
+The control stack includes multiple safety layers in descending priority: injected fault override, escape mode, ToF emergency handling, peer collision avoidance, soft peer repulsion, wall-slide heading correction, and ordinary target tracking. Motor commands are finalized only when trials have started and position data is fresh.
+
+\section{Fault Injection System}
+The system supports the following injected faults: spin, stop, erratic, bad\_leader, self\_injure\_leader, oscillate\_leader, freeze\_leader, none / clear, start, and set\_trial\_robots. Automated trial control uses a start delay followed by two injected faults at prescribed times and a fixed-duration stop.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{reipflowchart.png}
+    \caption{Entire architecture of REIP from leader command to trust update. REIP's proactive command verification pipeline. Each leader command is evaluated through three parallel checks: (1) \textbf{Three-Tier Evidence Check} (center) assesses command validity using confidence-weighted evidence from personal history (weight 1.0), sensor readings (weight 1.0), and peer reports (weight 0.3); (2) \textbf{Direction Consistency Check} (right) verifies the command direction aligns with unexplored frontiers, flagging severe mismatches ($\Delta\theta > 135°$), moderate misalignments ($90° \leq \Delta\theta \leq 135°$), or reasonable alignment ($\Delta\theta < 45°$); (3) \textbf{Command Instability Check} (left) monitors angular velocity $\Omega = \text{mean}(|\Delta\theta|)$ over an 8-command window to detect oscillation attacks ($\Omega > 3\pi/4$ rad). All three checks contribute to the trust state update, enabling sub-second detection of compromised leaders before mission-critical damage occurs. Image designed by author in Lucid Chart.}
+    \label{fig:data_flow}
+\end{figure}
+
+
+\chapter{Interfaces and Data Flow}
+\label{ch:interfaces}
+
+\section{External Interfaces}
+The platform exposes the following external interfaces:
+\begin{itemize}
+    \item position server to robot position stream over UDP
+    \item robot-to-robot peer-state broadcast over UDP
+    \item fault injection and start-control interface over UDP
+    \item Pi Zero 2 W to Pico UART motor / encoder interface
+    \item local file logging to JSONL
+\end{itemize}
+
+\section{Internal Data Flow}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{highlevelflow.png}
+    \caption{Internal data flow across localization, mapping, assignment, verification, trust update, and actuation. Image designed by author in Lucid Chart.}
+    \label{fig:data_flow}
+\end{figure}
+
+\section{Representative Message Types}
+The major UDP message classes are:
+\begin{itemize}
+    \item position update
+    \item peer state broadcast
+    \item leader acknowledgment
+    \item fault injection
+    \item trial configuration
+\end{itemize}
+
+Leader digests are derived from the leader ID, term, and assignment set using SHA-256 with compact JSON serialization, truncated to 16 hexadecimal characters.
+
+\chapter{Deployment and Operation}
+\label{ch:deployment}
+
+\section{Arena Configuration}
+\begin{table}[H]
+\centering
+\caption{Arena configuration}
+\label{tab:arena_config}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Arena dimensions & 2000 mm $\times$ 1500 mm \\
+Cell size & 125 mm $\times$ 125 mm \\
+Grid size & 16 $\times$ 12 = 192 cells \\
+Interior divider thickness & 35.7 mm \\
+Interior divider x-range & 1000 mm to 1036 mm \\
+Interior divider y-range & 0 mm to 1200 mm \\
+Passage width & 300 mm \\
+Outer wall margin & 110 mm \\
+Divider clearance margin & 64 mm \\
+Divider tip clearance & 100 mm \\
+Repulsion zone & 220 mm \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{arenapic/top.png}
+    \caption{Top view of arena with measurements. Image generated by author in Fusion 360.}
+    \label{fig:arenatop}
+\end{figure}
+
+
+\section{Reproducible Hardware Clone Starting Positions}
+\begin{table}[H]
+\centering
+\caption{Starting positions used for sim-to-hardware comparison}
+\label{tab:start_positions}
+\begin{tabular}{cccc}
+\toprule
+\textbf{Robot} & \textbf{x (mm)} & \textbf{y (mm)} & \textbf{$\theta$ (rad)} \\
+\midrule
+1 & 185.9 & 382.1 & 0.188 \\
+2 & 792.9 & 709.2 & 2.255 \\
+3 & 318.8 & 147.4 & 0.736 \\
+4 & 768.7 & 219.2 & 1.577 \\
+5 & 182.4 & 709.9 & 0.410 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Startup Procedure}
+The system bring-up procedure is:
+\begin{enumerate}
+    \item power on all five robots
+    \item start the position server on the PC
+    \item verify ArUco detection and calibration lock
+    \item deploy the selected controller to all robots
+    \item kill old processes and clear old logs
+    \item upload new code via SFTP
+    \item launch each robot process with a staggered delay
+    \item wait for localization and leader election convergence
+    \item send start signal and begin recording
+    \item inject scheduled faults during the trial
+    \item stop trial, clear faults, terminate processes, and collect logs
+\end{enumerate}
+
+\section{Deployment Pipeline}
+The deployment script performs parallel process kill, log clearing, code upload, process launch, and process verification over SSH. Launches are staggered to reduce WiFi contention. Retries and operation timeouts are used to stabilize multi-robot deployment.
+
+\section{Data Logging and Recording}
+Each robot writes JSONL logs at 5 Hz, including pose, state, leader, trust, suspicion, targets, coverage, faults, ToF readings, motor commands, escape flags, and timing variables. The position server records MP4 video and a parallel JSONL state stream for synchronization and analysis.
+
+\chapter{Verification-Oriented Design Notes}
+\label{ch:verification}
+
+\section{Design Choices That Support Validation}
+Several implementation choices were made to support explainability and validation:
+\begin{itemize}
+    \item a physically meaningful geometry model tied to the ArUco frame
+    \item explicit trust and suspicion constants
+    \item bounded detection-time reasoning from command evidence
+    \item per-robot JSONL logs with internal state exposure
+    \item recorded overhead video synchronized with robot and peer state
+    \item deterministic deployment and fixed experimental timing
+\end{itemize}
+
+\section{Traceability to Paper Claims}
+The system design directly supports the paper claims regarding embedded deployability, bounded detection, peer communication, and real-world transfer. The compute stack, sensing stack, update rates, and logging pipeline provide the implementation backing for the claims summarized in the research manuscript.
+
+
+\appendix
+
+\chapter{Glossary}
+\label{app:glossary}
+
+\begin{longtable}{p{0.22\textwidth} p{0.72\textwidth}}
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+\endfirsthead
+
+\toprule
+\textbf{Term} & \textbf{Definition} \\
+\midrule
+\endhead
+
+REIP & Resilient Election and Impeachment Policy, the trust-based governance framework used to detect, impeach, and replace compromised leaders in a multi-robot team. \\
+
+Leader & The robot currently responsible for computing and broadcasting frontier assignments to followers. \\
+
+Follower & A robot that receives assignments from the current leader and verifies them against local evidence before execution. \\
+
+Frontier & The boundary between explored and unexplored space used as a target for exploration. \\
+
+Visited cell & A grid cell personally traversed or directly confirmed by a robot. In REIP, this is high-confidence evidence. \\
+
+Known visited cell & A cell believed to be visited based on peer broadcasts rather than direct personal observation. \\
+
+Tier 1 evidence & Personal ground-truth evidence that the assigned cell has already been visited by the robot itself. \\
+
+Tier 2 evidence & Direct obstacle evidence from a robot's time-of-flight sensors. \\
+
+Tier 3 evidence & Lower-confidence evidence derived from peer-reported map information. \\
+
+Causality gate & The time-based check that suppresses false positives by ensuring evidence existed before the leader assignment was issued. \\
+
+Suspicion & The accumulated evidence score against the current leader. Suspicion rises when assignments conflict with local knowledge. \\
+
+Trust & The scalar confidence score maintained by a robot for the current leader. Trust decreases when suspicion crosses the threshold. \\
+
+Impeachment & The process by which robots collectively remove a leader whose trust falls below the impeachment threshold. \\
+
+Election & The distributed voting procedure used to select a new leader after impeachment or startup. \\
+
+Governed fallback & The behavior in which a robot temporarily reverts to local frontier exploration when leader trust becomes too low. \\
+
+Peer anomaly detection & Monitoring of non-leader robots for stuck, spinning, or coverage-stall behavior to avoid promoting compromised peers into leadership. \\
+
+ArUco marker & The fiducial marker mounted on each robot and around the arena for camera-based localization. \\
+
+Position server & The external overhead-camera process that estimates robot pose and broadcasts position updates. \\
+
+Leader digest & A compact hash derived from leader assignment state, used for agreement and acknowledgment consistency. \\
+
+Omega ($\Omega$) & The command-instability metric computed from recent changes in leader-command direction. Higher values indicate oscillatory or unstable commands. \\
+
+\bottomrule
+\end{longtable}
+
+
+\chapter{Pinout and Wiring Reference}
+\label{app:wiring}
+
+\section{Pi Zero 2 W Pinout}
+\begin{table}[H]
+\centering
+\caption{Pi Zero 2 W connections}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Pin} & \textbf{Function} & \textbf{Destination} \\
+\midrule
+1  & 3.3V & TCA9548A VCC \\
+2  & 5V   & 5V regulator output \\
+3  & SDA  & TCA9548A SDA \\
+5  & SCL  & TCA9548A SCL \\
+6  & GND  & Common ground \\
+8  & TX   & Pico GP1 RX \\
+10 & RX   & Pico GP0 TX \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Raspberry Pi Pico H Pinout}
+\begin{table}[H]
+\centering
+\caption{Pico H connections}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Pin} & \textbf{Function} & \textbf{Destination} \\
+\midrule
+40 & VBUS & 5V regulator output \\
+38 & GND  & Common ground \\
+36 & 3V3  & Encoder VCC rail \\
+2  & GP0  & Pi Zero RX \\
+3  & GP1  & Pi Zero TX \\
+5  & GP2  & Left encoder C1 \\
+6  & GP3  & Left encoder C2 \\
+10 & GP6  & Right encoder C1 \\
+11 & GP7  & Right encoder C2 \\
+24 & GP18 & DRV8833 IN1 \\
+25 & GP19 & DRV8833 IN2 \\
+26 & GP20 & DRV8833 IN3 \\
+27 & GP21 & DRV8833 IN4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{ToF Sensor Multiplexer Mapping}
+\begin{table}[H]
+\centering
+\caption{TCA9548A channel mapping for VL53L0X sensors}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Channel} & \textbf{Sensor name} & \textbf{Angle from forward} \\
+\midrule
+0 & Right       & $-75^\circ$ \\
+1 & Front-right & $-37.5^\circ$ \\
+2 & Front       & $0^\circ$ \\
+3 & Front-left  & $+37.5^\circ$ \\
+4 & Left        & $+75^\circ$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Motor Driver Connections}
+\begin{table}[H]
+\centering
+\caption{DRV8833 logical connections}
+\begin{tabular}{cc}
+\toprule
+\textbf{DRV8833 pin} & \textbf{Connection} \\
+\midrule
+IN1 & Pico GP18 \\
+IN2 & Pico GP19 \\
+IN3 & Pico GP20 \\
+IN4 & Pico GP21 \\
+OUT1 / OUT2 & Left motor terminals \\
+OUT3 / OUT4 & Right motor terminals \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent
+\textbf{Note:} Final power routing, regulator output routing, and ground topology should match the finalized EasyEDA schematic used for fabrication and assembly.
+
+
+\chapter{Message Field Reference}
+\label{app:messages}
+
+\section{Position Update Message}
+\begin{verbatim}
+{
+  "type": "position",
+  "robot_id": 3,
+  "x": 456.7,
+  "y": 789.0,
+  "theta": 1.234,
+  "timestamp": 1709456789.123
+}
+\end{verbatim}
+
+\begin{table}[H]
+\centering
+\caption{Position update fields}
+\begin{tabular}{lll}
+\toprule
+\textbf{Field} & \textbf{Type} & \textbf{Description} \\
+\midrule
+type & string & Message type identifier \\
+robot\_id & int & Robot identifier \\
+x & float & Arena-frame x position in mm \\
+y & float & Arena-frame y position in mm \\
+theta & float & Robot heading in radians \\
+timestamp & float & Message timestamp \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Peer State Broadcast}
+\begin{verbatim}
+{
+  "type": "peer_state",
+  "robot_id": 1,
+  "peer_seq": 42,
+  "x": 100.0,
+  "y": 200.0,
+  "theta": 0.5,
+  "state": "leader",
+  "trust_in_leader": 0.85,
+  "suspicion": 0.3,
+  "vote": 1,
+  "term": 3,
+  "coverage_count": 45,
+  "visited_cells": [[2,3],[4,5]],
+  "leader_id": 1,
+  "leader_seq": 10,
+  "leader_digest": "a1b2c3d4e5f67890",
+  "leader_established": true,
+  "mission_complete": false,
+  "has_fresh_position": true,
+  "navigation_target": [500.0, 300.0],
+  "predicted_target": [600.0, 400.0],
+  "commanded_target": [700.0, 500.0],
+  "command_source": "leader_assigned",
+  "trial_started": true,
+  "assignments": {"2": [300.0, 400.0], "3": [500.0, 600.0]},
+  "timestamp": 1709456789.456
+}
+\end{verbatim}
+
+\begin{table}[H]
+\centering
+\caption{Peer-state field summary}
+\begin{tabular}{p{0.22\textwidth} p{0.16\textwidth} p{0.5\textwidth}}
+\toprule
+\textbf{Field} & \textbf{Type} & \textbf{Description} \\
+\midrule
+type & string & Message type identifier \\
+robot\_id & int & Sender robot identifier \\
+peer\_seq & int & Sender broadcast sequence number \\
+x, y, theta & float & Sender pose in arena coordinates \\
+state & string & Current behavioral state \\
+trust\_in\_leader & float & Sender's trust in current leader \\
+suspicion & float & Sender's current suspicion value \\
+vote & int & Candidate robot ID currently voted for \\
+term & int & Current election term \\
+coverage\_count & int & Number of covered cells \\
+visited\_cells & list & Recently visited cells included in message \\
+leader\_id & int & Sender's believed current leader \\
+leader\_seq & int & Leader assignment sequence number \\
+leader\_digest & string & Truncated assignment-state digest \\
+leader\_established & bool & Whether the leader is considered stable \\
+mission\_complete & bool & Whether exploration is complete \\
+has\_fresh\_position & bool & Whether sender has recent pose data \\
+navigation\_target & list & Current motion target used for control \\
+predicted\_target & list & Sender's own locally predicted best target \\
+commanded\_target & list & Target issued by leader \\
+command\_source & string & Source label for current target \\
+trial\_started & bool & Whether trial start signal has been received \\
+assignments & dict & Leader assignment dictionary \\
+timestamp & float & Message timestamp \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Leader Acknowledgment Message}
+\begin{verbatim}
+{
+  "type": "leader_ack",
+  "robot_id": 2,
+  "leader_id": 1,
+  "term": 3,
+  "leader_seq": 10,
+  "leader_digest": "a1b2c3d4e5f67890",
+  "timestamp": 1709456789.789
+}
+\end{verbatim}
+
+\section{Fault Injection Message}
+\begin{verbatim}
+{
+  "type": "fault_inject",
+  "robot_id": 3,
+  "fault": "bad_leader",
+  "timestamp": 1709456789.123
+}
+\end{verbatim}
+
+\section{Trial Configuration Message}
+\begin{verbatim}
+{
+  "type": "fault_inject",
+  "robot_id": 0,
+  "fault": "set_trial_robots",
+  "active_robot_ids": [1,2,3,4,5],
+  "active_robot_count": 5
+}
+\end{verbatim}
+
+
+\chapter{Experiment Setup Checklist}
+\label{app:checklist}
+
+\section{Pre-Trial Hardware Checklist}
+\begin{itemize}
+    \item Verify all five robots are powered and reachable on the WiFi subnet.
+    \item Verify battery charge levels are sufficient for the full trial duration.
+    \item Verify all ArUco tags are mounted, visible, and undamaged.
+    \item Verify wheels, caster, and chassis fasteners are secure.
+    \item Verify ToF sensors are connected and unobstructed.
+    \item Verify the motor driver, regulator, and UART wiring are intact.
+\end{itemize}
+
+\section{Localization Checklist}
+\begin{itemize}
+    \item Start the overhead position server.
+    \item Verify all four corner markers are detected.
+    \item Verify homography calibration locks successfully.
+    \item Verify all robot markers are detected and pose updates are stable.
+    \item Verify camera focus and exposure settings are correct.
+\end{itemize}
+
+\section{Software Deployment Checklist}
+\begin{itemize}
+    \item Kill old robot processes.
+    \item Clear old JSONL logs if required.
+    \item Upload the correct controller version to all robots.
+    \item Launch all robot processes with the intended controller.
+    \item Verify each process is running.
+    \item Verify peer-state traffic is active.
+\end{itemize}
+
+\section{Trial Execution Checklist}
+\begin{itemize}
+    \item Configure the active robot set.
+    \item Confirm trial recording is enabled.
+    \item Send the start signal.
+    \item Verify initial leader election completes.
+    \item Monitor scheduled fault injections.
+    \item Verify robots stop at trial end.
+\end{itemize}
+
+\section{Post-Trial Checklist}
+\begin{itemize}
+    \item Stop all robot processes.
+    \item Save and label video recordings.
+    \item Save and label JSONL logs.
+    \item Record controller, fault condition, trial number, and date.
+    \item Inspect for dropped robots, localization failures, or corrupted logs.
+    \item Recharge batteries and inspect hardware before the next run.
+\end{itemize}
+
+
+\section{Leader Acknowledgment Message}
+
+
+
+\end{document}

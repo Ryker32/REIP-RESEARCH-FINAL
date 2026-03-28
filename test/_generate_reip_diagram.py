@@ -36,9 +36,9 @@ box_style = dict(boxstyle='round,pad=0.5', facecolor='white', edgecolor='black',
 # ========== INPUT LAYER ==========
 y_input = 7.5
 inputs = [
-    ('Position Server\nUDP 5100\nx, y, θ', 1.5, color_input),
+    ('Position Server\nUDP 5100\nx, y, theta', 1.5, color_input),
     ('Peer Broadcasts\nUDP 5200\nState messages', 3.5, color_input),
-    ('ToF Sensors\n5× VL53L0X\nDistance readings', 5.5, color_input),
+    ('ToF Sensors\n5x VL53L0X\nDistance readings', 5.5, color_input),
     ('Fault Injector\nUDP 5300\nFault modes', 7.5, color_input),
 ]
 
@@ -117,7 +117,7 @@ ax.text(6.5, y_proc4-0.1, 'Spatial Diversity', ha='center', va='center', fontsiz
 # ========== OUTPUT LAYER ==========
 y_output = 0.3
 outputs = [
-    ('Motor Commands\nUART → Pico\nPWM values', 2.5, color_output),
+    ('Motor Commands\nUART -> Pico\nPWM values', 2.5, color_output),
     ('State Broadcast\nUDP 5200\n5 Hz', 5.0, color_output),
     ('Logging\nJSON file\nVisualization', 7.5, color_output),
 ]

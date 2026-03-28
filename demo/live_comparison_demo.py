@@ -62,7 +62,7 @@ PLOT_H = 140
 GAP = 10
 MARGIN = 10
 NUM_ROBOTS = 5
-SPEED_MULTIPLIER = 2.5   # 2.5x real-time (higher breaks node control loop)
+SPEED_MULTIPLIER = 1.5   # mild 1.5x -- safe for robot control loop, gives ~90s equivalent in 60s
 REIP_COLOR = (0, 52, 204)
 RAFT_COLOR = (227, 30, 52)
 
@@ -304,7 +304,7 @@ def main():
 
     print("REIP vs Raft - Live Comparison Demo")
     print(f"  Robots: {num_robots}  Layout: {layout}")
-    print(f"  Faults: t=6s on leader, t=20s on leader")
+    print(f"  Faults: t=8s bad_leader on leader (single fault)")
     print("=" * 55)
 
     # Init pygame BEFORE creating VisualSimulation instances (fonts need it)
@@ -398,10 +398,9 @@ def main():
     start_time = time.time()
     paused = False
     run_number = 1
-    max_time = 40
+    max_time = 60
     fault_schedule = [
-        {"time": 6.0,  "target": "leader", "fired": False},
-        {"time": 20.0, "target": "leader", "fired": False},
+        {"time": 8.0,  "target": "leader", "fired": False},
     ]
 
     try:
@@ -528,7 +527,7 @@ def main():
                                 elapsed, max_time, fonts, fault_times=ft)
 
             # Restart hint
-            if elapsed > 28:
+            if elapsed > 50:
                 hint = fonts['body'].render(
                     "Press R to restart", True, (120, 120, 130))
                 screen.blit(hint, (total_w // 2 - hint.get_width() // 2,

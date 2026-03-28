@@ -51,6 +51,7 @@ NUM_ROBOTS = 5
 UDP_POSITION_PORT = 5100          # Sim sends to base+i
 UDP_PEER_PORT = 5200              # Robot i listens on base+i
 UDP_FAULT_PORT = 5300             # Sim sends faults to base+i
+SIM_MOTOR_PORT = 5400             # Robots send motor intents here (all to same port)
 SIM_PEER_RELAY_PORT = 5500        # Robots send peer msgs here; harness relays
 SIM_SENSOR_PORT = 5600            # Sim sends ToF/encoder data to base+i
 
@@ -297,6 +298,12 @@ class VisualSimulation:
         # Received states (from robot node broadcasts)
         self.robot_states: Dict[int, RobotState] = {}
 
+        # Motor intents from robot nodes (the ACTUAL motor commands)
+        self.motor_intents: Dict[int, Tuple[float, float]] = {}
+        # Per-robot velocity state for differential drive integration
+        self._motor_vel: Dict[int, List[float]] = {}  # rid -> [left_mm_s, right_mm_s]
+        self._last_tick_time = time.time()
+
         # Coverage tracking
         self.visited_cells: Set[tuple] = set()
         self.current_leader_id = None
@@ -316,6 +323,13 @@ class VisualSimulation:
 
         self.sensor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sensor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+        # Motor socket -- robots send motor intents to SIM_MOTOR_PORT (not per-robot).
+        # This is how isef_experiments.py receives motor commands; we match it exactly.
+        self.motor_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.motor_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.motor_socket.bind(('127.0.0.1', SIM_MOTOR_PORT + port_base))
+        self.motor_socket.setblocking(False)
 
         # Build full wall segment list for ToF ray-casting (arena bounds + layout walls)
         self._tof_wall_segments = [
@@ -504,7 +518,7 @@ class VisualSimulation:
     def close_sockets(self):
         """Close all UDP sockets."""
         for s in (self.pos_socket, self.state_socket, self.fault_socket,
-                  self.sensor_socket):
+                  self.sensor_socket, self.motor_socket):
             try:
                 s.close()
             except Exception:
@@ -542,13 +556,17 @@ class VisualSimulation:
         self._last_known_leader = None
         self.election_count = 0
         self.start_time = time.time()
+        self.motor_intents.clear()
+        self._motor_vel.clear()
+        self._last_tick_time = time.time()
 
-        # Drain stale UDP
-        try:
-            while True:
-                self.state_socket.recvfrom(8192)
-        except (BlockingIOError, OSError):
-            pass
+        # Drain stale UDP from state and motor sockets
+        for sock in (self.state_socket, self.motor_socket):
+            try:
+                while True:
+                    sock.recvfrom(8192)
+            except (BlockingIOError, OSError):
+                pass
 
         # Respawn
         self.start_robot_processes()
@@ -713,123 +731,125 @@ class VisualSimulation:
                     queue.append((nx, ny))
         return None
 
+    def receive_motor_intents(self):
+        """Receive motor intent messages from robot nodes.
+
+        Robot nodes publish (left_pwm, right_pwm) to SIM_MOTOR_PORT every
+        tick.  This is the ACTUAL motor output the robot computed using its
+        full REIP/Raft logic (trust, impeachment, ToF avoidance, stuck
+        escape, pivot turns -- everything).  We store it and apply it in
+        update_sim_robots() via differential-drive integration.
+        """
+        try:
+            for _ in range(200):
+                data, _ = self.motor_socket.recvfrom(4096)
+                msg = json.loads(data.decode())
+                if msg.get('type') != 'motor_intent':
+                    continue
+                rid = msg.get('robot_id')
+                if rid:
+                    self.motor_intents[rid] = (
+                        float(msg.get('left', 0.0)),
+                        float(msg.get('right', 0.0)),
+                    )
+        except (socket.timeout, BlockingIOError, ConnectionResetError, OSError):
+            pass
+
+    @staticmethod
+    def _wrap_angle(a):
+        while a > math.pi:
+            a -= 2 * math.pi
+        while a < -math.pi:
+            a += 2 * math.pi
+        return a
+
     def update_sim_robots(self):
-        """Update simulated robot positions - follow REIP assignments.
-        Includes stuck detection: if a robot makes no progress for
-        STUCK_THRESHOLD frames, override its target with the nearest
-        reachable unexplored cell."""
-        STUCK_THRESHOLD = 20  # frames (~1 sec at 20 FPS)
-        STUCK_MOVE_EPS = 15   # mm - less movement than this = stuck
-        OVERRIDE_ARRIVE_DIST = 60  # close enough to release override lock
+        """Drive robot positions from actual motor intents using differential
+        drive kinematics -- the SAME physics model as isef_experiments.py
+        hardware_clone mode.
+
+        Robot nodes compute motor commands based on their full REIP/Raft
+        logic.  We just integrate those commands here.  No A* pathfinding,
+        no stuck detection, no target chasing -- all of that lives in the
+        robot nodes where it belongs.
+        """
+        now = time.time()
+        dt = now - self._last_tick_time
+        dt = min(dt, 0.15)  # Cap to prevent huge jumps
+        self._last_tick_time = now
+
+        # Simplified hardware_clone constants (from isef_experiments.py)
+        PWM_TO_MM_S = 0.9
+        WHEEL_BASE_MM = 130.0  # 2 * body_half_width_mm (~65mm)
+        MAX_ACCEL_MM_S2 = 450.0
+        ROBOT_RADIUS = 75.0
 
         for rid, robot in self.sim_robots.items():
-            if robot.motor_fault == 'stop':
-                continue
-            elif robot.motor_fault == 'spin':
-                robot.theta += 0.2
-                continue
-            elif robot.motor_fault == 'erratic':
-                robot.x += random.uniform(-20, 20)
-                robot.y += random.uniform(-20, 20)
-                robot.theta += random.uniform(-0.3, 0.3)
-            else:
-                # ---- Check if override target reached ----
-                if robot.stuck_override:
-                    od = math.sqrt((robot.x - robot.stuck_override[0])**2 +
-                                   (robot.y - robot.stuck_override[1])**2)
-                    if od < OVERRIDE_ARRIVE_DIST:
-                        robot.stuck_override = None
-                        robot.stuck_counter = 0
+            left_pwm, right_pwm = self.motor_intents.get(rid, (0.0, 0.0))
 
-                # ---- Stuck detection ----
-                move_since = math.sqrt((robot.x - robot.prev_x)**2 +
-                                       (robot.y - robot.prev_y)**2)
-                if move_since < STUCK_MOVE_EPS:
-                    robot.stuck_counter += 1
+            # Initialize velocity state if needed
+            if rid not in self._motor_vel:
+                self._motor_vel[rid] = [0.0, 0.0]
+
+            vel = self._motor_vel[rid]
+
+            # Convert PWM to target velocity (mm/s)
+            target_left = left_pwm * PWM_TO_MM_S
+            target_right = right_pwm * PWM_TO_MM_S
+
+            # Acceleration-limited velocity update
+            def step_vel(current, target):
+                delta = target - current
+                limit = MAX_ACCEL_MM_S2 * dt
+                if delta > limit:
+                    delta = limit
+                elif delta < -limit:
+                    delta = -limit
+                return current + delta
+
+            vel[0] = step_vel(vel[0], target_left)
+            vel[1] = step_vel(vel[1], target_right)
+
+            # Sub-step integration (prevents wall tunneling)
+            substeps = max(1, int(dt / 0.01))
+            sub_dt = dt / substeps if substeps > 0 else 0.0
+
+            x, y, theta = robot.x, robot.y, robot.theta
+            for _ in range(substeps):
+                linear_mm_s = 0.5 * (vel[0] + vel[1])
+                angular_rad_s = (vel[1] - vel[0]) / max(WHEEL_BASE_MM, 1.0)
+                new_theta = theta + angular_rad_s * sub_dt
+                mid_theta = theta + 0.5 * angular_rad_s * sub_dt
+                cand_x = x + linear_mm_s * math.cos(mid_theta) * sub_dt
+                cand_y = y + linear_mm_s * math.sin(mid_theta) * sub_dt
+
+                moved = False
+                if not self._collides_with_wall(cand_x, cand_y, ROBOT_RADIUS):
+                    x, y = cand_x, cand_y
+                    moved = True
                 else:
-                    robot.stuck_counter = 0
-                    robot.prev_x, robot.prev_y = robot.x, robot.y
+                    # Slide along axes
+                    if not self._collides_with_wall(cand_x, y, ROBOT_RADIUS):
+                        x = cand_x
+                        moved = True
+                    if not self._collides_with_wall(x, cand_y, ROBOT_RADIUS):
+                        y = cand_y
+                        moved = True
+                if moved:
+                    theta = new_theta
+                else:
+                    vel[0] *= 0.5
+                    vel[1] *= 0.5
+                    theta = new_theta
 
-                if robot.stuck_counter >= STUCK_THRESHOLD:
-                    # Only override if robot is FAR from target (wall wedge).
-                    # If robot arrived at target and sits there, that's not
-                    # stuck - it's following orders.  Only REIP's trust model
-                    # can recover from a bad command, not a physics hack.
-                    target_dist = math.sqrt((robot.target_x - robot.x)**2 +
-                                            (robot.target_y - robot.y)**2)
-                    if target_dist > OVERRIDE_ARRIVE_DIST:
-                        alt = self._find_reachable_unexplored(robot)
-                        if alt:
-                            robot.target_x, robot.target_y = alt
-                            robot.stuck_override = alt
-                    robot.stuck_counter = 0
-                    robot.prev_x, robot.prev_y = robot.x, robot.y
+                theta = self._wrap_angle(theta)
 
-                # ---- A* waypoint navigation ----
-                tkey = (round(robot.target_x, 1), round(robot.target_y, 1))
-                if tkey != robot.path_target_key:
-                    robot.path_waypoints = self._get_path_waypoints(
-                        robot.x, robot.y, robot.target_x, robot.target_y)
-                    robot.path_target_key = tkey
+            # Clamp to arena bounds
+            x = max(ROBOT_RADIUS, min(ARENA_WIDTH - ROBOT_RADIUS, x))
+            y = max(ROBOT_RADIUS, min(ARENA_HEIGHT - ROBOT_RADIUS, y))
 
-                wps = robot.path_waypoints or [(robot.target_x, robot.target_y)]
+            robot.x, robot.y, robot.theta = x, y, theta
 
-                # Advance through waypoints
-                while len(wps) > 1:
-                    wd = math.sqrt((wps[0][0] - robot.x)**2 + (wps[0][1] - robot.y)**2)
-                    if wd < CELL_SIZE * 0.6:
-                        wps.pop(0)
-                    else:
-                        break
-
-                wp = wps[0]
-                dx = wp[0] - robot.x
-                dy = wp[1] - robot.y
-                dist = math.sqrt(dx*dx + dy*dy)
-
-                if dist > 20:
-                    robot.theta = math.atan2(dy, dx)
-                    new_x = robot.x + ROBOT_SPEED * math.cos(robot.theta)
-                    new_y = robot.y + ROBOT_SPEED * math.sin(robot.theta)
-
-                    if self._collides_with_wall(new_x, new_y):
-                        moved = False
-                        if not self._collides_with_wall(new_x, robot.y):
-                            robot.x = new_x
-                            moved = True
-                        if not self._collides_with_wall(robot.x, new_y) and abs(new_y - robot.y) > 0.5:
-                            robot.y = new_y
-                            moved = True
-                        if not moved:
-                            perp1 = robot.theta + math.pi / 2
-                            perp2 = robot.theta - math.pi / 2
-                            options = []
-                            for perp in [perp1, perp2]:
-                                tx = robot.x + ROBOT_SPEED * math.cos(perp)
-                                ty = robot.y + ROBOT_SPEED * math.sin(perp)
-                                if (not self._collides_with_wall(tx, ty) and
-                                        75 <= tx <= ARENA_WIDTH - 75 and
-                                        75 <= ty <= ARENA_HEIGHT - 75):
-                                    d = math.sqrt((tx - wp[0])**2 + (ty - wp[1])**2)
-                                    options.append((d, tx, ty))
-                            if options:
-                                options.sort()
-                                _, robot.x, robot.y = options[0]
-                    else:
-                        robot.x = new_x
-                        robot.y = new_y
-                elif len(wps) <= 1:
-                    # Reached final target
-                    alt = self._find_reachable_unexplored(robot)
-                    if alt:
-                        robot.target_x, robot.target_y = alt
-
-                robot.path_waypoints = wps
-            
-            # Clamp to arena
-            robot.x = max(75, min(ARENA_WIDTH - 75, robot.x))
-            robot.y = max(75, min(ARENA_HEIGHT - 75, robot.y))
-            
             # Track coverage
             cell = (int(robot.x / CELL_SIZE), int(robot.y / CELL_SIZE))
             self.visited_cells.add(cell)
@@ -842,10 +862,9 @@ class VisualSimulation:
         must relay them so that robots can hear each other.
 
         KEY: Each robot broadcasts its navigation_target -- the position it
-        actually decided to go to.  For a trusting follower this is the
-        leader's assignment.  For a distrusting follower this is its local
-        fallback frontier.  The visual sim drives physics based on this, so
-        the display faithfully reflects REIP/Raft decisions.
+        actually decided to go to.  We store it in robot.target_x/y for
+        drawing target lines.  Movement is driven by motor intents (see
+        receive_motor_intents + update_sim_robots), NOT by this target.
         """
         try:
             for _ in range(200):  # drain up to 200 msgs per tick
@@ -892,13 +911,13 @@ class VisualSimulation:
                     if msg.get('state') == 'leader':
                         self.current_leader_id = rid
 
-                    # Drive physics from the node's actual navigation target.
+                    # Store navigation target for drawing target lines.
+                    # Movement is driven by motor intents, not this.
                     nav = msg.get('navigation_target')
                     if nav and rid in self.sim_robots:
                         robot = self.sim_robots[rid]
-                        if not robot.stuck_override:
-                            robot.target_x = nav[0]
-                            robot.target_y = nav[1]
+                        robot.target_x = nav[0]
+                        robot.target_y = nav[1]
         except (BlockingIOError, ConnectionResetError, OSError):
             pass
     
@@ -1241,7 +1260,8 @@ class VisualSimulation:
                 if not self.handle_events():
                     break
                 
-                # Update simulation
+                # Update simulation -- motor-intent driven
+                self.receive_motor_intents()
                 self.update_sim_robots()
                 self.send_positions()
                 self.send_sensor_feedback()

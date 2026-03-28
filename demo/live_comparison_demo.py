@@ -456,6 +456,7 @@ def main():
             # ---- Simulation step ----
             if not paused:
                 for p in panels:
+                    p.receive_motor_intents()
                     p.update_sim_robots()
                     p.send_positions()
                     p.send_sensor_feedback()

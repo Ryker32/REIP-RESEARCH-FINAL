@@ -3,10 +3,10 @@
 ## Ultra-Simple Version
 
 ```
-Camera → Position Server → Pi Zero (REIP Brain) → Pico → Motors
-                              ↑                        ↓
+Camera -> Position Server -> Pi Zero (REIP Brain) -> Pico -> Motors
+                              ^                        v
                          Other Robots              Encoders
-                              ↑                        ↓
+                              ^                        v
                          (WiFi/UDP)              (Feedback)
                               │
                          ┌────┴────┐
@@ -23,7 +23,7 @@ Camera → Position Server → Pi Zero (REIP Brain) → Pico → Motors
                     │  (ArUco)    │
                     └──────┬──────┘
                            │
-                           ▼
+                           
                     ┌─────────────┐
                     │  Position   │
                     │   Server    │
@@ -31,7 +31,7 @@ Camera → Position Server → Pi Zero (REIP Brain) → Pico → Motors
                     └──────┬──────┘
                            │ UDP 5100
                            │ (Position)
-                           ▼
+                           
         ┌──────────────────────────────────────┐
         │      RASPBERRY PI ZERO 2W             │
         │      (Main Controller)                │
@@ -46,7 +46,7 @@ Camera → Position Server → Pi Zero (REIP Brain) → Pico → Motors
                   │        │        │
          ┌────────┘        │        └────────┐
          │                 │                  │
-         ▼                 ▼                  ▼
+                                            
     ┌─────────┐      ┌─────────┐      ┌─────────┐
     │   UDP   │      │   I2C   │      │  UART    │
     │ Network │      │   Bus   │      │ Serial   │
@@ -60,35 +60,35 @@ Camera → Position Server → Pi Zero (REIP Brain) → Pico → Motors
     │         │      │ Sensors │      │ Control │
     └─────────┘      └─────────┘      └────┬────┘
                                            │
-                                           ▼
+                                           
                                     ┌─────────────┐
                                     │  DRV8833    │
                                     │   Driver    │
                                     └──────┬──────┘
                                            │
-                                           ▼
+                                           
                                     ┌─────────────┐
                                     │   Motors    │
                                     │  (N20)      │
                                     └──────┬──────┘
                                            │
-                                           ▼
+                                           
                                     ┌─────────────┐
                                     │  Encoders   │
                                     │ (Feedback)  │
                                     └──────┬──────┘
                                            │
-                                           └──────▶ Back to Pico
+                                           └────── Back to Pico
 ```
 
 ## Data Flow Summary
 
 ### Inputs (Sensors & External Data)
 ```
-Camera → Position Server → UDP → Pi Zero
-ToF Sensors → I2C Mux → I2C → Pi Zero
-Encoders → Pico → UART → Pi Zero
-Other Robots → WiFi → UDP → Pi Zero
+Camera -> Position Server -> UDP -> Pi Zero
+ToF Sensors -> I2C Mux -> I2C -> Pi Zero
+Encoders -> Pico -> UART -> Pi Zero
+Other Robots -> WiFi -> UDP -> Pi Zero
 ```
 
 ### Processing
@@ -101,8 +101,8 @@ Pi Zero: REIP Control Logic
 
 ### Outputs (Actuators & Communication)
 ```
-Pi Zero → UART → Pico → DRV8833 → Motors
-Pi Zero → UDP → Other Robots (peer state)
+Pi Zero -> UART -> Pico -> DRV8833 -> Motors
+Pi Zero -> UDP -> Other Robots (peer state)
 ```
 
 ## Component Roles
@@ -123,39 +123,39 @@ Pi Zero → UDP → Other Robots (peer state)
 
 ```
 ┌─────────────┐
-│   Camera    │──UDP 5100──▶ Pi Zero (Position)
+│   Camera    │──UDP 5100── Pi Zero (Position)
 └─────────────┘
 
 ┌─────────────┐
-│  Pi Zero    │──UDP 5200──▶ Other Robots (Peer State)
+│  Pi Zero    │──UDP 5200── Other Robots (Peer State)
 └─────────────┘
 
 ┌─────────────┐
-│  Pi Zero    │──I2C──────▶ I2C Mux → ToF Sensors
+│  Pi Zero    │──I2C────── I2C Mux -> ToF Sensors
 └─────────────┘
 
 ┌─────────────┐
-│  Pi Zero    │──UART─────▶ Pico (Motor Commands)
+│  Pi Zero    │──UART───── Pico (Motor Commands)
 └─────────────┘              │
                              │
-                             ▼
+                             
                     ┌─────────────┐
-                    │    Pico     │──PWM──▶ DRV8833 → Motors
+                    │    Pico     │──PWM── DRV8833 -> Motors
                     └─────────────┘
                              │
                              │
-                             ▼
+                             
                     ┌─────────────┐
-                    │  Encoders   │──IRQ──▶ Pico (Feedback)
+                    │  Encoders   │──IRQ── Pico (Feedback)
                     └─────────────┘
 ```
 
 ## Simple One-Liner Flow
 
-**Sensors → Pi Zero (REIP Logic) → Pico (Motors) → Physical Motion**
+**Sensors -> Pi Zero (REIP Logic) -> Pico (Motors) -> Physical Motion**
 
 With feedback loops:
-- **Position**: Camera → Pi Zero (for navigation)
-- **Obstacles**: ToF → Pi Zero (for avoidance)
-- **Movement**: Encoders → Pico → Pi Zero (for stuck detection)
+- **Position**: Camera -> Pi Zero (for navigation)
+- **Obstacles**: ToF -> Pi Zero (for avoidance)
+- **Movement**: Encoders -> Pico -> Pi Zero (for stuck detection)
 - **Coordination**: Pi Zero ↔ Other Robots (for team behavior)

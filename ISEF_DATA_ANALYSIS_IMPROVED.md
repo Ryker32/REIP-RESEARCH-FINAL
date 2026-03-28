@@ -33,7 +33,7 @@ I will compare REIP against baseline policies under matched conditions to determ
 ### Data Visualization
 
 I will use the following visualizations to present results:
-- **Line graphs**: Coverage over time for each condition, showing mean with variability bands (e.g., ±1 standard deviation or interquartile range)
+- **Line graphs**: Coverage over time for each condition, showing mean with variability bands (e.g., +/-1 standard deviation or interquartile range)
 - **Bar graphs**: Average performance metrics across policies and fault conditions, with error bars showing variation
 - **Tables**: Summary statistics for leader-impeachment behavior, false-positive rates, timing measurements, and safety-related events
 - **Event timelines**: For selected representative trials, showing when trust decay, impeachment, and leader replacement occur relative to fault injection
@@ -41,9 +41,9 @@ I will use the following visualizations to present results:
 ### Success Criteria
 
 I will interpret REIP as effective if it demonstrates:
-- **Normal operation**: Maintains strong area coverage (≥80% final coverage) during no-fault trials, comparable to or better than baseline policies
+- **Normal operation**: Maintains strong area coverage (>=80% final coverage) during no-fault trials, comparable to or better than baseline policies
 - **Fault detection**: Detects harmful active leaders within a limited number of command cycles (target: <2 seconds from fault injection to first suspicion, <5 seconds to impeachment)
-- **Fault response**: Successfully replaces compromised leaders (≥90% detection rate) without excessive false positives (<1 false impeachment per clean trial)
+- **Fault response**: Successfully replaces compromised leaders (>=90% detection rate) without excessive false positives (<1 false impeachment per clean trial)
 - **Safety**: Maintains minimum separation distances and avoids excessive emergency events
 
 ### Simulation Validation

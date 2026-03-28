@@ -3,9 +3,9 @@
 ## Overview
 
 You need **3 terminal windows** on your PC (all SSH'd into the laptop in the garage):
-1. **Terminal 1** — Position Server (camera + ArUco)
-2. **Terminal 2** — Robot Launcher (starts reip_node on all 5 Pis)
-3. **Terminal 3** — Fault Injector (injects faults mid-experiment)
+1. **Terminal 1** -- Position Server (camera + ArUco)
+2. **Terminal 2** -- Robot Launcher (starts reip_node on all 5 Pis)
+3. **Terminal 3** -- Fault Injector (injects faults mid-experiment)
 
 Plus one quick command before each run to snapshot starting positions.
 
@@ -32,7 +32,7 @@ ping -c 1 clanker5.local
 ```
 
 ### 3. Place robots
-- 2–3 in Room A (left of wall), 2–3 in Room B (right of wall)
+- 2--3 in Room A (left of wall), 2--3 in Room B (right of wall)
 - At least 15 cm from walls, 20 cm apart from each other
 - Orientation doesn't matter
 
@@ -86,11 +86,11 @@ ssh pi@clanker5.local 'cd ~/reip && python3 reip_node.py 5 --decentralized &' &
 ```
 
 ### Step 4: Let Robots Explore (~10 seconds clean)
-- Watch the arena — robots should begin exploring and spreading out
+- Watch the arena -- robots should begin exploring and spreading out
 - The elected leader (check Terminal 1 output) coordinates frontier assignments
-- **Timer starts now** — note the wall clock time
+- **Timer starts now** -- note the wall clock time
 
-### Step 5: Inject Fault (Terminal 3) — at t ≈ 10s
+### Step 5: Inject Fault (Terminal 3) -- at t ~ 10s
 ```bash
 cd reip-sim-public
 python pc/fault_inject.py
@@ -100,15 +100,15 @@ python pc/fault_inject.py
 ```
 This tells Robot 1 (or whoever is leader) to start sending followers to already-explored cells.
 
-**Key demo fault:** `bad_leader <leader_id>` — this is the Byzantine leadership fault that REIP detects.
+**Key demo fault:** `bad_leader <leader_id>` -- this is the Byzantine leadership fault that REIP detects.
 
 ### Step 6: Observe REIP Response
 Watch for these events (should happen within seconds):
-1. **Suspicion** — followers detect command divergence (~0.3–0.5s after fault)
-2. **Trust decay** — trust scores drop below threshold
-3. **Impeachment vote** — democratic vote to remove leader (~1–3s after fault)
-4. **New election** — merit-based re-election of a new leader
-5. **Recovery** — exploration resumes with new leader
+1. **Suspicion** -- followers detect command divergence (~0.3--0.5s after fault)
+2. **Trust decay** -- trust scores drop below threshold
+3. **Impeachment vote** -- democratic vote to remove leader (~1--3s after fault)
+4. **New election** -- merit-based re-election of a new leader
+5. **Recovery** -- exploration resumes with new leader
 
 ### Step 7: Let Experiment Complete
 - Total run time: **120 seconds** (matches simulation)
@@ -140,24 +140,24 @@ Run each condition **at least 3 times** (more is better for stats):
 | 1 | REIP | None (clean) | Baseline coordination performance |
 | 2 | REIP | bad_leader @ 10s | **KEY DEMO**: detects + impeaches + recovers |
 | 3 | Raft | None (clean) | Consensus overhead baseline |
-| 4 | Raft | bad_leader @ 10s | Raft CANNOT detect this — coverage collapses |
+| 4 | Raft | bad_leader @ 10s | Raft CANNOT detect this -- coverage collapses |
 | 5 | Decentralized | None (clean) | No-leader baseline |
 | 6 | Decentralized | bad_leader @ 10s | Immune (no leader) but lower coordination |
 
-**Minimum trials: 6 conditions × 3 reps = 18 runs (~36 minutes of robot time)**
+**Minimum trials: 6 conditions * 3 reps = 18 runs (~36 minutes of robot time)**
 
 ---
 
 ## Fault Injector Commands Reference
 
 ```
-bad_leader <id>    — Byzantine: leader sends to explored cells (THE KEY FAULT)
-spin <id>          — Motor fault: robot spins in circles
-stop <id>          — Motor fault: robot freezes
-erratic <id>       — Motor fault: random movement
-clear <id>         — Remove fault, return to normal
-status             — Show active faults
-quit               — Exit injector (auto-clears all faults)
+bad_leader <id>    -- Byzantine: leader sends to explored cells (THE KEY FAULT)
+spin <id>          -- Motor fault: robot spins in circles
+stop <id>          -- Motor fault: robot freezes
+erratic <id>       -- Motor fault: random movement
+clear <id>         -- Remove fault, return to normal
+status             -- Show active faults
+quit               -- Exit injector (auto-clears all faults)
 ```
 
 ---
@@ -166,8 +166,8 @@ quit               — Exit injector (auto-clears all faults)
 
 1. **Stop all robots** (pkill command above)
 2. **Clear faults**: `clear <id>` in fault injector, or quit and restart it
-3. **Reposition robots** — spread them out again across both rooms
-4. **Snapshot new positions** — `python test/test_aruco_distances.py`
+3. **Reposition robots** -- spread them out again across both rooms
+4. **Snapshot new positions** -- `python test/test_aruco_distances.py`
 5. **Start next trial**
 
 ---
@@ -220,6 +220,6 @@ This is your **sim-to-real transfer** validation story.
 ## Safety
 
 - **ALWAYS have physical access to battery disconnects**
-- The Pico firmware has a 500ms safety timeout — if the Pi Zero crashes, motors stop automatically
-- Keep the fault injector terminal open — `quit` auto-clears all faults
+- The Pico firmware has a 500ms safety timeout -- if the Pi Zero crashes, motors stop automatically
+- Keep the fault injector terminal open -- `quit` auto-clears all faults
 - If anything goes wrong: **pull batteries first, debug second**

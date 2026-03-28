@@ -23,7 +23,7 @@ Today we completed the implementation, testing, and validation of the MPC (Model
 
 2. **Hybrid Trust Mechanism** (`update_trust` in `src/policy/reip_true.py`)
    - Combines prediction-observation trust + MPC trust
-   - Weighted combination: `error = (1-α) × pred_obs_error + α × mpc_error`
+   - Weighted combination: `error = (1-alpha) * pred_obs_error + alpha * mpc_error`
    - Configurable weight parameter
 
 3. **Configuration Parameters**
@@ -72,10 +72,10 @@ Today we completed the implementation, testing, and validation of the MPC (Model
 ### Test Results
 
 **MPC Trust is Working!**
-- ✅ MPC errors detected: **47-110 steps** during attack (out of 120)
-- ✅ Average MPC error: **0.317** (significant difference detected)
-- ✅ Trust decay: **0.241** (24.1% drop) with optimal parameters
-- ✅ Impeachments: **3-9** depending on parameters
+- [x] MPC errors detected: **47-110 steps** during attack (out of 120)
+- [x] Average MPC error: **0.317** (significant difference detected)
+- [x] Trust decay: **0.241** (24.1% drop) with optimal parameters
+- [x] Impeachments: **3-9** depending on parameters
 
 ---
 
@@ -122,23 +122,23 @@ reip:
 
 | Metric | Original (Pred-Obs) | MPC Trust | Winner |
 |--------|---------------------|-----------|--------|
-| **Final Coverage** | 74.17% ± 6.32% | 69.53% ± 6.53% | Original |
-| **Trust Decay** | **0.004 ± 0.007** | **0.126 ± 0.082** | **MPC** ✅ |
-| **Impeachments** | **0.0 ± 0.0** | **10.7 ± 2.2** | **MPC** ✅ |
-| **Min Trust** | 0.988 ± 0.017 | 0.100 ± 0.000 | MPC ✅ |
-| **Error Detection** | 0.4 steps | 142.1 steps | **MPC** ✅ |
+| **Final Coverage** | 74.17% +/- 6.32% | 69.53% +/- 6.53% | Original |
+| **Trust Decay** | **0.004 +/- 0.007** | **0.126 +/- 0.082** | **MPC** [x] |
+| **Impeachments** | **0.0 +/- 0.0** | **10.7 +/- 2.2** | **MPC** [x] |
+| **Min Trust** | 0.988 +/- 0.017 | 0.100 +/- 0.000 | MPC [x] |
+| **Error Detection** | 0.4 steps | 142.1 steps | **MPC** [x] |
 
 **Score: MPC wins 4 out of 5 metrics**
 
 ### Critical Finding
 
-**❌ Original Approach FAILS**
+**[ ] Original Approach FAILS**
 - Average impeachments: **0.0** (never impeaches!)
 - Trust decay: **0.004** (almost zero - trust stays at 0.988!)
 - Error detection: **0.4 steps** (out of 170 attack steps)
 - **Why it fails**: When `pred_unk=0`, there's no "promise" to break, so prediction-observation trust cannot detect bad assignments
 
-**✅ MPC Trust SOLVES the Problem**
+**[x] MPC Trust SOLVES the Problem**
 - Average impeachments: **10.7** (actually impeaches compromised leaders!)
 - Trust decay: **0.126** (significant - 12.6% drop!)
 - Error detection: **142.1 steps** (out of 170 attack steps)
@@ -163,7 +163,7 @@ When we analyze **coverage loss** (expected coverage - actual coverage), MPC is 
 
 | Metric | Original | MPC | Winner |
 |--------|----------|-----|--------|
-| **Coverage Loss** | 42.83% | **28.17%** | **MPC** ✅ |
+| **Coverage Loss** | 42.83% | **28.17%** | **MPC** [x] |
 | **Final Coverage** | 74.17% | 69.53% | Original |
 
 **MPC loses 14.66% LESS coverage** (42.83% - 28.17% = 14.66%)
@@ -202,10 +202,10 @@ When we analyze **coverage loss** (expected coverage - actual coverage), MPC is 
 
 **Final coverage alone is misleading!** Better metrics:
 
-1. **✅ Coverage Loss** (expected - actual) - **MPC wins by 34%!**
-2. **✅ Time to Detection** - MPC detects and impeaches quickly
-3. **✅ Impeachment Rate** - MPC: 10.7 vs Original: 0.0
-4. **✅ Trust Decay** - MPC: 0.126 vs Original: 0.004
+1. **[x] Coverage Loss** (expected - actual) - **MPC wins by 34%!**
+2. **[x] Time to Detection** - MPC detects and impeaches quickly
+3. **[x] Impeachment Rate** - MPC: 10.7 vs Original: 0.0
+4. **[x] Trust Decay** - MPC: 0.126 vs Original: 0.004
 
 ---
 
@@ -215,23 +215,23 @@ When we analyze **coverage loss** (expected coverage - actual coverage), MPC is 
 
 1. **Rawlings, J.B., Mayne, D.Q. (2009)**
    - "Model Predictive Control: Theory and Design."
-   - **Status**: ⚠️ **NEEDS VERIFICATION** (verify exact title, publisher, ISBN)
+   - **Status**: [!] **NEEDS VERIFICATION** (verify exact title, publisher, ISBN)
 
 2. **Camacho, E.F., Bordons, C. (2004)**
    - "Model Predictive Control." 2nd ed. Springer.
-   - **Status**: ⚠️ **NEEDS VERIFICATION** (verify 2nd edition exists, publisher)
+   - **Status**: [!] **NEEDS VERIFICATION** (verify 2nd edition exists, publisher)
 
 3. **Josang, A., Ismail, R. (2002)**
    - "The Beta Reputation System." Proc. 15th Bled Electronic Commerce Conference.
-   - **Status**: ⚠️ **NEEDS VERIFICATION** (verify exact conference name, year, page numbers)
+   - **Status**: [!] **NEEDS VERIFICATION** (verify exact conference name, year, page numbers)
 
 4. **Yamauchi, B. (1997)**
    - "A Frontier-Based Approach for Autonomous Exploration." IEEE CIRA.
-   - **Status**: ✅ **VERIFIED** (Standard reference in robotics)
+   - **Status**: [x] **VERIFIED** (Standard reference in robotics)
 
 5. **Shannon, C. (1948)**
    - "A Mathematical Theory of Communication." Bell Syst. Tech. J.
-   - **Status**: ✅ **VERIFIED** (Classic paper, no verification needed)
+   - **Status**: [x] **VERIFIED** (Classic paper, no verification needed)
 
 ### Action Required
 
@@ -294,20 +294,20 @@ See `docs/citation_verification_notes.md` for detailed instructions.
 
 ## 8. Key Achievements
 
-### ✅ Solved Critical Limitation
+### [x] Solved Critical Limitation
 
 **Problem**: Original prediction-observation trust fails when `pred_unk=0`
 
 **Solution**: MPC trust works in all scenarios by comparing leader assignments to locally optimal actions computed from each follower's own belief
 
-### ✅ Quantitative Improvements
+### [x] Quantitative Improvements
 
 - **355x more error detection** (142.1 vs 0.4 steps)
 - **31.5x better trust decay** (0.126 vs 0.004)
 - **34% less coverage loss** (28.17% vs 42.83%)
 - **10.7 impeachments** vs 0.0 (system actually responds!)
 
-### ✅ System Resilience
+### [x] System Resilience
 
 - MPC trust enables the system to actually respond to attacks
 - Impeaches compromised leaders
@@ -333,17 +333,17 @@ This work demonstrates:
 
 ### Immediate Actions
 
-1. **✅ Verify Citations** (3 citations need manual verification)
+1. **[x] Verify Citations** (3 citations need manual verification)
    - Rawlings & Mayne (2009)
    - Camacho & Bordons (2004)
    - Josang & Ismail (2002)
 
-2. **✅ Update Paper**
+2. **[x] Update Paper**
    - Add MPC trust mechanism section
    - Include comparison results
    - Highlight coverage loss metric (not just final coverage)
 
-3. **✅ Update Configs**
+3. **[x] Update Configs**
    - Apply optimal parameters to example configs
    - Document MPC trust configuration
 
@@ -378,11 +378,11 @@ reip:
 
 ## 12. Key Takeaways
 
-1. **✅ MPC Trust is Better**: Wins 4 out of 5 metrics, solves critical limitation
-2. **✅ Coverage Loss > Final Coverage**: Better metric for resilience
-3. **✅ Lower Final Coverage = Good**: Means system stops bad behavior
-4. **✅ Optimal Parameters**: `weight=1.0, threshold=0.1`
-5. **✅ Citations Need Verification**: 3 citations require manual check
+1. **[x] MPC Trust is Better**: Wins 4 out of 5 metrics, solves critical limitation
+2. **[x] Coverage Loss > Final Coverage**: Better metric for resilience
+3. **[x] Lower Final Coverage = Good**: Means system stops bad behavior
+4. **[x] Optimal Parameters**: `weight=1.0, threshold=0.1`
+5. **[x] Citations Need Verification**: 3 citations require manual check
 
 ---
 

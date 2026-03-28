@@ -39,9 +39,9 @@ Implemented lightweight MPC-based trust evaluation for REIP leader-follower syst
 2. Compute score for leader's assignment
 3. Return error = `max(0.0, local_optimum_score - leader_assignment_score)`
 
-**Computational Complexity**: O(window_size² × num_frontiers_in_window)
+**Computational Complexity**: O(window_size^2 * num_frontiers_in_window)
 - Window size: `pred_gain_radius` (typically 3-4)
-- Local window filtering: Only considers frontiers within `2 × window × ds` distance
+- Local window filtering: Only considers frontiers within `2 * window * ds` distance
 - **Result**: Computationally lightweight (matches existing architecture)
 
 **Citations**:
@@ -58,8 +58,8 @@ Implemented lightweight MPC-based trust evaluation for REIP leader-follower syst
 
 **Functionality**:
 - Combines prediction-observation trust with MPC trust
-- Weighted combination: `error = (1-α) × pred_obs_error + α × mpc_error`
-- Default weight: `α = 0.5` (equal weighting)
+- Weighted combination: `error = (1-alpha) * pred_obs_error + alpha * mpc_error`
+- Default weight: `alpha = 0.5` (equal weighting)
 
 **Hybrid Mechanism**:
 - **Prediction-Observation Trust**: Detects "failed promises" (leader promised gain but didn't deliver)
@@ -92,9 +92,9 @@ Implemented lightweight MPC-based trust evaluation for REIP leader-follower syst
 ### Computational Efficiency
 
 - **Uses Existing Data Structures**: Reuses `belief_lr` (already entropy-compressed)
-- **Local Window**: Only considers frontiers within `2 × window × ds` distance
-- **Complexity**: O(window_size² × num_frontiers_in_window) = O(7² × ~10) = ~500 operations per agent
-- **Comparison**: SLAM typically requires O(map_size²) operations, so MPC is negligible
+- **Local Window**: Only considers frontiers within `2 * window * ds` distance
+- **Complexity**: O(window_size^2 * num_frontiers_in_window) = O(7^2 * ~10) = ~500 operations per agent
+- **Comparison**: SLAM typically requires O(map_size^2) operations, so MPC is negligible
 
 **Citations**:
 - Camacho, E.F., Bordons, C. (2004). "Model Predictive Control." 2nd ed.

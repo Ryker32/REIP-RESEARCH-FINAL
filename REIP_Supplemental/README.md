@@ -2,7 +2,7 @@
 
 **Trust-Based Governance for Fault-Resilient Multi-Agent Frontier Exploration: The REIP Framework**
 
-William R. Kollmyer — Olympia High School, Olympia, WA
+William R. Kollmyer -- Olympia High School, Olympia, WA
 
 ---
 
@@ -21,12 +21,12 @@ William R. Kollmyer — Olympia High School, Olympia, WA
    ```
    Seeds are loaded from `seeds/seeds.json`. Results are written to `raw_data/multiroom_n30/`.
 
-2. **Generate statistical tables (Tables IV–VII in paper):**
+2. **Generate statistical tables (Tables IV--VII in paper):**
    ```bash
    python scripts/_full_analysis.py raw_data/multiroom_n30/
    ```
 
-3. **Generate convergence and resilience contrast charts (Figs. 3–4):**
+3. **Generate convergence and resilience contrast charts (Figs. 3--4):**
    ```bash
    python scripts/_convergence_chart.py raw_data/multiroom_n30/
    ```
@@ -49,30 +49,30 @@ William R. Kollmyer — Olympia High School, Olympia, WA
 ```
 REIP_Supplemental/
 ├── raw_data/
-│   ├── multiroom_n30/          ← 270-trial results (N=30 × 9 conditions)
-│   │   └── logs/               ← per-trial coverage timelines + robot logs
-│   ├── snapshots/              ← vector snapshot JSONs for visualization
-│   └── gridworld_2000/         ← original 2,000-seed GridWorld sim data
+│   ├── multiroom_n30/          <- 270-trial results (N=30 * 9 conditions)
+│   │   └── logs/               <- per-trial coverage timelines + robot logs
+│   ├── snapshots/              <- vector snapshot JSONs for visualization
+│   └── gridworld_2000/         <- original 2,000-seed GridWorld sim data
 ├── seeds/
-│   └── seeds.json              ← exact seeds for all 30 trials (1000–30000, step 1000)
+│   └── seeds.json              <- exact seeds for all 30 trials (1000--30000, step 1000)
 ├── scripts/
-│   ├── isef_experiments.py     ← main experiment harness (parallel execution)
-│   ├── _convergence_chart.py   ← IEEE-standard convergence plots
-│   ├── _full_analysis.py       ← statistical summary tables (mean, median, IQR)
-│   └── _gridworld_snapshots.py ← gridworld vector gallery generator
-├── figures/                    ← all charts as PNG + PDF (print-ready)
+│   ├── isef_experiments.py     <- main experiment harness (parallel execution)
+│   ├── _convergence_chart.py   <- IEEE-standard convergence plots
+│   ├── _full_analysis.py       <- statistical summary tables (mean, median, IQR)
+│   └── _gridworld_snapshots.py <- gridworld vector gallery generator
+├── figures/                    <- all charts as PNG + PDF (print-ready)
 ├── hardware/
-│   ├── bom.csv                 ← bill of materials with costs
-│   ├── wiring_diagram.png      ← system wiring schematic
-│   ├── aruco_markers/          ← printable ArUco marker PDFs
-│   │   ├── robot_markers/      ← IDs 0–4 (one per robot)
-│   │   └── corner_markers/     ← IDs 10–13 (arena corners for homography)
-│   └── cad/                    ← chassis STL files
+│   ├── bom.csv                 <- bill of materials with costs
+│   ├── wiring_diagram.png      <- system wiring schematic
+│   ├── aruco_markers/          <- printable ArUco marker PDFs
+│   │   ├── robot_markers/      <- IDs 0--4 (one per robot)
+│   │   └── corner_markers/     <- IDs 10--13 (arena corners for homography)
+│   └── cad/                    <- chassis STL files
 ├── paper/
 │   ├── IEEE-conference-template-062824.tex
 │   ├── IEEE-conference-template-062824.pdf
-│   └── figures/                ← figures referenced by LaTeX
-└── README.md                   ← this file
+│   └── figures/                <- figures referenced by LaTeX
+└── README.md                   <- this file
 ```
 
 ## Seeds
@@ -101,7 +101,7 @@ These same seeds are used for hardware trials to enable direct sim-to-real compa
 | 12        | Arena corner (BL)  | (0, 1500) mm          |
 | 13        | Arena corner (BR)  | (2000, 1500) mm       |
 
-Marker size: 50 mm × 50 mm. Dictionary: `DICT_4X4_50`.
+Marker size: 50 mm * 50 mm. Dictionary: `DICT_4X4_50`.
 
 The overhead camera (Logitech C922 at 1080p, 30 fps) detects all markers each frame. The four corner markers compute a homography transform that maps pixel coordinates to arena coordinates in millimeters. Robot markers are then localized in arena space via this homography.
 
@@ -109,7 +109,7 @@ The overhead camera (Logitech C922 at 1080p, 30 fps) detects all markers each fr
 
 | Condition   | Controller     | Fault Type   | Fault Time(s) |
 |-------------|---------------|-------------|----------------|
-| NoFault     | REIP/Raft/Dec | None        | —              |
+| NoFault     | REIP/Raft/Dec | None        | --              |
 | BadLeader   | REIP/Raft/Dec | bad_leader  | t=10s, t=30s   |
 | Spin        | REIP/Raft/Dec | motor spin  | t=10s          |
 
@@ -117,7 +117,7 @@ The overhead camera (Logitech C922 at 1080p, 30 fps) detects all markers each fr
 
 ## Key Results
 
-- **REIP under bad-leader**: 90.7% mean / 100% median coverage, 0.28±0.16s detection
+- **REIP under bad-leader**: 90.7% mean / 100% median coverage, 0.28+/-0.16s detection
 - **Raft under bad-leader**: 66.5% mean / 68.8% median coverage, 0/30 detection
 - **Resilience gap**: REIP median coverage is invariant to fault condition (100% clean = 100% bad-leader)
 

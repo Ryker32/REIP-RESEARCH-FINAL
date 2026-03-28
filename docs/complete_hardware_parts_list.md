@@ -28,7 +28,7 @@ This document provides a complete parts list for building a REIP micromouse robo
 |------|----------|-------------|----------|------|-------|
 | **LiPo Battery** | 1 | 2000mAh 3.7V | Adafruit #1578, SparkFun PRT-13855 | $10 | Main power source |
 | **USB-C Power Bank Module** | 1 | TP4056 | Adafruit #259, SparkFun PRT-14411 | $3 | Charging circuit |
-| **5V Boost Converter** | 1 | MT3608 | Adafruit #4654, SparkFun PRT-14411 | $2 | 3.7V → 5V for Pi Zero |
+| **5V Boost Converter** | 1 | MT3608 | Adafruit #4654, SparkFun PRT-14411 | $2 | 3.7V -> 5V for Pi Zero |
 | **Power Switch** | 1 | SPST Toggle | Any | $1 | On/off switch |
 | **JST-PH Connector** | 2 | JST-PH 2-pin | Adafruit #261, SparkFun PRT-09315 | $2 | Battery connector |
 
@@ -55,7 +55,7 @@ This document provides a complete parts list for building a REIP micromouse robo
 **Subtotal**: $14.20 (4 sensors @ $2.80 each + 1 multiplexer @ $3)
 
 **Amazon Options (Recommended)**:
-- **ACEIRMC 5-pack**: $13.99 for 5 sensors = **$2.80 per sensor** ⭐ **BEST VALUE**
+- **ACEIRMC 5-pack**: $13.99 for 5 sensors = **$2.80 per sensor** * **BEST VALUE**
   - Search: "ACEIRMC VL53L0X 5pcs Black"
   - 4.4/5 stars, 54 reviews
   - **For 6 robots**: Buy 5 packs (25 sensors) = $69.95 total
@@ -66,16 +66,16 @@ This document provides a complete parts list for building a REIP micromouse robo
   - Only buy if you need just 1-2 sensors
 
 **Bulk Purchase for 6 Robots**:
-- **Total sensors needed**: 24 (4 per robot × 6 robots)
-- **Recommended**: Buy 5× ACEIRMC 5-packs = 25 sensors (1 extra spare)
+- **Total sensors needed**: 24 (4 per robot * 6 robots)
+- **Recommended**: Buy 5* ACEIRMC 5-packs = 25 sensors (1 extra spare)
 - **Total cost**: $69.95 (vs $162.96 if buying singles)
 - **Savings**: $92.96 (57% discount!)
 
 **Sensor Configuration**:
-- **Front**: 1× VL53L0X (forward detection)
-- **Left**: 1× VL53L0X (side wall detection)
-- **Right**: 1× VL53L0X (side wall detection)
-- **Back**: 1× VL53L0X (optional, for reverse detection)
+- **Front**: 1* VL53L0X (forward detection)
+- **Left**: 1* VL53L0X (side wall detection)
+- **Right**: 1* VL53L0X (side wall detection)
+- **Back**: 1* VL53L0X (optional, for reverse detection)
 
 **Alternative (Budget)**: Use 2-3 sensors (front + left + right) = $10-15
 
@@ -116,9 +116,9 @@ This document provides a complete parts list for building a REIP micromouse robo
 
 | Part | Quantity | Part Number | Supplier | Cost | Notes |
 |------|----------|-------------|----------|------|-------|
-| **Perfboard** | 1 | 5cm × 5cm | Adafruit #2670, SparkFun PRT-12070 | $2 | Main chassis base |
-| **Standoffs** | 4-6 | M3 × 10mm | Any | $2 | Mount Pi Zero above board |
-| **Screws** | 10-15 | M3 × 6mm | Any | $1 | Assembly screws |
+| **Perfboard** | 1 | 5cm * 5cm | Adafruit #2670, SparkFun PRT-12070 | $2 | Main chassis base |
+| **Standoffs** | 4-6 | M3 * 10mm | Any | $2 | Mount Pi Zero above board |
+| **Screws** | 10-15 | M3 * 6mm | Any | $1 | Assembly screws |
 | **Wheels** | 2 | 32mm diameter | Pololu #1084, Amazon | $3 | Drive wheels |
 | **Caster Ball** | 1 | 15mm ball caster | Pololu #953, Amazon | $2 | Front/rear support |
 
@@ -160,7 +160,7 @@ This document provides a complete parts list for building a REIP micromouse robo
 
 ### WiFi (Built-in to Pi Zero 2 W)
 
-✅ **No additional parts needed** - Pi Zero 2 W has built-in WiFi 802.11n
+[x] **No additional parts needed** - Pi Zero 2 W has built-in WiFi 802.11n
 
 **Optional**: External antenna for better range (if needed)
 - **Antenna**: 2.4GHz external antenna ($3)
@@ -211,8 +211,8 @@ This document provides a complete parts list for building a REIP micromouse robo
 |----------|------|-------|
 | **Main Controller** | $22 | Pi Zero 2 W + MicroSD |
 | **Power Management** | $18 | Battery, charging, boost converter |
-| **Sensors** | $14.20 | 4× VL53L0X + multiplexer (Amazon bulk pricing) |
-| **Motors** | $12 | 2× N20 motors with encoders |
+| **Sensors** | $14.20 | 4* VL53L0X + multiplexer (Amazon bulk pricing) |
+| **Motors** | $12 | 2* N20 motors with encoders |
 | **Motor Driver** | $6 | TB6612FNG |
 | **Chassis** | $10 | Perfboard, wheels, caster |
 | **Electronics** | $9 | GPIO, wires, resistors |
@@ -226,12 +226,12 @@ This document provides a complete parts list for building a REIP micromouse robo
 
 | Item | Cost |
 |------|------|
-| **6× Robots** | $655.20 ($109.20 × 6) |
+| **6* Robots** | $655.20 ($109.20 * 6) |
 | **Tools (one-time)** | $80 |
-| **Contingency** | $66 ($11 × 6) |
+| **Contingency** | $66 ($11 * 6) |
 | **Total** | **$801.20** |
 
-**Note**: Sensors bought in bulk (5× 5-packs = 25 sensors for $69.95) saves $92.96 vs buying singles!
+**Note**: Sensors bought in bulk (5* 5-packs = 25 sensors for $69.95) saves $92.96 vs buying singles!
 
 ---
 
@@ -284,7 +284,7 @@ This document provides a complete parts list for building a REIP micromouse robo
 - **TB6612FNG Driver**: Adafruit #2448, SparkFun ROB-14450
 
 #### Chassis
-- **Perfboard**: Adafruit #2670 (5cm × 5cm), SparkFun PRT-12070
+- **Perfboard**: Adafruit #2670 (5cm * 5cm), SparkFun PRT-12070
 - **Wheels**: Pololu #1084 (32mm), Amazon (search "32mm robot wheels")
 - **Caster**: Pololu #953, Amazon (search "ball caster 15mm")
 
@@ -294,7 +294,7 @@ This document provides a complete parts list for building a REIP micromouse robo
 
 ### Step 1: Power System
 1. Solder TP4056 charging module to perfboard
-2. Solder MT3608 boost converter (3.7V → 5V)
+2. Solder MT3608 boost converter (3.7V -> 5V)
 3. Connect battery via JST-PH connector
 4. Add power switch between battery and boost converter
 5. Test: Verify 5V output before connecting Pi Zero
@@ -307,14 +307,14 @@ This document provides a complete parts list for building a REIP micromouse robo
 5. Connect ground (pin 6 or any ground)
 
 ### Step 3: Sensors
-1. Mount 4× VL53L0X sensors (front, left, right, back)
+1. Mount 4* VL53L0X sensors (front, left, right, back)
 2. Connect all sensors to TCA9548A multiplexer
 3. Connect multiplexer to Pi Zero I2C (SDA=pin 3, SCL=pin 5)
 4. Add 4.7kΩ pull-up resistors on I2C bus
 5. Test: Use `i2cdetect` to verify all sensors
 
 ### Step 4: Motors
-1. Mount 2× N20 motors on chassis
+1. Mount 2* N20 motors on chassis
 2. Attach wheels to motor shafts
 3. Connect motors to TB6612FNG driver
 4. Connect driver to Pi Zero GPIO:
@@ -336,18 +336,18 @@ This document provides a complete parts list for building a REIP micromouse robo
 
 ### Power Connections
 ```
-Battery (3.7V) → TP4056 Charger → MT3608 Boost (5V) → Pi Zero
+Battery (3.7V) -> TP4056 Charger -> MT3608 Boost (5V) -> Pi Zero
 ```
 
 ### I2C Bus (Sensors)
 ```
-Pi Zero (SDA/SCL) → TCA9548A Multiplexer → 4× VL53L0X Sensors
+Pi Zero (SDA/SCL) -> TCA9548A Multiplexer -> 4* VL53L0X Sensors
 ```
 
 ### Motor Control
 ```
-Pi Zero GPIO → TB6612FNG Driver → 2× N20 Motors
-Pi Zero GPIO → Motor Encoders (for odometry)
+Pi Zero GPIO -> TB6612FNG Driver -> 2* N20 Motors
+Pi Zero GPIO -> Motor Encoders (for odometry)
 ```
 
 ### GPIO Pin Assignments (Suggested)
@@ -372,7 +372,7 @@ Pi Zero GPIO → Motor Encoders (for odometry)
 ## 13. Budget Options
 
 ### Option A: Minimal Sensors (3 instead of 4)
-- **Savings**: $2.80 (1× VL53L0X at bulk price)
+- **Savings**: $2.80 (1* VL53L0X at bulk price)
 - **Total**: $117.40 per robot
 
 ### Option B: Smaller Battery (1000mAh)
@@ -412,10 +412,10 @@ Pi Zero GPIO → Motor Encoders (for odometry)
 
 ## 15. Next Steps
 
-1. **Order 1× complete set** for prototyping
+1. **Order 1* complete set** for prototyping
 2. **Build and test** first robot
 3. **Verify all components work** before ordering 5 more
-4. **Order remaining 5×** once validated
+4. **Order remaining 5*** once validated
 5. **Build all 6 robots** in parallel
 
 ---
@@ -455,4 +455,4 @@ Before ordering, verify:
 
 ---
 
-**Good luck with your build!** 🚀
+**Good luck with your build!** 

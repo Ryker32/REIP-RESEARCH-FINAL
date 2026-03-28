@@ -4,21 +4,21 @@
 
 | Controller | Fault Type | N | Coverage | Speed (mm/s) | Detect (s) | Status |
 |-----------|------------|---|----------|--------------|------------|--------|
-| REIP | None (clean) | 5 | 63.5% | 42 | --- | ✅ DONE |
-| REIP | Freeze Ldr | 5 | 63.5% | 45 | 8.8 | ✅ DONE |
-| REIP | Self-Injure | 5 | 61.6% | 46 | 3.3 | ✅ DONE |
-| Raft | None (clean) | 5 | 66.3% | 19 | --- | ✅ DONE |
-| Raft | Freeze Ldr | 5 | 33.3% | 19 | --- | ✅ DONE |
-| Raft | Self-Injure | 5 | 21.5% | 19 | --- | ✅ DONE |
+| REIP | None (clean) | 5 | 63.5% | 42 | --- | [x] DONE |
+| REIP | Freeze Ldr | 5 | 63.5% | 45 | 8.8 | [x] DONE |
+| REIP | Self-Injure | 5 | 61.6% | 46 | 3.3 | [x] DONE |
+| Raft | None (clean) | 5 | 66.3% | 19 | --- | [x] DONE |
+| Raft | Freeze Ldr | 5 | 33.3% | 19 | --- | [x] DONE |
+| Raft | Self-Injure | 5 | 21.5% | 19 | --- | [x] DONE |
 
-## ⚠️ POTENTIAL GAPS / QUESTIONS:
+## [!] POTENTIAL GAPS / QUESTIONS:
 
-1. **"Self-Injure" fault type**: ✅ **CONFIRMED** - This is `self_injure_leader` fault:
+1. **"Self-Injure" fault type**: [x] **CONFIRMED** - This is `self_injure_leader` fault:
    - Leader commands followers into leader's occupied peer bubble (causes collisions)
    - Different from `bad_leader` (sends to explored cells)
    - Different from `freeze_leader` (stops updating assignments)
 
-2. **Missing `bad_leader` hardware results**: ⚠️ **POTENTIAL GAP**
+2. **Missing `bad_leader` hardware results**: [!] **POTENTIAL GAP**
    - Simulation has `bad_leader` as the KEY differentiator (90.9% vs Raft 66.4%)
    - Hardware table shows "Freeze Ldr" and "Self-Injure" but NOT `bad_leader`
    - **Question**: Do you have `bad_leader` hardware results? If not, this is the most important one to run!
@@ -28,9 +28,9 @@
 ## RECOMMENDED COMPLETE MATRIX (for ISEF submission):
 
 ### Minimum Required (if you have the 6 above):
-✅ **You have all 6 conditions reported in the paper**
+[x] **You have all 6 conditions reported in the paper**
 
-### ⚠️ CRITICAL MISSING (if not already run):
+### [!] CRITICAL MISSING (if not already run):
 - **REIP + `bad_leader` fault** - THIS IS THE KEY DEMO (simulation shows 90.9% vs Raft 66.4%)
 - **Raft + `bad_leader` fault** - Shows Raft's failure (simulation shows 66.4% coverage)
 
@@ -42,12 +42,12 @@
 
 Before submitting, verify:
 
-1. ✅ All 6 conditions in Table 2 have data
-2. ✅ N=5 trials per condition (or more)
-3. ✅ Coverage, Speed, and Detect times are calculated
-4. ✅ Fault injection timing matches paper description
-5. ✅ "Self-Injure" is clearly defined (what fault command?)
-6. ✅ Speed-normalized comparison table (Table 3) has matching data
+1. [x] All 6 conditions in Table 2 have data
+2. [x] N=5 trials per condition (or more)
+3. [x] Coverage, Speed, and Detect times are calculated
+4. [x] Fault injection timing matches paper description
+5. [x] "Self-Injure" is clearly defined (what fault command?)
+6. [x] Speed-normalized comparison table (Table 3) has matching data
 
 ## FAULT INJECTION COMMANDS REFERENCE:
 
@@ -63,17 +63,17 @@ From `EXPERIMENT_PROCEDURE.md`:
 
 - Each trial: 120 seconds
 - Setup between trials: ~2-3 minutes
-- **6 conditions × 5 trials = 30 trials**
+- **6 conditions * 5 trials = 30 trials**
 - **Total time: ~2-3 hours** (if robots are already set up)
 
 ## ACTION ITEMS (PRIORITY ORDER):
 
-1. **🔴 CRITICAL: Check if `bad_leader` hardware results exist**
+1. ** CRITICAL: Check if `bad_leader` hardware results exist**
    - This is the KEY differentiator in simulation (90.9% vs 66.4%)
    - If missing, this is the #1 priority to run
    - Fault command: `bad_leader 1` (inject at t=10s)
 
-2. **Confirm all 6 existing conditions have N≥5 trials** - Paper shows N=5
+2. **Confirm all 6 existing conditions have N>=5 trials** - Paper shows N=5
 
 3. **Double-check all numbers in Table 2** - Coverage, Speed, Detect times
 
@@ -85,7 +85,7 @@ From `EXPERIMENT_PROCEDURE.md`:
 
 ## IF YOU NEED TO RUN MORE TRIALS:
 
-### 🔴 CRITICAL PRIORITY (if `bad_leader` is missing):
+###  CRITICAL PRIORITY (if `bad_leader` is missing):
 1. **REIP + bad_leader** - THIS IS THE KEY DEMO (simulation: 90.9% coverage)
    - Fault injection: `bad_leader 1` at t=10s
    - Minimum: 5 trials (N=5)

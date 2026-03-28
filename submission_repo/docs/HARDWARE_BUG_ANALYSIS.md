@@ -1,6 +1,6 @@
 # Hardware Bug Analysis: REIP Node
 
-**Based on code review of `robot/reip_node.py` and robot geometry (147mm × 128mm body)**
+**Based on code review of `robot/reip_node.py` and robot geometry (147mm * 128mm body)**
 
 ## Critical Bugs (Will Cause Failures)
 
@@ -167,7 +167,7 @@ if reading < 50:
 ### 9. **ArUco Position Jitter Not Filtered**
 **Location**: `receive_position()` lines 548-559
 
-**Bug**: Position uses EMA filter (`POS_EMA = 0.5`), but heading (`theta`) is used directly without filtering. ArUco heading can jitter ±5°.
+**Bug**: Position uses EMA filter (`POS_EMA = 0.5`), but heading (`theta`) is used directly without filtering. ArUco heading can jitter +/-5deg.
 
 **Impact**:
 - Robot heading oscillates

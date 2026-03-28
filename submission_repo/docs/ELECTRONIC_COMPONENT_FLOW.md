@@ -6,12 +6,12 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         EXTERNAL SYSTEMS                                │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  Camera (Laptop) → ArUco Detection → Position Server (UDP 5100)        │
+│  Camera (Laptop) -> ArUco Detection -> Position Server (UDP 5100)        │
 │  Fault Injector (UDP 5300)                                              │
 │  Peer Robots (UDP 5200)                                                 │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
+                              
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    RASPBERRY PI ZERO 2W                                  │
 │                    (Main Controller - reip_node.py)                      │
@@ -19,12 +19,12 @@
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────┐     │
 │  │  NETWORK LAYER (UDP)                                          │     │
-│  │  • Position Server (Port 5100) → Position updates            │     │
-│  │  • Peer Broadcast (Port 5200) → Trust, maps, elections        │     │
-│  │  • Fault Injection (Port 5300) → Start/stop, fault modes      │     │
+│  │  • Position Server (Port 5100) -> Position updates            │     │
+│  │  • Peer Broadcast (Port 5200) -> Trust, maps, elections        │     │
+│  │  • Fault Injection (Port 5300) -> Start/stop, fault modes      │     │
 │  └──────────────────────────────────────────────────────────────┘     │
 │                              │                                           │
-│                              ▼                                           │
+│                                                                         │
 │  ┌──────────────────────────────────────────────────────────────┐     │
 │  │  REIP CONTROL LOGIC                                           │     │
 │  │  • Trust Assessment (3-tier)                                  │     │
@@ -35,7 +35,7 @@
 │  │  • Navigation (A* pathfinding)                                 │     │
 │  └──────────────────────────────────────────────────────────────┘     │
 │                              │                                           │
-│                              ▼                                           │
+│                                                                         │
 │  ┌──────────────────────────────────────────────────────────────┐     │
 │  │  HARDWARE INTERFACE                                           │     │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐        │     │
@@ -48,10 +48,10 @@
 └─────────┼────────────────────┼──────────────────────────────────────────┘
           │                    │
           │ I2C                │ UART (115200 baud)
-          │ SDA: GPIO2         │ TX: GPIO14 → Pico RX (GP1)
-          │ SCL: GPIO3         │ RX: GPIO15 ← Pico TX (GP0)
+          │ SDA: GPIO2         │ TX: GPIO14 -> Pico RX (GP1)
+          │ SCL: GPIO3         │ RX: GPIO15 <- Pico TX (GP0)
           │                    │
-          ▼                    ▼
+                              
 ┌─────────────────┐  ┌──────────────────────────────────────────┐
 │  I2C MUX       │  │  RASPBERRY PI PICO                      │
 │  (TCA9548A)    │  │  (Motor Controller - main.py)           │
@@ -63,36 +63,36 @@
          │           │  │  • Responds: PONG, encoder counts  │ │
          │           │  └────────────────────────────────────┘ │
          │           │              │                          │
-         │           │              ▼                          │
+         │           │                                        │
          │           │  ┌────────────────────────────────────┐ │
          │           │  │  Motor Control (PWM)                │ │
-         │           │  │  • GP18, GP19 → Left Motor         │ │
-         │           │  │  • GP20, GP21 → Right Motor        │ │
+         │           │  │  • GP18, GP19 -> Left Motor         │ │
+         │           │  │  • GP20, GP21 -> Right Motor        │ │
          │           │  └────────────────────────────────────┘ │
          │           │              │                          │
-         │           │              ▼                          │
+         │           │                                        │
          │           │  ┌────────────────────────────────────┐ │
          │           │  │  Encoder Reading (IRQ)               │ │
-         │           │  │  • GP3, GP4 → Left Encoder         │ │
-         │           │  │  • GP7, GP8 → Right Encoder       │ │
+         │           │  │  • GP3, GP4 -> Left Encoder         │ │
+         │           │  │  • GP7, GP8 -> Right Encoder       │ │
          │           │  └────────────────────────────────────┘ │
          │           └──────────────────────────────────────────┘
          │                    │              │
          │                    │              │
-         │                    ▼              ▼
+         │                                  
          │           ┌─────────────┐  ┌─────────────┐
          │           │  DRV8833    │  │  Encoders   │
          │           │  Motor      │  │  (Quadrature│
          │           │  Driver     │  │   Optical) │
          │           └─────────────┘  └─────────────┘
          │                    │              │
-         │                    ▼              │
+         │                                  │
          │           ┌─────────────┐         │
-         │           │  N20 Motors │◀─────────┘
+         │           │  N20 Motors │─────────┘
          │           │  (100:1)    │
          │           └─────────────┘
          │
-         ▼
+         
 ┌─────────────────────────────────┐
 │  ToF Sensors (VL53L0X)          │
 │  via I2C Mux Channels:         │
@@ -106,7 +106,7 @@
 
 ## Detailed Data Flow
 
-### 1. Position Updates (Camera → Pi Zero)
+### 1. Position Updates (Camera -> Pi Zero)
 
 ```
 Camera (Laptop)
@@ -116,13 +116,13 @@ Camera (Laptop)
     │ • Detects corner tags (IDs 40-43)
     │ • Computes homography transform
     │
-    ▼
+    
 Position Server (aruco_position_server.py)
     │
     │ UDP Broadcast (Port 5100)
     │ JSON: {"robot_id": 1, "x": 500, "y": 750, "theta": 0.5, "timestamp": ...}
     │
-    ▼
+    
 Pi Zero: Network Thread
     │
     │ receive_position()
@@ -130,14 +130,14 @@ Pi Zero: Network Thread
     │ • Applies EMA filter to theta (reduces jitter)
     │ • Sets position_rx_mono timestamp
     │
-    ▼
+    
 REIP Control Logic
     │ • Uses position for coverage marking
     │ • Uses position for navigation
     │ • Uses position for peer state
 ```
 
-### 2. ToF Sensor Reading (Sensors → Pi Zero)
+### 2. ToF Sensor Reading (Sensors -> Pi Zero)
 
 ```
 ToF Sensor (VL53L0X) #1 (Front)
@@ -145,20 +145,20 @@ ToF Sensor (VL53L0X) #1 (Front)
     │ I2C Communication
     │ Address: 0x29 (default, shared bus)
     │
-    ▼
+    
 I2C Mux (TCA9548A)
     │
     │ Channel Selection (via SMBus)
     │ Pi Zero writes: bus.write_byte(0x70, 1 << channel)
-    │ • Channel 0 → Front sensor
-    │ • Channel 1 → Front-Right
-    │ • Channel 2 → Front-Left
-    │ • Channel 3 → Left
-    │ • Channel 4 → Right
+    │ • Channel 0 -> Front sensor
+    │ • Channel 1 -> Front-Right
+    │ • Channel 2 -> Front-Left
+    │ • Channel 3 -> Left
+    │ • Channel 4 -> Right
     │
     │ Wait 5ms (I2C settling time)
     │
-    ▼
+    
 Pi Zero: Sensor Thread (sensor_loop)
     │
     │ read_tof_all()
@@ -167,7 +167,7 @@ Pi Zero: Sensor Thread (sensor_loop)
     │ • Returns dict: {"front": 150, "left": 9999, ...}
     │ • Error handling: returns 9999 on failure
     │
-    ▼
+    
 REIP Control Logic
     │ • update_tof_obstacles()
     │   - Converts ToF readings to obstacle cells
@@ -181,7 +181,7 @@ REIP Control Logic
     │   - Tier 2 trust: checks if target cell has ToF obstacle
 ```
 
-### 3. Motor Control (Pi Zero → Pico → Motors)
+### 3. Motor Control (Pi Zero -> Pico -> Motors)
 
 ```
 REIP Control Logic
@@ -190,25 +190,25 @@ REIP Control Logic
     │ • Calculates left/right PWM values (-100 to 100)
     │ • Accounts for: navigation, wall avoidance, stuck detection
     │
-    ▼
+    
 Pi Zero: Hardware.set_motors(left, right)
     │
     │ UART Serial Communication (115200 baud)
     │ Command: f"MOT,{left:.1f},{right:.1f}\n"
-    │ • TX: GPIO14 → Pico RX (GP1)
-    │ • RX: GPIO15 ← Pico TX (GP0)
+    │ • TX: GPIO14 -> Pico RX (GP1)
+    │ • RX: GPIO15 <- Pico TX (GP0)
     │
     │ Thread-safe: Uses _uart_lock
     │ Error handling: Tracks _uart_error_count
     │
-    ▼
+    
 Pico: UART Handler (main.py)
     │
     │ process_text_command() or process_json_command()
     │ • Parses "MOT,80.0,80.0"
     │ • Validates range (-100 to 100)
     │
-    ▼
+    
 Pico: set_motor(pwms, speed_l, speed_r)
     │
     │ PWM Generation (1000 Hz)
@@ -217,14 +217,14 @@ Pico: set_motor(pwms, speed_l, speed_r)
     │ • Duty cycle: speed * 655.35 (0-65535 range)
     │ • Direction: IN1 high = forward, IN2 high = reverse
     │
-    ▼
+    
 DRV8833 Motor Driver
     │
     │ H-Bridge Control
     │ • Converts 3.3V PWM to motor voltage (5V from battery)
     │ • Provides current protection
     │
-    ▼
+    
 N20 Motors (100:1 gear ratio)
     │
     │ Physical Motion
@@ -232,21 +232,21 @@ N20 Motors (100:1 gear ratio)
     │ • Differential drive steering
 ```
 
-### 4. Encoder Feedback (Encoders → Pico → Pi Zero)
+### 4. Encoder Feedback (Encoders -> Pico -> Pi Zero)
 
 ```
 N20 Motor Shaft
     │
     │ Mechanical Coupling
     │
-    ▼
+    
 Optical Encoder (Quadrature)
     │
-    │ Ch.A and Ch.B Signals (90° phase)
+    │ Ch.A and Ch.B Signals (90deg phase)
     │ • Left: GP3 (A), GP4 (B)
     │ • Right: GP7 (A), GP8 (B)
     │
-    ▼
+    
 Pico: Encoder IRQ Handlers
     │
     │ Interrupt on Rising Edge
@@ -256,18 +256,18 @@ Pico: Encoder IRQ Handlers
     │
     │ (Encoders read continuously, counts stored in memory)
     │
-    ▼
+    
 Pi Zero: Hardware.read_encoders()
     │
     │ UART Request
     │ Command: "ENC\n"
     │
-    ▼
+    
 Pico: UART Response
     │
     │ Response: f"{left_count},{right_count}\n"
     │
-    ▼
+    
 Pi Zero: Control Logic
     │
     │ Uses encoders for:
@@ -293,10 +293,10 @@ Robot 1: REIP Control Logic
     │ • Target: 192.168.20.255 (broadcast)
     │ • JSON: {"robot_id": 1, "x": 500, "trust_in_leader": 0.8, ...}
     │
-    ▼
+    
 WiFi Network (802.11)
     │
-    ▼
+    
 Robot 2: Network Thread
     │
     │ receive_peer_state()
@@ -304,7 +304,7 @@ Robot 2: Network Thread
     │ • Updates PeerInfo for robot_id
     │ • Applies velocity extrapolation (accounts for 200ms delay)
     │
-    ▼
+    
 REIP Control Logic
     │ • Uses peer reports for:
     │   - Tier 3 trust assessment (weight 0.3)
@@ -313,7 +313,7 @@ REIP Control Logic
     │   - Emergency avoidance
 ```
 
-### 6. Fault Injection (Laptop → Robots)
+### 6. Fault Injection (Laptop -> Robots)
 
 ```
 Fault Injector (Laptop)
@@ -321,10 +321,10 @@ Fault Injector (Laptop)
     │ UDP Broadcast (Port 5300)
     │ JSON: {"type": "fault_inject", "robot_id": 1, "fault": "bad_leader", ...}
     │
-    ▼
+    
 WiFi Network
     │
-    ▼
+    
 All Robots: Network Thread
     │
     │ receive_fault_injection()
@@ -332,7 +332,7 @@ All Robots: Network Thread
     │ • Sets injected_fault flag
     │ • Handles: "start", "stop", "bad_leader", "freeze_leader"
     │
-    ▼
+    
 REIP Control Logic
     │ • "bad_leader": Leader sends wrong assignments
     │ • "freeze_leader": Leader sends stale assignments
@@ -346,11 +346,11 @@ REIP Control Logic
 
 | Command | Direction | Format | Response | Description |
 |---------|-----------|--------|----------|-------------|
-| `PING` | Pi → Pico | Text | `PONG` | Connection test |
-| `ENC` | Pi → Pico | Text | `left,right` | Get encoder counts |
-| `MOT,L,R` | Pi → Pico | Text | `OK` | Set motor speeds (-100 to 100) |
-| `STOP` | Pi → Pico | Text | `OK` | Emergency stop |
-| `RST` | Pi → Pico | Text | `OK` | Reset encoder counts |
+| `PING` | Pi -> Pico | Text | `PONG` | Connection test |
+| `ENC` | Pi -> Pico | Text | `left,right` | Get encoder counts |
+| `MOT,L,R` | Pi -> Pico | Text | `OK` | Set motor speeds (-100 to 100) |
+| `STOP` | Pi -> Pico | Text | `OK` | Emergency stop |
+| `RST` | Pi -> Pico | Text | `OK` | Reset encoder counts |
 
 **Example:**
 ```python
@@ -430,9 +430,9 @@ distance = tof.range  # Returns mm (0-2000, or 9999 on error)
 
 | Operation | Frequency | Latency | Notes |
 |-----------|-----------|---------|-------|
-| Position updates | 30 Hz | ~33ms | Camera → UDP → Pi Zero |
+| Position updates | 30 Hz | ~33ms | Camera -> UDP -> Pi Zero |
 | ToF sensor read | 10 Hz | ~100ms | All 5 sensors, 5ms mux switch each |
-| Motor command | 10 Hz | ~100ms | Pi Zero → Pico → Motors |
+| Motor command | 10 Hz | ~100ms | Pi Zero -> Pico -> Motors |
 | Encoder read | 10 Hz | ~20ms | UART request/response |
 | Peer broadcast | 5 Hz | ~200ms | Network delay + processing |
 | Control loop | 10 Hz | ~100ms | Main REIP logic |
@@ -442,23 +442,23 @@ distance = tof.range  # Returns mm (0-2000, or 9999 on error)
 ```
 Battery (5V, ~2000mAh)
     │
-    ├─→ Pi Zero 2W (VSYS, 5V)
+    ├─-> Pi Zero 2W (VSYS, 5V)
     │   • Powers CPU, WiFi, GPIO
     │   • ~500mA typical, ~1A peak
     │
-    ├─→ Pico (VSYS, 5V)
+    ├─-> Pico (VSYS, 5V)
     │   • Powers CPU, GPIO, PWM
     │   • ~100mA typical, ~200mA peak
     │
-    ├─→ DRV8833 (VM, 5V)
+    ├─-> DRV8833 (VM, 5V)
     │   • Powers motor H-bridge
     │   • ~500mA per motor (1A total peak)
     │
-    ├─→ ToF Sensors (3.3V via regulator)
-    │   • 5 sensors × ~20mA = ~100mA
+    ├─-> ToF Sensors (3.3V via regulator)
+    │   • 5 sensors * ~20mA = ~100mA
     │
-    └─→ Encoders (5V from Pico)
-        • 2 encoders × ~10mA = ~20mA
+    └─-> Encoders (5V from Pico)
+        • 2 encoders * ~10mA = ~20mA
 
 Total: ~1.5A typical, ~2.5A peak
 ```
@@ -489,7 +489,7 @@ Total: ~1.5A typical, ~2.5A peak
 
 The system uses a **hierarchical architecture**:
 
-1. **Laptop**: Position server (camera → ArUco → UDP)
+1. **Laptop**: Position server (camera -> ArUco -> UDP)
 2. **Pi Zero**: Main controller (REIP logic, network, I2C, UART)
 3. **I2C Mux**: Routes I2C to 5 ToF sensors
 4. **Pico**: Motor controller (PWM, encoders, UART)

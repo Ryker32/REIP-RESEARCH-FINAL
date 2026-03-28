@@ -189,20 +189,20 @@ $p_{\text{cmd-loss}}$, modeling command loss.
 ## Key Changes Summary
 
 ### 1. **Trust Dynamics Section**
-- ✅ Added combined residual equation with MPC weight $\alpha$
-- ✅ Split into two subsections: Prediction-Observation and MPC-Based Trust
-- ✅ Explained the limitation MPC trust addresses
+- [x] Added combined residual equation with MPC weight $\alpha$
+- [x] Split into two subsections: Prediction-Observation and MPC-Based Trust
+- [x] Explained the limitation MPC trust addresses
 
 ### 2. **New Subsection: MPC-Based Trust**
-- ✅ Mathematical formulation of MPC trust
-- ✅ Local optimum computation
-- ✅ MPC error calculation
-- ✅ Computational efficiency justification
-- ✅ Citations added
+- [x] Mathematical formulation of MPC trust
+- [x] Local optimum computation
+- [x] MPC error calculation
+- [x] Computational efficiency justification
+- [x] Citations added
 
 ### 3. **Fault Detection Section**
-- ✅ Updated to mention MPC trust errors
-- ✅ Note about when MPC trust is used
+- [x] Updated to mention MPC trust errors
+- [x] Note about when MPC trust is used
 
 ### 4. **Citations to Add**
 - Rawlings & Mayne (2009) - MPC theory

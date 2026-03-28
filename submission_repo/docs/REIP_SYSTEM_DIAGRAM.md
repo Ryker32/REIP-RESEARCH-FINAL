@@ -19,10 +19,10 @@ graph TB
         end
 
         subgraph Inputs["Input Processing"]
-            PositionRx["receive_position()<br/>UDP 5100<br/>Updates: x, y, θ"]
+            PositionRx["receive_position()<br/>UDP 5100<br/>Updates: x, y, theta"]
             PeerRx["receive_peer_states()<br/>UDP 5200<br/>Updates: peers[]"]
             FaultRx["receive_fault_injection()<br/>UDP 5300<br/>Sets fault modes"]
-            ToFProc["update_tof_obstacles()<br/>Converts ToF → cells"]
+            ToFProc["update_tof_obstacles()<br/>Converts ToF -> cells"]
         end
 
         subgraph Core["Core REIP Logic"]
@@ -117,7 +117,7 @@ graph TB
 ```mermaid
 graph LR
     subgraph "REIP Node Architecture"
-        A[Position Server<br/>UDP 5100] -->|x, y, θ| B[receive_position]
+        A[Position Server<br/>UDP 5100] -->|x, y, theta| B[receive_position]
         B --> C[Coverage Tracking<br/>my_visited<br/>known_visited]
         
         D[Peer Broadcasts<br/>UDP 5200] -->|state messages| E[receive_peer_states]
@@ -179,7 +179,7 @@ EXTERNAL SYSTEMS
 └────────┬────────┘      └────────┬────────┘      └────────┬────────┘
          │                        │                        │
          │ USB                    │                        │
-         ▼                        │                        │
+                                 │                        │
 ┌─────────────────┐              │                        │
 │ Position Server │              │                        │
 │ (PC/Laptop)     │              │                        │
@@ -188,7 +188,7 @@ EXTERNAL SYSTEMS
          │                        │                        │
          └────────────────────────┼────────────────────────┘
                                   │
-                                  ▼
+                                  
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          REIP NODE (reip_node.py)                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -199,7 +199,7 @@ EXTERNAL SYSTEMS
 │  │ ~8-10 Hz     │  │ 100 Hz poll  │  │ 10 Hz        │                     │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                     │
 │         │                 │                  │                              │
-│         ▼                 ▼                  ▼                              │
+│                                                                          │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                     │
 │  │ read_tof_all │  │receive_pos   │  │assess_leader │                     │
 │  │              │  │receive_peer  │  │_command()    │                     │
@@ -208,7 +208,7 @@ EXTERNAL SYSTEMS
 │  │              │  │state()        │  │              │                     │
 │  └──────┬───────┘  └──────┬───────┘  │compute_motor │                     │
 │         │                 │           │_command()    │                     │
-│         ▼                 ▼           └──────┬───────┘                     │
+│                                     └──────┬───────┘                     │
 │  ┌──────────────┐  ┌──────────────┐         │                              │
 │  │update_tof_   │  │update_peer() │         │                              │
 │  │obstacles()   │  │              │         │                              │
@@ -216,7 +216,7 @@ EXTERNAL SYSTEMS
 │         │                 │                  │                              │
 │         └─────────────────┼──────────────────┘                              │
 │                           │                                                 │
-│                           ▼                                                 │
+│                                                                            │
 │  ┌──────────────────────────────────────────────────────────┐              │
 │  │              STATE MANAGEMENT                            │              │
 │  ├──────────────────────────────────────────────────────────┤              │
@@ -245,7 +245,7 @@ EXTERNAL SYSTEMS
 │  │    • tof_obstacles: Set[cell]                            │              │
 │  └──────────────────────────────────────────────────────────┘              │
 │                           │                                                 │
-│                           ▼                                                 │
+│                                                                            │
 │  ┌──────────────────────────────────────────────────────────┐              │
 │  │         CORE REIP PROCESSES                              │              │
 │  ├──────────────────────────────────────────────────────────┤              │
@@ -293,17 +293,17 @@ EXTERNAL SYSTEMS
 │  │     └─────────────────────────────────────┘              │              │
 │  └──────────────────────────────────────────────────────────┘              │
 │                           │                                                 │
-│                           ▼                                                 │
+│                                                                            │
 │  ┌──────────────────────────────────────────────────────────┐              │
 │  │                    OUTPUTS                               │              │
 │  ├──────────────────────────────────────────────────────────┤              │
-│  │  • hw.set_motors(left, right) → UART → Pico             │              │
-│  │  • broadcast_state() → UDP 5200 → Peers                  │              │
-│  │  • log_state() → JSON file → Visualization              │              │
+│  │  • hw.set_motors(left, right) -> UART -> Pico             │              │
+│  │  • broadcast_state() -> UDP 5200 -> Peers                  │              │
+│  │  • log_state() -> JSON file -> Visualization              │              │
 │  └──────────────────────────────────────────────────────────┘              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                   │
-                                  ▼
+                                  
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         HARDWARE LAYER                                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -312,7 +312,7 @@ EXTERNAL SYSTEMS
 │  │ Pi Pico      │      │ DRV8833      │      │ VL53L0X ToF  │              │
 │  │ (main.py)    │      │ Motor Driver │      │ Sensors (x5) │              │
 │  │              │      │              │      │              │              │
-│  │ • PWM Gen    │◀─────│ • Left Motor │      │ • Front      │              │
+│  │ • PWM Gen    │─────│ • Left Motor │      │ • Front      │              │
 │  │ • Encoder    │      │ • Right Motor│      │ • Front-L    │              │
 │  │   Reading    │      │              │      │ • Front-R     │              │
 │  │              │      │              │      │ • Left        │              │
@@ -335,12 +335,12 @@ sequenceDiagram
     participant HW as Hardware (Pico)
 
     Note over RN: Startup Phase
-    PS->>RN: Position (x, y, θ)
+    PS->>RN: Position (x, y, theta)
     RN->>RN: Mark cell as visited
     RN->>Peer: Broadcast state (5 Hz)
     Peer->>RN: Broadcast state
     RN->>RN: Merge coverage maps
-    RN->>RN: run_election() → Elect leader
+    RN->>RN: run_election() -> Elect leader
 
     Note over RN: Normal Operation
     RN->>RN: compute_task_assignments() (if leader)
@@ -357,12 +357,12 @@ sequenceDiagram
     RN->>RN: compute_motor_command()
     RN->>HW: set_motors(left, right)
     HW->>RN: Encoder feedback
-    RN->>RN: Update position → Mark coverage
+    RN->>RN: Update position -> Mark coverage
 
     Note over RN: Fault Detection
     RN->>RN: trust_in_leader < 0.3
     RN->>RN: check_impeachment()
-    RN->>RN: run_election() → Exclude bad leader
+    RN->>RN: run_election() -> Exclude bad leader
     RN->>RN: Elect new leader
     RN->>RN: Reset trust for new leader
 ```

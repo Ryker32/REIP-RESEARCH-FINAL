@@ -41,9 +41,9 @@ Commands:
 
 | Port | From | To | Data |
 |------|------|-----|------|
-| 5100 | PC → Robots | Position (x, y, θ) — each robot filters by its ID |
+| 5100 | PC -> Robots | Position (x, y, theta) -- each robot filters by its ID |
 | 5200 | Robots ↔ Robots | Peer state broadcast |
-| 5300 | PC → Robots | Fault injection — each robot filters by target ID |
+| 5300 | PC -> Robots | Fault injection -- each robot filters by target ID |
 
 **Sim mode** (`--sim`): unique ports per robot for localhost testing.
 

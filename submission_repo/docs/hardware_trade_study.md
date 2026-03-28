@@ -37,8 +37,8 @@
 
 - **Number of robots**: 6 (1 leader + 5 followers)
 - **Communication**: WiFi (UDP multicast)
-- **Sensors**: 2-4× VL53L0X ToF (I2C)
-- **Motors**: 2× N20 micro gear motors with encoders
+- **Sensors**: 2-4* VL53L0X ToF (I2C)
+- **Motors**: 2* N20 micro gear motors with encoders
 - **Power**: Battery-powered (prefer low power)
 - **Size**: Micromouse form factor (compact)
 
@@ -46,7 +46,7 @@
 
 ## 2. Hardware Options Comparison
 
-### Option 1: Raspberry Pi Zero 2 W ⭐ **RECOMMENDED**
+### Option 1: Raspberry Pi Zero 2 W * **RECOMMENDED**
 
 #### Specifications
 
@@ -58,7 +58,7 @@
 | **Connectivity** | WiFi 802.11n, Bluetooth 4.2 |
 | **GPIO** | 40-pin header (I2C, SPI, UART) |
 | **Power** | 5V @ 200mA (~1W) |
-| **Size** | 65mm × 30mm × 5mm |
+| **Size** | 65mm * 30mm * 5mm |
 | **Cost** | ~$15 |
 
 #### Performance Analysis
@@ -83,21 +83,21 @@
 
 #### Pros
 
-✅ **Excellent performance/price ratio**  
-✅ **Full Linux OS** (Raspberry Pi OS)  
-✅ **Python support** (easy development)  
-✅ **Built-in WiFi** (no additional module)  
-✅ **Large community** (lots of tutorials/examples)  
-✅ **GPIO support** (I2C, SPI, UART)  
-✅ **Low power** (~1W)  
-✅ **Small form factor** (fits micromouse)  
-✅ **Sufficient headroom** (5-20x capacity)  
+[x] **Excellent performance/price ratio**  
+[x] **Full Linux OS** (Raspberry Pi OS)  
+[x] **Python support** (easy development)  
+[x] **Built-in WiFi** (no additional module)  
+[x] **Large community** (lots of tutorials/examples)  
+[x] **GPIO support** (I2C, SPI, UART)  
+[x] **Low power** (~1W)  
+[x] **Small form factor** (fits micromouse)  
+[x] **Sufficient headroom** (5-20x capacity)  
 
 #### Cons
 
-❌ **More expensive than Pico** ($15 vs $6)  
-❌ **Higher power than Pico** (1W vs 0.1W)  
-❌ **Requires microSD card** (additional cost)  
+[ ] **More expensive than Pico** ($15 vs $6)  
+[ ] **Higher power than Pico** (1W vs 0.1W)  
+[ ] **Requires microSD card** (additional cost)  
 
 #### Suitability Score: **9.5/10**
 
@@ -117,7 +117,7 @@
 | **Connectivity** | WiFi 802.11n |
 | **GPIO** | 26-pin header (I2C, SPI, UART) |
 | **Power** | 5V @ 20mA (~0.1W) |
-| **Size** | 51mm × 21mm × 1mm |
+| **Size** | 51mm * 21mm * 1mm |
 | **Cost** | ~$6 |
 
 #### Performance Analysis
@@ -127,7 +127,7 @@
 - Multi-threaded: ~200-300 MIPS
 - **Our load**: 12-50 ms per timestep
 - **Capacity**: 2-8 timesteps/second
-- **Usage**: 12.5-50% (1 Hz), 62.5-250% (5 Hz) ⚠️
+- **Usage**: 12.5-50% (1 Hz), 62.5-250% (5 Hz) [!]
 
 **Memory**:
 - OS: None (bare metal / MicroPython)
@@ -141,21 +141,21 @@
 
 #### Pros
 
-✅ **Very low cost** ($6)  
-✅ **Very low power** (~0.1W)  
-✅ **Very small** (smallest option)  
-✅ **Built-in WiFi**  
-✅ **GPIO support** (I2C, SPI, UART)  
-✅ **No microSD needed** (internal flash)  
+[x] **Very low cost** ($6)  
+[x] **Very low power** (~0.1W)  
+[x] **Very small** (smallest option)  
+[x] **Built-in WiFi**  
+[x] **GPIO support** (I2C, SPI, UART)  
+[x] **No microSD needed** (internal flash)  
 
 #### Cons
 
-❌ **Limited CPU** (might be tight at 5 Hz)  
-❌ **Limited RAM** (264 KB - sufficient but tight)  
-❌ **No Linux** (MicroPython or C/C++ only)  
-❌ **Less software support** (smaller community)  
-❌ **Harder development** (no full OS)  
-❌ **May need optimization** (Strategy 3 required)  
+[ ] **Limited CPU** (might be tight at 5 Hz)  
+[ ] **Limited RAM** (264 KB - sufficient but tight)  
+[ ] **No Linux** (MicroPython or C/C++ only)  
+[ ] **Less software support** (smaller community)  
+[ ] **Harder development** (no full OS)  
+[ ] **May need optimization** (Strategy 3 required)  
 
 #### Suitability Score: **6.5/10**
 
@@ -177,7 +177,7 @@
 | **Connectivity** | WiFi 802.11ac, Bluetooth 5.0, Gigabit Ethernet |
 | **GPIO** | 40-pin header (I2C, SPI, UART) |
 | **Power** | 5V @ 1.2-2.5A (~6-12W) |
-| **Size** | 88mm × 58mm × 19.5mm |
+| **Size** | 88mm * 58mm * 19.5mm |
 | **Cost** | ~$55 (2 GB), ~$75 (4 GB) |
 
 #### Performance Analysis
@@ -198,24 +198,24 @@
 **Power Consumption**:
 - Idle: ~500 mW
 - Active (our load): ~1-2W
-- **Battery life**: ~2-4 hours (2000 mAh battery) ⚠️
+- **Battery life**: ~2-4 hours (2000 mAh battery) [!]
 
 #### Pros
 
-✅ **Extremely powerful** (10-30x headroom)  
-✅ **Lots of RAM** (2-8 GB)  
-✅ **Full Linux OS**  
-✅ **Python support**  
-✅ **Future-proof** (can add camera, ML, etc.)  
-✅ **Gigabit Ethernet** (if needed)  
+[x] **Extremely powerful** (10-30x headroom)  
+[x] **Lots of RAM** (2-8 GB)  
+[x] **Full Linux OS**  
+[x] **Python support**  
+[x] **Future-proof** (can add camera, ML, etc.)  
+[x] **Gigabit Ethernet** (if needed)  
 
 #### Cons
 
-❌ **Expensive** ($55-75)  
-❌ **High power** (6-12W - needs larger battery)  
-❌ **Large size** (might not fit micromouse)  
-❌ **Overkill** (10-30x more than needed)  
-❌ **Short battery life** (2-4 hours)  
+[ ] **Expensive** ($55-75)  
+[ ] **High power** (6-12W - needs larger battery)  
+[ ] **Large size** (might not fit micromouse)  
+[ ] **Overkill** (10-30x more than needed)  
+[ ] **Short battery life** (2-4 hours)  
 
 #### Suitability Score: **5/10**
 
@@ -235,7 +235,7 @@
 | **Connectivity** | WiFi 802.11n, Bluetooth 4.2 |
 | **GPIO** | 34-pin (I2C, SPI, UART) |
 | **Power** | 3.3V @ 80-240mA (~0.3-0.8W) |
-| **Size** | 25mm × 18mm × 3mm |
+| **Size** | 25mm * 18mm * 3mm |
 | **Cost** | ~$5-8 |
 
 #### Performance Analysis
@@ -259,21 +259,21 @@
 
 #### Pros
 
-✅ **Very low cost** ($5-8)  
-✅ **Low power** (~0.3-0.8W)  
-✅ **Built-in WiFi/Bluetooth**  
-✅ **GPIO support**  
-✅ **Small form factor**  
-✅ **Real-time OS** (FreeRTOS)  
+[x] **Very low cost** ($5-8)  
+[x] **Low power** (~0.3-0.8W)  
+[x] **Built-in WiFi/Bluetooth**  
+[x] **GPIO support**  
+[x] **Small form factor**  
+[x] **Real-time OS** (FreeRTOS)  
 
 #### Cons
 
-❌ **No Linux** (Arduino/FreeRTOS only)  
-❌ **Limited RAM** (520 KB - tight)  
-❌ **Python not native** (MicroPython possible but limited)  
-❌ **Less software support** (smaller community)  
-❌ **Harder development** (C/C++ or MicroPython)  
-❌ **May need porting** (code written for Linux)  
+[ ] **No Linux** (Arduino/FreeRTOS only)  
+[ ] **Limited RAM** (520 KB - tight)  
+[ ] **Python not native** (MicroPython possible but limited)  
+[ ] **Less software support** (smaller community)  
+[ ] **Harder development** (C/C++ or MicroPython)  
+[ ] **May need porting** (code written for Linux)  
 
 #### Suitability Score: **6/10**
 
@@ -293,7 +293,7 @@
 | **Connectivity** | Ethernet (WiFi via USB dongle) |
 | **GPIO** | 92-pin header (I2C, SPI, UART, PRU) |
 | **Power** | 5V @ 500mA (~2.5W) |
-| **Size** | 86mm × 53mm × 15mm |
+| **Size** | 86mm * 53mm * 15mm |
 | **Cost** | ~$55 |
 
 #### Performance Analysis
@@ -316,20 +316,20 @@
 
 #### Pros
 
-✅ **Full Linux OS**  
-✅ **Python support**  
-✅ **PRU (Programmable Real-time Units)** - for real-time tasks  
-✅ **Lots of GPIO** (92 pins)  
-✅ **Ethernet** (reliable)  
+[x] **Full Linux OS**  
+[x] **Python support**  
+[x] **PRU (Programmable Real-time Units)** - for real-time tasks  
+[x] **Lots of GPIO** (92 pins)  
+[x] **Ethernet** (reliable)  
 
 #### Cons
 
-❌ **Expensive** ($55)  
-❌ **Higher power** (~2.5W)  
-❌ **No built-in WiFi** (needs USB dongle)  
-❌ **Single-core** (less parallel processing)  
-❌ **Larger size** (might not fit micromouse)  
-❌ **Less popular** (smaller community)  
+[ ] **Expensive** ($55)  
+[ ] **Higher power** (~2.5W)  
+[ ] **No built-in WiFi** (needs USB dongle)  
+[ ] **Single-core** (less parallel processing)  
+[ ] **Larger size** (might not fit micromouse)  
+[ ] **Less popular** (smaller community)  
 
 #### Suitability Score: **5.5/10**
 
@@ -342,14 +342,14 @@
 | Metric | Pi Zero 2 W | Pi Pico W | Pi 4B | ESP32 | BeagleBone |
 |--------|-------------|-----------|-------|-------|------------|
 | **Cost** | $15 | $6 | $55 | $5-8 | $55 |
-| **CPU Performance** | ⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
+| **CPU Performance** | **** | ** | ***** | *** | *** |
 | **Memory** | 512 MB | 264 KB | 2-8 GB | 520 KB | 512 MB |
 | **Power** | 1W | 0.1W | 6-12W | 0.3-0.8W | 2.5W |
-| **Linux OS** | ✅ | ❌ | ✅ | ❌ | ✅ |
-| **Python Support** | ✅ | ⚠️ | ✅ | ⚠️ | ✅ |
-| **WiFi Built-in** | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Development Ease** | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐ | ⭐⭐⭐⭐ |
-| **Community Support** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **Linux OS** | [x] | [ ] | [x] | [ ] | [x] |
+| **Python Support** | [x] | [!] | [x] | [!] | [x] |
+| **WiFi Built-in** | [x] | [x] | [x] | [x] | [ ] |
+| **Development Ease** | ***** | ** | ***** | ** | **** |
+| **Community Support** | ***** | *** | ***** | **** | ** |
 | **Size** | Small | Tiny | Large | Tiny | Medium |
 | **Battery Life** | 10-15h | 20-40h | 2-4h | 4-8h | 2-4h |
 | **Suitability** | **9.5/10** | 6.5/10 | 5/10 | 6/10 | 5.5/10 |
@@ -367,10 +367,10 @@
 | **BeagleBone** | $55 | **$330** | Not recommended |
 
 **Additional costs** (same for all):
-- Sensors: 2-4× VL53L0X ($5 each) = $10-20
+- Sensors: 2-4* VL53L0X ($5 each) = $10-20
 - I2C Multiplexer: TCA9548A ($3)
 - Motor Driver: TB6612FNG ($5)
-- Motors: 2× N20 ($10)
+- Motors: 2* N20 ($10)
 - **Per robot**: $28-38
 - **6 robots**: $168-228
 
@@ -390,14 +390,14 @@
 |--------|-------|--------------|-------|
 | **Pi Zero 2 W** | 1W | **10-15 hours** | Good |
 | **Pi Pico W** | 0.1W | **20-40 hours** | Excellent |
-| **Pi 4B** | 6-12W | **0.6-1.2 hours** | ⚠️ Poor |
+| **Pi 4B** | 6-12W | **0.6-1.2 hours** | [!] Poor |
 | **ESP32** | 0.3-0.8W | **9-25 hours** | Good |
-| **BeagleBone** | 2.5W | **3 hours** | ⚠️ Poor |
+| **BeagleBone** | 2.5W | **3 hours** | [!] Poor |
 
 **For 6 robots** (all active):
 - **Pi Zero 2 W**: 6W total
 - **Pi Pico W**: 0.6W total
-- **Pi 4B**: 36-72W total ⚠️
+- **Pi 4B**: 36-72W total [!]
 - **ESP32**: 1.8-4.8W total
 - **BeagleBone**: 15W total
 
@@ -409,11 +409,11 @@
 
 | Option | OS | Python | Libraries | Community | Development Time |
 |--------|----|--------|-----------|-----------|------------------|
-| **Pi Zero 2 W** | Linux | ✅ Full | ✅ All | ⭐⭐⭐⭐⭐ | **1-2 weeks** |
-| **Pi Pico W** | Bare metal | ⚠️ MicroPython | ⚠️ Limited | ⭐⭐⭐ | **4-6 weeks** |
-| **Pi 4B** | Linux | ✅ Full | ✅ All | ⭐⭐⭐⭐⭐ | **1-2 weeks** |
-| **ESP32** | FreeRTOS | ⚠️ MicroPython | ⚠️ Limited | ⭐⭐⭐⭐ | **6-8 weeks** |
-| **BeagleBone** | Linux | ✅ Full | ✅ Most | ⭐⭐ | **2-3 weeks** |
+| **Pi Zero 2 W** | Linux | [x] Full | [x] All | ***** | **1-2 weeks** |
+| **Pi Pico W** | Bare metal | [!] MicroPython | [!] Limited | *** | **4-6 weeks** |
+| **Pi 4B** | Linux | [x] Full | [x] All | ***** | **1-2 weeks** |
+| **ESP32** | FreeRTOS | [!] MicroPython | [!] Limited | **** | **6-8 weeks** |
+| **BeagleBone** | Linux | [x] Full | [x] Most | ** | **2-3 weeks** |
 
 **Key Insight**: Pi Zero 2 W and Pi 4B have the best software support, making development fastest.
 
@@ -425,18 +425,18 @@
 
 | Option | Computation Time | Headroom | Real-Time Capable? |
 |--------|-----------------|----------|---------------------|
-| **Pi Zero 2 W** | 12-50 ms | 950-988 ms (95-98.8%) | ✅ **Yes** |
-| **Pi Pico W** | 12-50 ms | 950-988 ms (95-98.8%) | ⚠️ **Maybe** (at 1 Hz) |
-| **Pi 4B** | 12-50 ms | 950-988 ms (95-98.8%) | ✅ **Yes** |
-| **ESP32** | 12-50 ms | 950-988 ms (95-98.8%) | ⚠️ **Maybe** (test first) |
-| **BeagleBone** | 12-50 ms | 950-988 ms (95-98.8%) | ✅ **Yes** |
+| **Pi Zero 2 W** | 12-50 ms | 950-988 ms (95-98.8%) | [x] **Yes** |
+| **Pi Pico W** | 12-50 ms | 950-988 ms (95-98.8%) | [!] **Maybe** (at 1 Hz) |
+| **Pi 4B** | 12-50 ms | 950-988 ms (95-98.8%) | [x] **Yes** |
+| **ESP32** | 12-50 ms | 950-988 ms (95-98.8%) | [!] **Maybe** (test first) |
+| **BeagleBone** | 12-50 ms | 950-988 ms (95-98.8%) | [x] **Yes** |
 
 **At 5 Hz** (200 ms per timestep):
-- **Pi Zero 2 W**: 12-50 ms = 6-25% usage ✅
-- **Pi Pico W**: 12-50 ms = 6-25% usage ⚠️ (might be tight)
-- **Pi 4B**: 12-50 ms = 6-25% usage ✅
-- **ESP32**: 12-50 ms = 6-25% usage ⚠️ (test first)
-- **BeagleBone**: 12-50 ms = 6-25% usage ✅
+- **Pi Zero 2 W**: 12-50 ms = 6-25% usage [x]
+- **Pi Pico W**: 12-50 ms = 6-25% usage [!] (might be tight)
+- **Pi 4B**: 12-50 ms = 6-25% usage [x]
+- **ESP32**: 12-50 ms = 6-25% usage [!] (test first)
+- **BeagleBone**: 12-50 ms = 6-25% usage [x]
 
 ---
 
@@ -447,11 +447,11 @@
 **Option**: **Raspberry Pi Zero 2 W**
 
 **Why**:
-- ✅ Best balance of performance, cost, and development time
-- ✅ Full Linux/Python support (easy to demonstrate)
-- ✅ Sufficient headroom for reliable operation
-- ✅ Good battery life (10-15 hours)
-- ✅ Large community (easy to get help)
+- [x] Best balance of performance, cost, and development time
+- [x] Full Linux/Python support (easy to demonstrate)
+- [x] Sufficient headroom for reliable operation
+- [x] Good battery life (10-15 hours)
+- [x] Large community (easy to get help)
 
 **Total Cost**: ~$258-318 for 6 robots
 
@@ -462,10 +462,10 @@
 **Option**: **Raspberry Pi Pico W** (followers) + **Pi Zero 2 W** (leader)
 
 **Why**:
-- ✅ Lower cost ($6 × 5 + $15 = $45 vs $90)
-- ✅ Leader gets more compute (frontier detection/assignment)
-- ✅ Followers still sufficient (MPC trust is lightweight)
-- ⚠️ Requires testing and optimization
+- [x] Lower cost ($6 * 5 + $15 = $45 vs $90)
+- [x] Leader gets more compute (frontier detection/assignment)
+- [x] Followers still sufficient (MPC trust is lightweight)
+- [!] Requires testing and optimization
 
 **Total Cost**: ~$204-264 for 6 robots
 
@@ -476,11 +476,11 @@
 **Option**: **Raspberry Pi 4B**
 
 **Why**:
-- ✅ Extremely powerful (can add camera, ML features)
-- ✅ Lots of RAM (2-8 GB)
-- ⚠️ Expensive ($330 vs $90)
-- ⚠️ High power (needs larger battery)
-- ⚠️ Large size (might not fit micromouse)
+- [x] Extremely powerful (can add camera, ML features)
+- [x] Lots of RAM (2-8 GB)
+- [!] Expensive ($330 vs $90)
+- [!] High power (needs larger battery)
+- [!] Large size (might not fit micromouse)
 
 **Total Cost**: ~$498-558 for 6 robots
 
@@ -491,10 +491,10 @@
 **Option**: **Raspberry Pi Pico W**
 
 **Why**:
-- ✅ Very low power (0.1W - 20-40 hour battery life)
-- ✅ Very low cost ($6)
-- ⚠️ Limited CPU (might be tight)
-- ⚠️ No Linux (harder development)
+- [x] Very low power (0.1W - 20-40 hour battery life)
+- [x] Very low cost ($6)
+- [!] Limited CPU (might be tight)
+- [!] No Linux (harder development)
 
 **Total Cost**: ~$204-264 for 6 robots
 
@@ -502,18 +502,18 @@
 
 ## 9. Final Recommendation
 
-### Primary Recommendation: **Raspberry Pi Zero 2 W** ⭐
+### Primary Recommendation: **Raspberry Pi Zero 2 W** *
 
 **Score**: 9.5/10
 
 **Reasons**:
-1. ✅ **Best performance/price ratio**
-2. ✅ **Full Linux/Python support** (easy development)
-3. ✅ **Sufficient headroom** (5-20x capacity)
-4. ✅ **Good battery life** (10-15 hours)
-5. ✅ **Large community** (lots of support)
-6. ✅ **Built-in WiFi** (no additional module)
-7. ✅ **Small form factor** (fits micromouse)
+1. [x] **Best performance/price ratio**
+2. [x] **Full Linux/Python support** (easy development)
+3. [x] **Sufficient headroom** (5-20x capacity)
+4. [x] **Good battery life** (10-15 hours)
+5. [x] **Large community** (lots of support)
+6. [x] **Built-in WiFi** (no additional module)
+7. [x] **Small form factor** (fits micromouse)
 
 **Total System Cost**: ~$258-318
 
@@ -522,18 +522,18 @@
 ### Alternative: **Hybrid Approach** (Budget Option)
 
 **Leader**: Raspberry Pi Zero 2 W ($15)  
-**Followers**: Raspberry Pi Pico W ($6 × 5 = $30)
+**Followers**: Raspberry Pi Pico W ($6 * 5 = $30)
 
 **Total**: $45 (vs $90 for all Pi Zero 2 W)
 
 **Pros**:
-- ✅ Lower cost ($45 vs $90)
-- ✅ Leader has more compute (needed for frontier detection)
-- ✅ Followers sufficient (MPC trust is lightweight)
+- [x] Lower cost ($45 vs $90)
+- [x] Leader has more compute (needed for frontier detection)
+- [x] Followers sufficient (MPC trust is lightweight)
 
 **Cons**:
-- ⚠️ Requires testing (Pico W might be tight)
-- ⚠️ Two different platforms (more complexity)
+- [!] Requires testing (Pico W might be tight)
+- [!] Two different platforms (more complexity)
 
 **Recommendation**: Test Pico W first, use Pi Zero 2 W if tight.
 
@@ -557,12 +557,12 @@
 
 ## 11. Next Steps
 
-1. **Order 1× Pi Zero 2 W** for testing
+1. **Order 1* Pi Zero 2 W** for testing
 2. **Profile actual CPU usage** on hardware
 3. **Test at 1 Hz and 5 Hz** control loops
 4. **Measure power consumption** (verify battery life)
 5. **If budget is tight**: Test Pi Pico W as alternative
-6. **Order remaining 5×** once validated
+6. **Order remaining 5*** once validated
 
 ---
 

@@ -3,9 +3,9 @@
 ## Ultra-Simple Version
 
 ```
-Position → Coverage → Trust → Election → Assignment → Navigation → Motors
-Sensors →  Merging   Assessment         (Leader)     (A* + Avoid)   Commands
-Peers  →                                                             
+Position -> Coverage -> Trust -> Election -> Assignment -> Navigation -> Motors
+Sensors ->  Merging   Assessment         (Leader)     (A* + Avoid)   Commands
+Peers  ->                                                             
 ```
 
 ## Complete REIP Software Flow (Including Leader Commands)
@@ -16,7 +16,7 @@ Peers  →
         │  Server     │  │  Sensors    │  │   States    │
         └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
                │                │                 │
-               ▼                ▼                 ▼
+                                                
         ┌─────────────────────────────────────────────┐
         │         Coverage Merging                    │
         │  • Personal visited cells (my_visited)      │
@@ -24,7 +24,7 @@ Peers  →
         │  • Obstacle cells (tof_obstacles)           │
         └──────────────────┬──────────────────────────┘
                            │
-                           ▼
+                           
         ┌─────────────────────────────────────────────┐
         │      REIP Control Logic                     │
         │                                             │
@@ -36,7 +36,7 @@ Peers  →
         │  │  • Elect new leader                  │  │
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Task Assignment (Leader Only)      │  │
         │  │                                      │  │
@@ -46,7 +46,7 @@ Peers  →
         │  │    {robot_id: (x, y) target}        │  │
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Command Broadcast (UDP 5200)       │  │
         │  │   • Include assignments in message   │  │
@@ -54,14 +54,14 @@ Peers  →
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
         │              │                                 │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Command Reception (Followers)      │  │
         │  │   • Extract assigned_target          │  │
         │  │   • Store as leader_assigned_target  │  │
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Proactive Command Verification     │  │
         │  │   (assess_leader_command)            │  │
@@ -86,15 +86,15 @@ Peers  →
         │  │  │  MPC Direction Check          │  │  │
         │  │  │  • Command vs. nearest        │  │  │
         │  │  │    unexplored area            │  │  │
-        │  │  │  • Severe (>135°) or          │  │  │
-        │  │  │    Moderate (90-135°)         │  │  │
+        │  │  │  • Severe (>135deg) or          │  │  │
+        │  │  │    Moderate (90-135deg)         │  │  │
         │  │  └──────────────────────────────┘  │  │
         │  │                                      │  │
-        │  │  → Updates: suspicion_of_leader    │  │
+        │  │  -> Updates: suspicion_of_leader    │  │
         │  │     trust_in_leader                 │  │
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Navigation Decision                │  │
         │  │                                      │  │
@@ -104,7 +104,7 @@ Peers  →
         │  │    Use local frontier                │  │
         │  └───────────┬──────────────────────────┘  │
         │              │                               │
-        │              ▼                               │
+        │                                             │
         │  ┌──────────────────────────────────────┐  │
         │  │   Navigation                         │  │
         │  │   • A* Pathfinding                  │  │
@@ -114,7 +114,7 @@ Peers  →
         │  └──────────────────────────────────────┘  │
         └──────────────────┬───────────────────────────┘
                            │
-                           ▼
+                           
         ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
         │   Motor     │  │   Peer      │  │   Logging   │
         │  Commands   │  │  Broadcast  │  │   (JSON)    │
@@ -152,7 +152,7 @@ LEADER SIDE:
                     │
                     │ UDP 5200
                     │
-                    ▼
+                    
 ┌─────────────────────────────────────────────────────┐
 │  Follower Robot                                    │
 │                                                     │
@@ -171,8 +171,8 @@ LEADER SIDE:
 │     ├─ Tier 3: Cell in known_visited?             │
 │     └─ MPC: Command direction vs. frontiers       │
 │                                                     │
-│     → Updates suspicion_of_leader                 │
-│     → Updates trust_in_leader                      │
+│     -> Updates suspicion_of_leader                 │
+│     -> Updates trust_in_leader                      │
 │                                                     │
 │  3. Navigation Decision                            │
 │     If command valid:                              │
@@ -190,7 +190,7 @@ LEADER SIDE:
 ## Simplified Version
 
 ```
-Inputs → Coverage Merging → Trust Assessment → Election → Task Assignment → Navigation → Outputs
+Inputs -> Coverage Merging -> Trust Assessment -> Election -> Task Assignment -> Navigation -> Outputs
          (Position,         (3-Tier Check)   (Leader    (Frontier        (A* +        (Motors,
           Sensors,          + MPC)           Selection)  Assignment)      Avoidance)   Broadcast,
           Peers)                                                                       Log)
@@ -199,9 +199,9 @@ Inputs → Coverage Merging → Trust Assessment → Election → Task Assignmen
 ## Component Details
 
 ### Input Processing
-- **Position Server**: ArUco camera → robot pose (x, y, θ) → visited cell marking
-- **ToF Sensors**: Distance readings → obstacle cell map
-- **Peer States**: Network broadcasts → coverage merging, trust signals
+- **Position Server**: ArUco camera -> robot pose (x, y, theta) -> visited cell marking
+- **ToF Sensors**: Distance readings -> obstacle cell map
+- **Peer States**: Network broadcasts -> coverage merging, trust signals
 
 ### Coverage Merging
 - Combines personal visits, peer reports, and sensor obstacles
@@ -233,21 +233,21 @@ Inputs → Coverage Merging → Trust Assessment → Election → Task Assignmen
 - Generates left/right motor PWM commands
 
 ### Output
-- **Motor Commands**: UART to Pico → DRV8833 → Motors
+- **Motor Commands**: UART to Pico -> DRV8833 -> Motors
 - **Peer Broadcast**: UDP to other robots (state, trust, assignments)
 - **Logging**: JSON file for visualization and analysis
 
 ## Data Flow Summary
 
 ```
-Position Updates → Coverage Map → Trust Assessment → Leader Decision
+Position Updates -> Coverage Map -> Trust Assessment -> Leader Decision
                                                           │
-                                                          ├─→ If Leader: Task Assignment
+                                                          ├─-> If Leader: Task Assignment
                                                           │
-                                                          └─→ If Follower: Receive Assignment
+                                                          └─-> If Follower: Receive Assignment
                                                                       │
-                                                                      ▼
-                                                              Navigation → Motor Commands
+                                                                      
+                                                              Navigation -> Motor Commands
 ```
 
 ## Key Design Features

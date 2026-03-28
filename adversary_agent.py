@@ -6,7 +6,7 @@ the current leader, then re-compromises after each recovery. Uses only
 bad_leader fault (no new fault types required).
 
 Budget-limited (default 4 attacks across 120s trial) with fixed cooldown
-between strikes. No trust-score observation — just public leader identity.
+between strikes. No trust-score observation -- just public leader identity.
 """
 
 from dataclasses import dataclass
@@ -51,7 +51,7 @@ class AdaptiveAdversary:
             return None
         if elapsed < self.holdoff_s:
             return None
-        # Our target was deposed — reset so we can re-attack new leader
+        # Our target was deposed -- reset so we can re-attack new leader
         if self._last_target is not None and leader_changed_since_last:
             self._last_target = None
         # Cooldown

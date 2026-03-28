@@ -101,7 +101,7 @@ class FaultInjector:
             for _ in range(3):
                 self.socket.sendto(data, (BROADCAST_IP, UDP_FAULT_PORT))
                 time.sleep(0.05)
-        print("START sent to all robots — motors engaged")
+        print("START sent to all robots -- motors engaged")
 
     def run(self):
         print("=== REIP Fault Injector ===")
@@ -136,11 +136,11 @@ class FaultInjector:
                     rid = int(parts[1])
                     self.inject(rid, parts[0])
                     if parts[0] == 'bad_leader':
-                        print("  → Leader will now send robots to explored cells")
-                        print("  → Watch for trust decay in followers!")
+                        print("  -> Leader will now send robots to explored cells")
+                        print("  -> Watch for trust decay in followers!")
                     elif parts[0] == 'self_injure_leader':
-                        print("  → Leader will now attract followers into an occupied peer zone")
-                        print("  → Watch whether REIP followers reject the unsafe command!")
+                        print("  -> Leader will now attract followers into an occupied peer zone")
+                        print("  -> Watch whether REIP followers reject the unsafe command!")
                 
                 elif parts[0] == 'clear' and len(parts) >= 2:
                     rid = int(parts[1])

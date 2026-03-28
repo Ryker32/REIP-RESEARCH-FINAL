@@ -49,9 +49,9 @@ This will:
 - Load hardware results
 - Compare key metrics (coverage, detection time, suspicion time)
 - Report pass/fail with tolerances:
-  - Coverage: ±10% difference
-  - Detection time: ±0.5s difference
-  - Suspicion time: ±0.3s difference
+  - Coverage: +/-10% difference
+  - Detection time: +/-0.5s difference
+  - Suspicion time: +/-0.3s difference
 
 ### Step 5: If Validation Passes
 
@@ -78,7 +78,7 @@ The `--hardware-positions` flag loads positions from ArUco detection JSON:
 
 The `--validate` flag compares sim vs hardware:
 - Loads hardware results from JSON
-- Groups by condition (controller × fault type)
+- Groups by condition (controller * fault type)
 - Computes mean differences
 - Reports pass/fail with clear tolerances
 
@@ -89,19 +89,19 @@ The `--validate` flag compares sim vs hardware:
 SIMULATION vs HARDWARE VALIDATION
 ================================================================================
 
-  ✓ PASS reip|bad_leader:
+  OK PASS reip|bad_leader:
     Coverage: Sim 91.2% vs HW 89.5% (diff: 1.7%)
     Detection: Sim 1.21s vs HW 1.35s (diff: 0.14s)
     Suspicion: Sim 0.20s vs HW 0.22s (diff: 0.02s)
 
-  ✓ PASS reip|none:
+  OK PASS reip|none:
     Coverage: Sim 92.1% vs HW 90.8% (diff: 1.3%)
     Detection: N/A (no faults)
     Suspicion: N/A (no faults)
 
 ================================================================================
 VALIDATION PASSED: Simulation matches hardware within tolerances
-  → Safe to use 100-trial sim results for paper
+  -> Safe to use 100-trial sim results for paper
 ================================================================================
 ```
 

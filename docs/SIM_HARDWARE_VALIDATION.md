@@ -83,7 +83,7 @@
 **Validation Steps**:
 - [ ] Inject bad leader on hardware, measure detection time
 - [ ] Compare to sim: Should be similar (0.20-0.21s median)
-- [ ] Test causality: Visit cell, then receive assignment to that cell — should NOT trigger false positive
+- [ ] Test causality: Visit cell, then receive assignment to that cell -- should NOT trigger false positive
 - [ ] Test Tier 2: Command robot to wall, does ToF trigger suspicion?
 
 ---

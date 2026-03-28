@@ -14,7 +14,7 @@ I assembled a low-cost multi-robot testbed consisting of five differential-drive
 - 2S 1000 mAh LiPo battery power system
 - 3D-printed PLA chassis (under 300g per robot)
 
-Each robot is color-coded and carries an ArUco identification tag (IDs 1-5, 4×4 library, 50mm) for visual tracking. Robots communicate via WiFi peer-to-peer and are named clanker1-5. The system operates autonomously without centralized control during trials.
+Each robot is color-coded and carries an ArUco identification tag (IDs 1-5, 4*4 library, 50mm) for visual tracking. Robots communicate via WiFi peer-to-peer and are named clanker1-5. The system operates autonomously without centralized control during trials.
 
 ## 2. Software Development
 
@@ -33,7 +33,7 @@ I also implemented baseline comparison systems from distributed coordination lit
 
 ## 3. Experimental Arena
 
-I constructed an indoor experimental arena (2000 × 1500 mm) using 38 mm EPS foamboard to represent a constrained search-and-rescue-style environment. The arena includes:
+I constructed an indoor experimental arena (2000 * 1500 mm) using 38 mm EPS foamboard to represent a constrained search-and-rescue-style environment. The arena includes:
 - Boundary walls covered with masking tape to reduce ToF sensor reflections
 - A central divider (1000 mm from left edge, 1300 mm tall) creating a two-room layout
 - Four ArUco corner markers (IDs 40-43, 80mm) for camera-based localization

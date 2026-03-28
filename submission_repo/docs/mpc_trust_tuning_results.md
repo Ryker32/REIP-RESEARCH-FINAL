@@ -41,34 +41,34 @@ reip:
 
 ## Citation Verification
 
-### ✅ Verified Citations
+### [x] Verified Citations
 
 1. **Shannon, C. (1948). "A Mathematical Theory of Communication."**
-   - **Status**: ✅ Standard reference, widely cited
+   - **Status**: [x] Standard reference, widely cited
    - **Relevance**: Information theory, entropy as information measure
    - **Usage**: Entropy-based frontier scoring, unknown cell counting
 
 2. **Yamauchi, B. (1997). "A Frontier-Based Approach for Autonomous Exploration."**
-   - **Status**: ✅ Standard reference in robotics
+   - **Status**: [x] Standard reference in robotics
    - **Relevance**: Frontier-based exploration methodology
    - **Usage**: Frontier detection and assignment algorithms
 
-### ⚠️ Need Manual Verification
+### [!] Need Manual Verification
 
 3. **Rawlings, J.B., Mayne, D.Q. (2009). "Model Predictive Control: Theory and Design."**
-   - **Status**: ⚠️ Verify publisher (likely Nob Hill Publishing or similar)
+   - **Status**: [!] Verify publisher (likely Nob Hill Publishing or similar)
    - **Relevance**: MPC theory for local optimization
    - **Usage**: MPC trust computation (agents compute locally optimal actions)
    - **Action Required**: Check exact title, publisher, ISBN
 
 4. **Camacho, E.F., Bordons, C. (2004). "Model Predictive Control." 2nd ed.**
-   - **Status**: ⚠️ Verify edition and publisher (likely Springer)
+   - **Status**: [!] Verify edition and publisher (likely Springer)
    - **Relevance**: MPC computational efficiency
    - **Usage**: Justification for lightweight MPC using compressed representations
    - **Action Required**: Verify 2nd edition exists, check publisher
 
 5. **Josang, A., Ismail, R. (2002). "The Beta Reputation System."**
-   - **Status**: ⚠️ Verify conference (likely Bled Electronic Commerce Conference)
+   - **Status**: [!] Verify conference (likely Bled Electronic Commerce Conference)
    - **Relevance**: Trust aggregation methods
    - **Usage**: Combining multiple trust signals (hybrid mechanism)
    - **Action Required**: Verify exact conference name, year, page numbers
@@ -97,7 +97,7 @@ If the above citations cannot be verified, consider:
 
 ## Implementation Status
 
-### ✅ Completed
+### [x] Completed
 
 1. MPC trust computation method (`compute_mpc_trust_error`)
 2. Hybrid trust mechanism (`update_trust` with MPC error)
@@ -105,14 +105,14 @@ If the above citations cannot be verified, consider:
 4. Integration into REIP step loop
 5. Debug/telemetry tracking (`_last_mpc_error`)
 
-### ✅ Tested
+### [x] Tested
 
-1. MPC errors detected: ✅ (47-110 steps during attack)
-2. Trust decay: ✅ (0.241 with optimal parameters)
-3. Impeachments: ✅ (3-9 depending on parameters)
-4. Computational efficiency: ✅ (lightweight, uses existing `belief_lr`)
+1. MPC errors detected: [x] (47-110 steps during attack)
+2. Trust decay: [x] (0.241 with optimal parameters)
+3. Impeachments: [x] (3-9 depending on parameters)
+4. Computational efficiency: [x] (lightweight, uses existing `belief_lr`)
 
-### 📝 Notes
+###  Notes
 
 - MPC trust works even when `pred_unk = 0` (addresses limitation)
 - Optimal configuration uses MPC trust exclusively (weight=1.0)

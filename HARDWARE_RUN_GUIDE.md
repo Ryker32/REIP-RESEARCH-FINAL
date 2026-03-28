@@ -25,9 +25,9 @@ python -c "from run_trial import kill_all; kill_all()"
 ## Fault Timing (automatic)
 
 `run_trial.py` handles fault injection automatically with dual sequential faults:
-- **t=20s** — Fault #1 injected on current leader
-- **t=40s** — Fault #2 injected on current leader (may be a new leader after impeachment)
-- **t=120s** — Trial ends, robots stopped, logs collected
+- **t=20s** -- Fault #1 injected on current leader
+- **t=40s** -- Fault #2 injected on current leader (may be a new leader after impeachment)
+- **t=120s** -- Trial ends, robots stopped, logs collected
 
 ---
 
@@ -43,13 +43,13 @@ python run_trial.py --controller reip --fault none --trial 3
 python run_trial.py --controller reip --fault none --trial 4
 python run_trial.py --controller reip --fault none --trial 5
 
-# REIP bad_leader — *** KEY DEMO ***
+# REIP bad_leader -- *** KEY DEMO ***
 python run_trial.py --controller reip --fault bad_leader --trial 1 ## trials\reip_bad_leader_t1_20260315_185118
 python run_trial.py --controller reip --fault bad_leader --trial 2 ## trials\reip_bad_leader_t2_20260315_185439
 python run_trial.py --controller reip --fault bad_leader --trial 3 ## trials\reip_bad_leader_t3_20260315_185801
 python run_trial.py --controller reip --fault bad_leader --trial 4 ## trials\reip_bad_leader_t4_20260315_190114
 python run_trial.py --controller reip --fault bad_leader --trial 5 ## trials\reip_bad_leader_t5_20260315_191258
-## Best: [REC] Stopped — saved to trials\20260315_191301
+## Best: [REC] Stopped -- saved to trials\20260315_191301
 
 # REIP freeze_leader
 python run_trial.py --controller reip --fault freeze_leader --trial 1 ## trials\reip_freeze_leader_t1_20260315_191636
@@ -132,13 +132,13 @@ python run_trial.py --controller raft --fault self_injure_leader --trial 5 ## tr
 
 ### Priority Order (what to run first)
 
-1. **REIP + bad_leader x5** — the paper's key claim, currently missing from hardware table
-2. **REIP + freeze_leader x4** — only have 1 trial
-3. **Raft + bad_leader x5** — need the Raft-fails-under-fault comparison
-4. **REIP + self_injure x2** — have 3, get to 5
+1. **REIP + bad_leader x5** -- the paper's key claim, currently missing from hardware table
+2. **REIP + freeze_leader x4** -- only have 1 trial
+3. **Raft + bad_leader x5** -- need the Raft-fails-under-fault comparison
+4. **REIP + self_injure x2** -- have 3, get to 5
 5. **Raft + freeze_leader x5**
 6. **Raft + self_injure x5**
-7. **Raft + none x1** — have 4, get to 5
+7. **Raft + none x1** -- have 4, get to 5
 
 **Total: 8 conditions x 5 trials = 40 runs (~80 minutes of robot time)**
 

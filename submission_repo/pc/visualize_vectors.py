@@ -11,7 +11,7 @@ publication-quality annotated video showing:
   - Per-robot trust halos (green/yellow/orange/red)
   - Heading arrow (white)
   - Navigation target arrow (cyan)
-  - Predicted vs commanded divergence (green vs red arrows when >30°)
+  - Predicted vs commanded divergence (green vs red arrows when >30deg)
   - Leader crown marker
   - Fault injection event banners (from trial_meta.json)
   - Stats panel: time, coverage, per-robot trust
@@ -20,7 +20,7 @@ Optionally merges per-robot JSONL logs (from run_trial.py) for richer data
 (fault classification, impeachment timing, etc.).
 
 Usage:
-  # Minimal — just the server's trial directory:
+  # Minimal -- just the server's trial directory:
   python visualize_vectors.py --trial-dir trials/20250303_143052
 
   # With robot-side logs and fault metadata:
@@ -44,22 +44,22 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Set
 
 # ============== Colors (BGR) ==============
-C_ARENA       = (0, 255, 0)       # green  — arena boundary
-C_WALL        = (0, 255, 0)       # green  — interior wall
-C_MARGIN      = (0, 200, 255)     # yellow — wall margin
-C_GRID        = (100, 100, 100)   # gray   — grid lines
-C_VISITED     = (0, 140, 0)       # dark green — visited cell fill
-C_UNEXPLORED  = (40, 20, 20)      # dark red   — unexplored cell fill
-C_WALL_CELL   = (60, 60, 60)      # dark gray  — wall cell fill
-C_HEADING     = (255, 255, 255)   # white  — heading arrow
-C_NAV_TARGET  = (255, 200, 0)     # cyan   — navigation target
-C_PREDICTED   = (0, 255, 100)     # green  — predicted target
-C_COMMANDED   = (0, 0, 255)       # red    — commanded target
-C_TRUST_OK    = (0, 255, 0)       # green  — trust healthy
-C_TRUST_WARN  = (0, 180, 255)     # orange — suspicion rising
-C_TRUST_BAD   = (0, 0, 255)       # red    — trust lost
-C_LEADER      = (0, 255, 255)     # yellow — leader crown
-C_FAULT_BG    = (0, 0, 180)       # dark red — fault banner background
+C_ARENA       = (0, 255, 0)       # green  -- arena boundary
+C_WALL        = (0, 255, 0)       # green  -- interior wall
+C_MARGIN      = (0, 200, 255)     # yellow -- wall margin
+C_GRID        = (100, 100, 100)   # gray   -- grid lines
+C_VISITED     = (0, 140, 0)       # dark green -- visited cell fill
+C_UNEXPLORED  = (40, 20, 20)      # dark red   -- unexplored cell fill
+C_WALL_CELL   = (60, 60, 60)      # dark gray  -- wall cell fill
+C_HEADING     = (255, 255, 255)   # white  -- heading arrow
+C_NAV_TARGET  = (255, 200, 0)     # cyan   -- navigation target
+C_PREDICTED   = (0, 255, 100)     # green  -- predicted target
+C_COMMANDED   = (0, 0, 255)       # red    -- commanded target
+C_TRUST_OK    = (0, 255, 0)       # green  -- trust healthy
+C_TRUST_WARN  = (0, 180, 255)     # orange -- suspicion rising
+C_TRUST_BAD   = (0, 0, 255)       # red    -- trust lost
+C_LEADER      = (0, 255, 255)     # yellow -- leader crown
+C_FAULT_BG    = (0, 0, 180)       # dark red -- fault banner background
 C_WHITE       = (255, 255, 255)
 C_TEXT_DIM    = (180, 180, 180)
 
@@ -200,7 +200,7 @@ def draw_exploration(frame, cell_polys, visited: Set[Tuple[int, int]], num_explo
 
 
 def draw_arena(frame, cal: Calibration):
-    """Arena boundary, interior wall, margin, and grid — semi-transparent."""
+    """Arena boundary, interior wall, margin, and grid -- semi-transparent."""
     WALL_MARGIN = 115
     DIVIDER_MARGIN = 125
     overlay = frame.copy()
@@ -571,7 +571,7 @@ def main():
     print(f"  {len(state_lines)} state frames loaded")
 
     if cal.inv_homography is None:
-        print("WARNING: No homography in calibration — overlays will use raw coords")
+        print("WARNING: No homography in calibration -- overlays will use raw coords")
 
     # --- Open source video ---
     cap = cv2.VideoCapture(video_path)
@@ -589,7 +589,7 @@ def main():
     print(f"  State lines: {len(state_lines)}  (expect ~{total_frames})")
 
     if len(state_lines) != total_frames and len(state_lines) > 0:
-        print(f"  NOTE: Frame count mismatch — will use min({total_frames}, {len(state_lines)})")
+        print(f"  NOTE: Frame count mismatch -- will use min({total_frames}, {len(state_lines)})")
 
     # --- Build cell cache ---
     cell_polys, num_explorable = build_cell_cache(cal)

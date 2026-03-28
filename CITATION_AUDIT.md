@@ -11,7 +11,7 @@
 
 ## Introduction - Motivation and Context (Lines 83-87)
 
-**All claims appear properly cited ✓**
+**All claims appear properly cited OK**
 
 ---
 
@@ -53,7 +53,7 @@
 
 ## Methodology Section
 
-**All methodology appears to be your original work - no citations needed ✓**
+**All methodology appears to be your original work - no citations needed OK**
 
 ---
 
@@ -65,7 +65,7 @@
 **ISSUE:** "assignment persistence" appears to be your addition/modification. The citation to burgard2000collaborative is for greedy nearest-frontier, but "assignment persistence" might need clarification that it's your contribution.
 
 **UNCITED:**
-- "Localization is provided by an overhead camera (Logitech C922 at 1080p, 30\,fps) running ArUco marker detection~\cite{garrido2014aruco} on a separate PC." - Properly cited ✓
+- "Localization is provided by an overhead camera (Logitech C922 at 1080p, 30\,fps) running ArUco marker detection~\cite{garrido2014aruco} on a separate PC." - Properly cited OK
 
 **UNCITED:**
 - "Raft is the dominant consensus protocol in production distributed systems" (Line 583) - Should cite a survey or the Raft paper with context about production use.
@@ -76,7 +76,7 @@
 
 ## Results Section
 
-**All results are your own - no citations needed ✓**
+**All results are your own - no citations needed OK**
 
 ---
 
@@ -97,7 +97,7 @@
 
 ## Conclusion
 
-**All claims appear to be your results or general statements - no citations needed ✓**
+**All claims appear to be your results or general statements - no citations needed OK**
 
 ---
 

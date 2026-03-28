@@ -6,11 +6,11 @@
 
 | Fault Type | RAFT/Heartbeat | PBFT | REIP |
 |------------|----------------|------|------|
-| Leader crashes (heartbeat stops) | ✅ Detected | ✅ Detected | ✅ Detected |
-| Leader is slow/laggy | ⚠️ Maybe | ✅ Detected | ✅ Detected |
-| Leader sends wrong commands (alive) | ❌ **NOT DETECTED** | ✅ Detected | ✅ Detected |
-| Communication overhead | Low | **Very High (O(n²))** | **Low (O(n))** |
-| Real-time robotics suitable | ✅ Yes | ❌ No | ✅ Yes |
+| Leader crashes (heartbeat stops) | [x] Detected | [x] Detected | [x] Detected |
+| Leader is slow/laggy | [!] Maybe | [x] Detected | [x] Detected |
+| Leader sends wrong commands (alive) | [ ] **NOT DETECTED** | [x] Detected | [x] Detected |
+| Communication overhead | Low | **Very High (O(n^2))** | **Low (O(n))** |
+| Real-time robotics suitable | [x] Yes | [ ] No | [x] Yes |
 
 **REIP's niche**: Catch "alive-but-bad" leaders with low overhead suitable for real-time robots.
 
@@ -35,11 +35,11 @@
 ### Novelty #2: Task-Aware Trust (Not Just "Are You Alive?")
 
 **Heartbeat-based systems**:
-- "Leader sent heartbeat? Yes → Leader is fine"
+- "Leader sent heartbeat? Yes -> Leader is fine"
 - Can't tell if leader is doing the job well
 
 **REIP**:
-- "Leader's command achieves mission goal? Yes → Trust high"
+- "Leader's command achieves mission goal? Yes -> Trust high"
 - Trust tied to MISSION PERFORMANCE, not just health
 
 **One-liner for poster**: "REIP knows the difference between a leader that's alive and a leader that's effective."
@@ -55,29 +55,29 @@
 | Sensor data (I can see it) | 1.0 | Direct observation |
 | Peer reports (they said so) | 0.3 | Might be stale |
 
-**One-liner for poster**: "Not all information is equally trustworthy—REIP knows the difference."
+**One-liner for poster**: "Not all information is equally trustworthy--REIP knows the difference."
 
 ### Novelty #4: Causality-Aware Trust for Distributed Systems
 
 **Problem**: In distributed systems, messages arrive late. Leader computes assignment at t=1.0, robot receives at t=1.2, but robot visited cell at t=1.1.
 
-**Naive approach**: Penalize leader → FALSE POSITIVE
+**Naive approach**: Penalize leader -> FALSE POSITIVE
 
 **REIP**: Uses leader's SEND timestamp, not receive time
 - Only penalize if cell was visited BEFORE leader computed assignment
-- Leader couldn't have known → No penalty
+- Leader couldn't have known -> No penalty
 
-**One-liner for poster**: "REIP understands causality—it only blames leaders for things they could have known."
+**One-liner for poster**: "REIP understands causality--it only blames leaders for things they could have known."
 
 ### Novelty #5: MPC-Gated Direction Verification
 
 **Problem**: Follower's local belief is incomplete. Comparing to leader might cause false positives.
 
-**REIP Solution**: MPC direction check is GATED—only fires when three-tier check ALSO found evidence.
+**REIP Solution**: MPC direction check is GATED--only fires when three-tier check ALSO found evidence.
 - MPC alone cannot trigger trust decay
 - Reinforces existing evidence, doesn't create new accusations
 
-**One-liner for poster**: "Multiple signals must agree before REIP acts—no single-point false positives."
+**One-liner for poster**: "Multiple signals must agree before REIP acts--no single-point false positives."
 
 ---
 
@@ -87,20 +87,20 @@
 ```
 Scenario: Leader's sensor glitches, sends robots to wrong locations
 
-RAFT: Leader still sends heartbeats → "Leader is healthy" → NO ACTION
+RAFT: Leader still sends heartbeats -> "Leader is healthy" -> NO ACTION
       Robots waste time going to wrong places
       Eventually humans notice coverage is bad
 
 REIP: Followers verify commands against personal knowledge
       Detect commands to already-explored cells
-      Suspicion accumulates → Trust decays → Impeachment
+      Suspicion accumulates -> Trust decays -> Impeachment
       New leader elected within seconds
 ```
 
 ### vs. PBFT (Byzantine Fault Tolerance)
 ```
 PBFT: Handles up to f Byzantine faults with 3f+1 nodes
-      Requires O(n²) message complexity per consensus round
+      Requires O(n^2) message complexity per consensus round
       Designed for databases, not real-time robotics
 
 REIP: Handles "Byzantine-lite" faults (confused/hallucinating, not malicious)
@@ -111,11 +111,11 @@ REIP: Handles "Byzantine-lite" faults (confused/hallucinating, not malicious)
 ### vs. Reputation Systems
 ```
 Traditional Reputation: Update trust based on past outcomes
-                       "Last task failed → trust drops"
+                       "Last task failed -> trust drops"
                        Reactive, damage already done
 
 REIP: Update trust based on command verification
-      "This command looks wrong → trust drops"
+      "This command looks wrong -> trust drops"
       Proactive, prevents damage
 ```
 
@@ -128,7 +128,7 @@ REIP: Update trust based on command verification
 Panel A: RAFT System                    Panel B: REIP System
 ┌─────────────────────────────┐        ┌─────────────────────────────┐
 │  Leader: "Go to (5,3)"      │        │  Leader: "Go to (5,3)"      │
-│  [heartbeat ✓]              │        │  [command verified...]      │
+│  [heartbeat OK]              │        │  [command verified...]      │
 │                             │        │                             │
 │  Follower: "Heartbeat OK!"  │        │  Follower: "I was at (5,3)  │
 │  [goes to (5,3)]            │        │   5 seconds ago. SUSPICIOUS"│
@@ -141,17 +141,17 @@ Panel A: RAFT System                    Panel B: REIP System
 ```
                     ┌─────────────┐
                     │  PERSONAL   │  Weight: 1.0
-                    │ "I was there"│ ← GROUND TRUTH
+                    │ "I was there"│ <- GROUND TRUTH
                     └──────┬──────┘
                            │
                   ┌────────┴────────┐
                   │     SENSORS     │  Weight: 1.0
-                  │ "I can see it"  │ ← DIRECT OBSERVATION
+                  │ "I can see it"  │ <- DIRECT OBSERVATION
                   └────────┬────────┘
                            │
            ┌───────────────┴───────────────┐
            │         PEER REPORTS          │  Weight: 0.3
-           │       "They said so"          │ ← MIGHT BE STALE
+           │       "They said so"          │ <- MIGHT BE STALE
            └───────────────────────────────┘
 ```
 
@@ -161,7 +161,7 @@ Trust
 1.0 ─────────┐
              │                              ┌── Election
 0.8          │     ┌── Bad commands start   │   New leader
-             │     ▼                        ▼
+             │                             
 0.6          └─────────────────────────────────────
                    ╲         ╲        ╲
 0.4                 ╲suspicion╲        ╲
@@ -170,7 +170,7 @@ Trust
 0.2                            ╲        │
                                 ╲ decay │
 0.1 ────────────────────────────────────────────
-    ────┼────┼────┼────┼────┼────┼────┼────► Time
+    ────┼────┼────┼────┼────┼────┼────┼──── Time
         t0   t1   t2   t3   t4   t5   t6
         
     [Normal]  [Fault]     [Detected] [Recovered]
@@ -196,9 +196,9 @@ Coverage %
 20%  │──────────╱   │    ╱────────────────────────────│
      │             │   ╱                              │
      │ No REIP ────┴──╱ (never recovers)              │
-0%   └────┼────┼────┼────┼────┼────┼────┼────┼────┼──►
+0%   └────┼────┼────┼────┼────┼────┼────┼────┼────┼──
           t20  t40  t60  t80  t100 t120 t140 t160 Time
-               ↑
+               ^
          Fault injected
 ```
 
@@ -207,16 +207,16 @@ Coverage %
 ## 5. Potential Judge Questions & Answers
 
 ### Q1: "How is this different from RAFT?"
-**A**: RAFT detects crash faults (leader stops sending heartbeats). REIP detects performance faults (leader sends wrong commands but is still alive). A malfunctioning robot that spins in circles still sends heartbeats—RAFT thinks it's healthy, REIP knows it's broken.
+**A**: RAFT detects crash faults (leader stops sending heartbeats). REIP detects performance faults (leader sends wrong commands but is still alive). A malfunctioning robot that spins in circles still sends heartbeats--RAFT thinks it's healthy, REIP knows it's broken.
 
 ### Q2: "Why not just use PBFT?"
-**A**: PBFT requires O(n²) messages per consensus round and assumes discrete rounds. Real-time robotics needs continuous operation with limited bandwidth. REIP achieves similar fault tolerance with O(n) message complexity suitable for wireless robot swarms.
+**A**: PBFT requires O(n^2) messages per consensus round and assumes discrete rounds. Real-time robotics needs continuous operation with limited bandwidth. REIP achieves similar fault tolerance with O(n) message complexity suitable for wireless robot swarms.
 
 ### Q3: "What if followers have wrong beliefs?"
 **A**: REIP uses three-tier confidence weighting. Personal experience (ground truth) has weight 1.0, but peer-reported information only has weight 0.3. False positives from stale peer data are unlikely to trigger impeachment alone.
 
 ### Q4: "What about network delays?"
-**A**: REIP uses causality-aware trust. Commands include the leader's SEND timestamp, not just receive time. If a follower visited a cell AFTER the leader computed the assignment, the leader couldn't have known—no penalty.
+**A**: REIP uses causality-aware trust. Commands include the leader's SEND timestamp, not just receive time. If a follower visited a cell AFTER the leader computed the assignment, the leader couldn't have known--no penalty.
 
 ### Q5: "Is this actually novel?"
 **A**: The combination of (1) proactive command verification, (2) task-aware trust, (3) confidence-weighted evidence, and (4) causality-aware timestamps in a real-time robotics context is novel. Each piece exists separately, but integrating them for physical robot swarms is new.
@@ -236,7 +236,7 @@ Coverage %
 6. **Different fault types** (spin, stop, erratic, bad_leader)
 
 ### Hardware Validation (Critical for ISEF):
-7. **Physical robot demo** showing fault injection → detection → recovery
+7. **Physical robot demo** showing fault injection -> detection -> recovery
 8. **Video with vector overlay** showing trust mechanics in action
 
 ---

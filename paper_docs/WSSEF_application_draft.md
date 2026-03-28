@@ -136,13 +136,13 @@ Not yet. The current project develops the coordination and resilience layer need
 
 ## Bibliography Starter List
 
-1. Ongaro, D., and Ousterhout, J. “In Search of an Understandable Consensus Algorithm (Raft).”
-2. Yamauchi, B. “A Frontier-Based Approach for Autonomous Exploration.”
-3. Burgard, W. et al. “Collaborative Multi-Robot Exploration.”
-4. Simmons, R. et al. “Coordination for Multi-Robot Exploration and Mapping.”
-5. Lamport, L. et al. “The Byzantine Generals Problem.”
-6. Castro, M., and Liskov, B. “Practical Byzantine Fault Tolerance.”
-7. Marsh, S. “Formalising Trust as a Computational Concept.”
+1. Ongaro, D., and Ousterhout, J. "In Search of an Understandable Consensus Algorithm (Raft)."
+2. Yamauchi, B. "A Frontier-Based Approach for Autonomous Exploration."
+3. Burgard, W. et al. "Collaborative Multi-Robot Exploration."
+4. Simmons, R. et al. "Coordination for Multi-Robot Exploration and Mapping."
+5. Lamport, L. et al. "The Byzantine Generals Problem."
+6. Castro, M., and Liskov, B. "Practical Byzantine Fault Tolerance."
+7. Marsh, S. "Formalising Trust as a Computational Concept."
 8. A source on avalanche survival probability / search urgency.
 9. Garrido-Jurado, S. et al. on ArUco fiducial markers.
 10. A source on disaster robotics or search-and-rescue robotics.

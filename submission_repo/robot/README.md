@@ -119,7 +119,7 @@ ser.write(b'MOT,50,50\n')  # Drive forward at 50%
 - Verify each sensor has unique mux channel
 
 ### Pico not responding
-- Check UART wiring: Pi TX → Pico RX (GP1), Pi RX ← Pico TX (GP0)
+- Check UART wiring: Pi TX -> Pico RX (GP1), Pi RX <- Pico TX (GP0)
 - Make sure Pico is running main.py (LED should blink)
 - Try `screen /dev/serial0 115200` and type `PING`
 

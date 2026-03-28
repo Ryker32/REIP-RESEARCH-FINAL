@@ -40,80 +40,80 @@ REIP (Resilient Election and Impeachment Policy) is a distributed governance fra
 │                    EXTERNAL INPUTS                           │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Position Server (ArUco Camera)                           │
-│    → receive_position()                                     │
-│    → Updates: self.x, self.y, self.theta                   │
-│    → Marks: self.my_visited[cell] = timestamp              │
+│    -> receive_position()                                     │
+│    -> Updates: self.x, self.y, self.theta                   │
+│    -> Marks: self.my_visited[cell] = timestamp              │
 │                                                              │
 │ 2. ToF Sensors (Hardware)                                    │
-│    → sensor_loop() → hw.read_tof_all()                     │
-│    → update_tof_obstacles()                                 │
-│    → Updates: self.tof_obstacles (set of cells)            │
+│    -> sensor_loop() -> hw.read_tof_all()                     │
+│    -> update_tof_obstacles()                                 │
+│    -> Updates: self.tof_obstacles (set of cells)            │
 │                                                              │
 │ 3. Peer State Broadcasts (UDP)                              │
-│    → receive_peer_states() → update_peer()                  │
-│    → Updates: self.peers[peer_id] (position, trust, etc.) │
-│    → Merges: self.known_visited (union of all visited)    │
+│    -> receive_peer_states() -> update_peer()                  │
+│    -> Updates: self.peers[peer_id] (position, trust, etc.) │
+│    -> Merges: self.known_visited (union of all visited)    │
 │                                                              │
 │ 4. Fault Injection (UDP)                                     │
-│    → receive_fault_injection()                              │
-│    → Sets: bad_leader_mode, oscillate_leader_mode, etc.   │
+│    -> receive_fault_injection()                              │
+│    -> Sets: bad_leader_mode, oscillate_leader_mode, etc.   │
 └─────────────────────────────────────────────────────────────┘
-                            ↓
+                            v
 ┌─────────────────────────────────────────────────────────────┐
 │                    INTERNAL PROCESSING                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  CONTROL LOOP (10 Hz)                                        │
-│  ├─→ check_impeachment() [if trust < 0.3]                  │
-│  ├─→ run_election() [every 2s, or 0.5s at startup]          │
-│  │   ├─→ Builds candidate list (trust > 0.5)              │
-│  │   ├─→ Counts votes from peers                           │
-│  │   └─→ Elects new leader if changed                       │
+│  ├─-> check_impeachment() [if trust < 0.3]                  │
+│  ├─-> run_election() [every 2s, or 0.5s at startup]          │
+│  │   ├─-> Builds candidate list (trust > 0.5)              │
+│  │   ├─-> Counts votes from peers                           │
+│  │   └─-> Elects new leader if changed                       │
 │  │                                                           │
-│  └─→ compute_motor_command() [if trial_started]           │
-│      ├─→ assess_leader_command() [if follower]             │
-│      │   ├─→ THREE-TIER CHECK                               │
-│      │   │   ├─→ Tier 1: cell in self.my_visited?         │
-│      │   │   ├─→ Tier 2: cell in self.tof_obstacles?      │
-│      │   │   └─→ Tier 3: cell in self.known_visited?      │
+│  └─-> compute_motor_command() [if trial_started]           │
+│      ├─-> assess_leader_command() [if follower]             │
+│      │   ├─-> THREE-TIER CHECK                               │
+│      │   │   ├─-> Tier 1: cell in self.my_visited?         │
+│      │   │   ├─-> Tier 2: cell in self.tof_obstacles?      │
+│      │   │   └─-> Tier 3: cell in self.known_visited?      │
 │      │   │                                                   │
-│      │   ├─→ MPC DIRECTION CHECK                             │
-│      │   │   └─→ Command direction vs. nearest frontier    │
+│      │   ├─-> MPC DIRECTION CHECK                             │
+│      │   │   └─-> Command direction vs. nearest frontier    │
 │      │   │                                                   │
-│      │   └─→ Updates: suspicion_of_leader, trust_in_leader  │
+│      │   └─-> Updates: suspicion_of_leader, trust_in_leader  │
 │      │                                                       │
-│      ├─→ [If Leader] compute_task_assignments()            │
-│      │   ├─→ Finds frontiers (unexplored cells)             │
-│      │   ├─→ Greedy nearest-frontier assignment            │
-│      │   └─→ Returns: {robot_id: (x, y) target}            │
+│      ├─-> [If Leader] compute_task_assignments()            │
+│      │   ├─-> Finds frontiers (unexplored cells)             │
+│      │   ├─-> Greedy nearest-frontier assignment            │
+│      │   └─-> Returns: {robot_id: (x, y) target}            │
 │      │                                                       │
-│      ├─→ [If Follower] Uses leader_assigned_target          │
-│      │   └─→ OR get_my_frontier() if no assignment         │
+│      ├─-> [If Follower] Uses leader_assigned_target          │
+│      │   └─-> OR get_my_frontier() if no assignment         │
 │      │                                                       │
-│      └─→ Navigation logic (A*, wall avoidance, etc.)       │
+│      └─-> Navigation logic (A*, wall avoidance, etc.)       │
 │                                                              │
 │  NETWORK LOOP (100 Hz polling)                               │
-│  ├─→ receive_position() [UDP port 5100]                    │
-│  ├─→ receive_peer_states() [UDP port 5200]                 │
-│  ├─→ receive_fault_injection() [UDP port 5300]             │
-│  └─→ broadcast_state() [every 0.2s = 5 Hz]                 │
-│      └─→ Includes: position, trust, vote, assignments      │
+│  ├─-> receive_position() [UDP port 5100]                    │
+│  ├─-> receive_peer_states() [UDP port 5200]                 │
+│  ├─-> receive_fault_injection() [UDP port 5300]             │
+│  └─-> broadcast_state() [every 0.2s = 5 Hz]                 │
+│      └─-> Includes: position, trust, vote, assignments      │
 │                                                              │
 │  SENSOR LOOP (~8-10 Hz)                                      │
-│  └─→ hw.read_tof_all() → update_tof_obstacles()           │
+│  └─-> hw.read_tof_all() -> update_tof_obstacles()           │
 └─────────────────────────────────────────────────────────────┘
-                            ↓
+                            v
 ┌─────────────────────────────────────────────────────────────┐
 │                    OUTPUTS                                   │
 ├─────────────────────────────────────────────────────────────┤
 │ 1. Motor Commands (UART to Pico)                            │
-│    → hw.set_motors(left, right)                            │
+│    -> hw.set_motors(left, right)                            │
 │                                                              │
 │ 2. State Broadcasts (UDP)                                   │
-│    → broadcast_state() → All peers                          │
+│    -> broadcast_state() -> All peers                          │
 │                                                              │
 │ 3. Logging (File)                                            │
-│    → log_state() → JSON lines for visualization            │
+│    -> log_state() -> JSON lines for visualization            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -129,7 +129,7 @@ REIP (Resilient Election and Impeachment Policy) is a distributed governance fra
 **Information Flow**:
 1. Listens on UDP port 5100 for position messages
 2. Extracts `x`, `y`, `theta` from JSON message
-3. Applies EMA filter (α=0.5) to reduce jitter:
+3. Applies EMA filter (alpha=0.5) to reduce jitter:
    ```python
    self.x += 0.5 * (raw_x - self.x)
    self.y += 0.5 * (raw_y - self.y)
@@ -156,7 +156,7 @@ REIP (Resilient Election and Impeachment Policy) is a distributed governance fra
 **Purpose**: Continuously reads ToF sensors for obstacle detection.
 
 **Information Flow**:
-1. Calls `hw.read_tof_all()` → Returns `Dict[str, int]` (sensor_name: distance_mm)
+1. Calls `hw.read_tof_all()` -> Returns `Dict[str, int]` (sensor_name: distance_mm)
 2. Calls `update_tof_obstacles()` to convert readings to cell coordinates
 3. Sleeps 20ms (targets ~8-10 Hz effective rate)
 
@@ -301,8 +301,8 @@ mpc_suspicion, mpc_severe = self._compute_mpc_direction_error()
 
 Checks if leader's commanded direction aligns with any unexplored area:
 
-- **Severe Mismatch** (>135° from nearest frontier): Can trigger independently
-- **Moderate Mismatch** (90-135°): Only reinforces three-tier evidence
+- **Severe Mismatch** (>135deg from nearest frontier): Can trigger independently
+- **Moderate Mismatch** (90-135deg): Only reinforces three-tier evidence
 - **Purpose**: Catches "wrong direction" faults even if target cell is unexplored
 
 **Step 3: Suspicion Accumulation**
@@ -348,9 +348,9 @@ if self.suspicion_of_leader >= SUSPICION_THRESHOLD:  # 1.5
    best_alignment = min(angle_diff(cmd_dir, frontier_dir) for all frontiers)
    ```
 4. Returns suspicion weight:
-   - **Severe** (>135°): `0.5 + (error - 135°) / 45° * 0.3` (can trigger independently)
-   - **Moderate** (90-135°): `(error - 90°) / 45° * 0.3` (only reinforces)
-   - **Good** (<90°): `0.0`
+   - **Severe** (>135deg): `0.5 + (error - 135deg) / 45deg * 0.3` (can trigger independently)
+   - **Moderate** (90-135deg): `(error - 90deg) / 45deg * 0.3` (only reinforces)
+   - **Good** (<90deg): `0.0`
 
 ---
 
@@ -524,7 +524,7 @@ else:
 
 ```python
 target_angle = atan2(target_y - self.y, target_x - self.x)
-diff = target_angle - self.theta  # Normalize to [-π, π]
+diff = target_angle - self.theta  # Normalize to [-pi, pi]
 
 # Speed factors (0.0 to 1.0)
 sf_wall = compute_wall_speed_factor()  # Slows near walls
@@ -581,37 +581,37 @@ left, right = _finalize_motor_command(left_speed, right_speed, stop_reason)
 ```
 1. Leader computes assignments:
    compute_task_assignments()
-   → Finds frontiers
-   → Greedy assignment
-   → Returns {robot_id: (x, y)}
+   -> Finds frontiers
+   -> Greedy assignment
+   -> Returns {robot_id: (x, y)}
 
 2. Leader broadcasts state:
    broadcast_state()
-   → Includes assignments
-   → UDP broadcast to all peers
+   -> Includes assignments
+   -> UDP broadcast to all peers
 
 3. Follower receives assignment:
-   receive_peer_states() → update_peer()
-   → Sets self.leader_assigned_target
-   → Sets self.leader_assignment_rx_mono
+   receive_peer_states() -> update_peer()
+   -> Sets self.leader_assigned_target
+   -> Sets self.leader_assignment_rx_mono
 
 4. Follower verifies command:
    compute_motor_command()
-   → assess_leader_command()
-   → Three-tier check: cell not in my_visited, tof_obstacles, known_visited
-   → No suspicion added (good command)
-   → suspicion_of_leader -= RECOVERY_RATE (slow recovery)
+   -> assess_leader_command()
+   -> Three-tier check: cell not in my_visited, tof_obstacles, known_visited
+   -> No suspicion added (good command)
+   -> suspicion_of_leader -= RECOVERY_RATE (slow recovery)
 
 5. Follower navigates:
    compute_motor_command()
-   → Uses leader_assigned_target
-   → A* pathfinding, wall avoidance
-   → Returns (left_pwm, right_pwm)
+   -> Uses leader_assigned_target
+   -> A* pathfinding, wall avoidance
+   -> Returns (left_pwm, right_pwm)
 
 6. Follower marks coverage:
    receive_position()
-   → Marks current cell as visited
-   → Updates my_visited, known_visited
+   -> Marks current cell as visited
+   -> Updates my_visited, known_visited
 ```
 
 ### Flow 2: Fault Detection and Impeachment
@@ -619,45 +619,45 @@ left, right = _finalize_motor_command(left_speed, right_speed, stop_reason)
 ```
 1. Bad leader sends explored cell:
    compute_task_assignments() [bad_leader_mode=True]
-   → Returns explored cell as target
+   -> Returns explored cell as target
 
 2. Follower receives bad assignment:
-   receive_peer_states() → update_peer()
-   → Sets self.leader_assigned_target = explored_cell
+   receive_peer_states() -> update_peer()
+   -> Sets self.leader_assigned_target = explored_cell
 
 3. Follower verifies command:
    compute_motor_command()
-   → assess_leader_command()
-   → Tier 1 check: cell in self.my_visited
-   → visited_time < causality_cutoff (visited BEFORE assignment)
-   → suspicion_added += 1.0 (WEIGHT_PERSONAL)
-   → suspicion_of_leader += 1.0
-   → bad_commands_received += 1
+   -> assess_leader_command()
+   -> Tier 1 check: cell in self.my_visited
+   -> visited_time < causality_cutoff (visited BEFORE assignment)
+   -> suspicion_added += 1.0 (WEIGHT_PERSONAL)
+   -> suspicion_of_leader += 1.0
+   -> bad_commands_received += 1
 
 4. Suspicion accumulates:
    After 2 bad commands (Tier 1):
-   → suspicion_of_leader >= 1.5 (SUSPICION_THRESHOLD)
-   → trust_in_leader -= 0.2 (TRUST_DECAY_RATE)
-   → suspicion_of_leader -= 1.5 (carry over excess)
-   → first_decay_time = time.time()
+   -> suspicion_of_leader >= 1.5 (SUSPICION_THRESHOLD)
+   -> trust_in_leader -= 0.2 (TRUST_DECAY_RATE)
+   -> suspicion_of_leader -= 1.5 (carry over excess)
+   -> first_decay_time = time.time()
 
 5. Trust continues to decay:
    After 4 threshold crossings:
-   → trust_in_leader < 0.3 (IMPEACHMENT_THRESHOLD)
-   → check_impeachment() sets impeachment_time
+   -> trust_in_leader < 0.3 (IMPEACHMENT_THRESHOLD)
+   -> check_impeachment() sets impeachment_time
 
 6. Election occurs:
    run_election()
-   → check_impeachment() excludes leader from candidates
-   → Builds candidate list (trust > 0.5)
-   → Old leader excluded (trust < 0.3)
-   → New leader elected
-   → leader_failures[old_leader] += 1
+   -> check_impeachment() excludes leader from candidates
+   -> Builds candidate list (trust > 0.5)
+   -> Old leader excluded (trust < 0.3)
+   -> New leader elected
+   -> leader_failures[old_leader] += 1
 
 7. New leader takes over:
-   → trust_in_leader = 1.0 (reset)
-   → suspicion_of_leader = 0.0 (reset)
-   → New assignments computed
+   -> trust_in_leader = 1.0 (reset)
+   -> suspicion_of_leader = 0.0 (reset)
+   -> New assignments computed
 ```
 
 ### Flow 3: Election Process
@@ -665,35 +665,35 @@ left, right = _finalize_motor_command(left_speed, right_speed, stop_reason)
 ```
 1. Election timer triggers:
    control_loop()
-   → time.time() - last_election > ELECTION_INTERVAL (2.0s)
-   → Calls run_election()
+   -> time.time() - last_election > ELECTION_INTERVAL (2.0s)
+   -> Calls run_election()
 
 2. Update peer trust:
-   → If current_leader in peers:
+   -> If current_leader in peers:
       peers[current_leader].my_trust_for_them = trust_in_leader
 
 3. Build candidates:
    candidates = []
-   → Add self (trust = 1.0)
-   → For each peer with trust > 0.5:
+   -> Add self (trust = 1.0)
+   -> For each peer with trust > 0.5:
       candidates.append((peer_id, peer.my_trust_for_them, failures))
 
 4. Sort candidates:
-   → Sort by: (-trust, failures, id)
-   → self.my_vote = candidates[0][0]
+   -> Sort by: (-trust, failures, id)
+   -> self.my_vote = candidates[0][0]
 
 5. Count votes:
    votes = {self.my_vote: 1}
-   → For each peer:
+   -> For each peer:
       if peer.vote in eligible_ids:
          votes[peer.vote] += 1
 
 6. Elect winner:
-   → Sort by: (-votes, failures, id)
-   → self.current_leader = winner
+   -> Sort by: (-votes, failures, id)
+   -> self.current_leader = winner
 
 7. Handle leader change:
-   → If leader changed:
+   -> If leader changed:
       leader_failures[old_leader] += 1
       trust_in_leader = 1.0 (reset)
       suspicion_of_leader = 0.0 (reset)
@@ -704,19 +704,19 @@ left, right = _finalize_motor_command(left_speed, right_speed, stop_reason)
 ```
 1. Robot visits cell:
    receive_position()
-   → cell = get_cell(self.x, self.y)
-   → self.my_visited[cell] = time.monotonic()
-   → self.known_visited.add(cell)
-   → self.known_visited_time[cell] = time.monotonic()
+   -> cell = get_cell(self.x, self.y)
+   -> self.my_visited[cell] = time.monotonic()
+   -> self.known_visited.add(cell)
+   -> self.known_visited_time[cell] = time.monotonic()
 
 2. Robot broadcasts state:
    broadcast_state()
-   → Includes visited_cells (last 100)
-   → UDP broadcast
+   -> Includes visited_cells (last 100)
+   -> UDP broadcast
 
 3. Peer receives broadcast:
-   receive_peer_states() → update_peer()
-   → For each cell in msg['visited_cells']:
+   receive_peer_states() -> update_peer()
+   -> For each cell in msg['visited_cells']:
       peer.visited_cells.add(cell)
       if cell not in self.known_visited:
          self.known_visited.add(cell)
@@ -724,7 +724,7 @@ left, right = _finalize_motor_command(left_speed, right_speed, stop_reason)
 
 4. Leader uses merged coverage:
    compute_task_assignments()
-   → For each cell:
+   -> For each cell:
       if cell not in self.known_visited:
          frontiers.append(cell)
 ```

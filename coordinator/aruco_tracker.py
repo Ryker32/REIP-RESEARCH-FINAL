@@ -180,7 +180,7 @@ class ArUcoTracker:
                     
                     for marker_id, data in detections.items():
                         x, y, theta = data['x'], data['y'], data['theta']
-                        text = f"ID{marker_id}: ({x:.0f}, {y:.0f}, {math.degrees(theta):.0f}°)"
+                        text = f"ID{marker_id}: ({x:.0f}, {y:.0f}, {math.degrees(theta):.0f}deg)"
                         cv2.putText(annotated, text, (10, 60 + marker_id * 25),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
                     

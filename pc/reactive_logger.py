@@ -5,7 +5,7 @@ Passive Reactive Trust Model Logger
 Runs alongside the real REIP system (does NOT affect robot behavior).
 Listens to robot broadcasts and computes what a REACTIVE trust model
 (based on coverage prediction error, like the original simulation)
-would have detected — and when.
+would have detected -- and when.
 
 This gives the proactive-vs-reactive detection timing comparison
 for the ISEF poster.

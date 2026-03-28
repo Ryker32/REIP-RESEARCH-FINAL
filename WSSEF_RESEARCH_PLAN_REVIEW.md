@@ -1,36 +1,36 @@
 # WSSEF Research Plan Review
 
-## ✅ Rationale - EXCELLENT
+## [x] Rationale - EXCELLENT
 
 Your rationale is comprehensive and well-structured:
-- ✅ Explains importance (time-critical missions, avalanche SAR)
-- ✅ Describes social/societal impact (search-and-rescue, disaster response)
-- ✅ Identifies the problem (leader vulnerability)
-- ✅ Mentions existing solutions (Raft) and their limitations
-- ✅ Describes your solution (REIP)
-- ✅ Connects to future applications (RECCO radar, avalanche debris)
+- [x] Explains importance (time-critical missions, avalanche SAR)
+- [x] Describes social/societal impact (search-and-rescue, disaster response)
+- [x] Identifies the problem (leader vulnerability)
+- [x] Mentions existing solutions (Raft) and their limitations
+- [x] Describes your solution (REIP)
+- [x] Connects to future applications (RECCO radar, avalanche debris)
 
 **No changes needed.**
 
 ---
 
-## ✅ Research Question/Hypothesis/Engineering Goals - GOOD
+## [x] Research Question/Hypothesis/Engineering Goals - GOOD
 
 ### Engineering Goals:
-- ✅ Primary goals clearly stated
-- ✅ Secondary goals included
-- ✅ All goals relate to rationale
+- [x] Primary goals clearly stated
+- [x] Secondary goals included
+- [x] All goals relate to rationale
 
 ### Hypothesis:
-- ✅ Clear and testable
-- ✅ States expected outcomes
-- ✅ Relates to rationale
+- [x] Clear and testable
+- [x] States expected outcomes
+- [x] Relates to rationale
 
 **Minor suggestion:** Consider making the hypothesis more concise. Current version is good but could be slightly tightened.
 
 ---
 
-## ⚠️ Procedures - NEEDS FORMATTING FIX
+## [!] Procedures - NEEDS FORMATTING FIX
 
 **ISSUE:** WSSEF requires a **numbered list**. Your procedures are in sections, not a numbered list.
 
@@ -58,7 +58,7 @@ Your rationale is comprehensive and well-structured:
 
 5. Implement baseline comparison systems from distributed coordination literature (Raft consensus protocol) that respond to unresponsive leaders but do not proactively evaluate whether an active leader is sending harmful commands.
 
-6. Construct an indoor experimental arena (2000 × 1500 mm) using 38 mm EPS foamboard with boundary walls covered in masking tape, a central divider creating a two-room layout, and four ArUco corner markers (IDs 40-43, 80mm) for camera-based localization.
+6. Construct an indoor experimental arena (2000 * 1500 mm) using 38 mm EPS foamboard with boundary walls covered in masking tape, a central divider creating a two-room layout, and four ArUco corner markers (IDs 40-43, 80mm) for camera-based localization.
 
 7. Set up overhead imaging using a Logitech C922 webcam positioned approximately 2040 mm above the arena center, with an OpenCV-based script performing real-time homography transformation, per-robot pose tracking, and live visualization overlay.
 
@@ -84,21 +84,21 @@ Your rationale is comprehensive and well-structured:
 
 ---
 
-## ✅ Data Analysis - EXCELLENT
+## [x] Data Analysis - EXCELLENT
 
 Your data analysis section is comprehensive:
-- ✅ Metric calculation clearly described
-- ✅ Statistical analysis methods specified
-- ✅ Comparative analysis framework defined
-- ✅ Data visualization methods listed
-- ✅ Success criteria quantified
-- ✅ Simulation validation approach described
+- [x] Metric calculation clearly described
+- [x] Statistical analysis methods specified
+- [x] Comparative analysis framework defined
+- [x] Data visualization methods listed
+- [x] Success criteria quantified
+- [x] Simulation validation approach described
 
 **No changes needed.**
 
 ---
 
-## ⚠️ Risk and Safety - NEEDS VERIFICATION
+## [!] Risk and Safety - NEEDS VERIFICATION
 
 You mentioned "risks are done" but I don't see them in what you provided. **Make sure you include:**
 
@@ -111,26 +111,26 @@ You mentioned "risks are done" but I don't see them in what you provided. **Make
 
 ---
 
-## ⚠️ Bibliography - NEEDS ADDITION
+## [!] Bibliography - NEEDS ADDITION
 
 You have 24 references, which is excellent. However, check if these are covered:
 
 **Mentioned in Rationale:**
-- ✅ Avalanche survival (Rauch - [1])
-- ✅ Multi-robot SAR (Queralta - [2])
-- ✅ Frontier exploration (Yamauchi - [3], Burgard - [4])
-- ✅ Leader-follower coordination (Simmons - [11])
-- ✅ Raft consensus (Ongaro - [16])
-- ✅ Trust in multi-agent systems (Marsh - [17], Ramchurn - [23])
-- ✅ Byzantine fault tolerance (Lamport - [14], Castro - [15])
-- ✅ Disaster response (Murphy - [6])
-- ✅ DARPA Subterranean (Chung - [8])
-- ✅ NASA CADRE (de la Croix - [9], Whittaker - [10])
-- ✅ Mining robotics (Marshall - [22])
-- ✅ Mars communication (McBrayer - [7])
+- [x] Avalanche survival (Rauch - [1])
+- [x] Multi-robot SAR (Queralta - [2])
+- [x] Frontier exploration (Yamauchi - [3], Burgard - [4])
+- [x] Leader-follower coordination (Simmons - [11])
+- [x] Raft consensus (Ongaro - [16])
+- [x] Trust in multi-agent systems (Marsh - [17], Ramchurn - [23])
+- [x] Byzantine fault tolerance (Lamport - [14], Castro - [15])
+- [x] Disaster response (Murphy - [6])
+- [x] DARPA Subterranean (Chung - [8])
+- [x] NASA CADRE (de la Croix - [9], Whittaker - [10])
+- [x] Mining robotics (Marshall - [22])
+- [x] Mars communication (McBrayer - [7])
 
 **MISSING:**
-- ❌ **RECCO radar** - You mention "RECCO radar receivers" in rationale but no citation. Consider adding a reference about RECCO technology or victim detection systems.
+- [ ] **RECCO radar** - You mention "RECCO radar receivers" in rationale but no citation. Consider adding a reference about RECCO technology or victim detection systems.
 
 **Optional additions:**
 - Consider adding a reference about leader-follower vulnerabilities in multi-robot systems (if such a paper exists)

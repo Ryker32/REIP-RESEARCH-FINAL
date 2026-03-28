@@ -7,7 +7,7 @@
 
 > **"REIP maintains coordinated performance that autonomous agents can't match, even when faults would normally destroy that coordination."**
 
-Everything on the poster — the vector overlays, the baselines, the trust model — serves this single sentence.
+Everything on the poster -- the vector overlays, the baselines, the trust model -- serves this single sentence.
 
 ---
 
@@ -19,13 +19,13 @@ Everything on the poster — the vector overlays, the baselines, the trust model
 
 | Component | Role |
 |-----------|------|
-| **Trust** | The trigger — detects when coordination is failing |
-| **Election** | The recovery — restores coordination with new leader |
-| **Fallback** | The safety net — maintains progress during transition |
+| **Trust** | The trigger -- detects when coordination is failing |
+| **Election** | The recovery -- restores coordination with new leader |
+| **Fallback** | The safety net -- maintains progress during transition |
 
 Without governance, you get:
-- Fallback ON, Trust OFF → Robots never return to coordination. You lose the efficiency gains of merged maps and partitioned tasks.
-- Trust ON, Fallback OFF → One bad command and the robot freezes waiting for impeachment. Brittle.
+- Fallback ON, Trust OFF -> Robots never return to coordination. You lose the efficiency gains of merged maps and partitioned tasks.
+- Trust ON, Fallback OFF -> One bad command and the robot freezes waiting for impeachment. Brittle.
 
 **REIP = the system that knows when to coordinate, when to fall back, and when to recover.**
 
@@ -37,10 +37,10 @@ Without governance, you get:
 
 | Ablation | Trust | Election | Fallback | Expected Result |
 |----------|-------|----------|----------|-----------------|
-| **Full REIP** | ✓ | ✓ | ✓ | Best overall |
-| **No Fallback** | ✓ | ✓ | ✗ | Fragile under faults |
-| **No Governance** | ✗ | ✗ | ✓ | Pure autonomy, no recovery |
-| **Fixed Leader** | ✗ | ✗ | ✗ | Catastrophic under leader fault |
+| **Full REIP** | OK | OK | OK | Best overall |
+| **No Fallback** | OK | OK | FAIL | Fragile under faults |
+| **No Governance** | FAIL | FAIL | OK | Pure autonomy, no recovery |
+| **Fixed Leader** | FAIL | FAIL | FAIL | Catastrophic under leader fault |
 
 **Critical addition:** "Fallback ON, Governance OFF" proves that governance does real work beyond just having a fallback mechanism.
 
@@ -61,7 +61,7 @@ Without governance, you get:
 
 **Why it's judge-proof:** RAFT is industry standard. It's what serious distributed systems use. If REIP beats RAFT under adversarial faults (where the leader is *alive* but *misbehaving*), no judge can dismiss that.
 
-**The key insight:** RAFT handles crash faults. REIP handles Byzantine faults (malicious/erratic behavior). A spinning leader still sends heartbeats — RAFT never catches it. REIP's trust model does.
+**The key insight:** RAFT handles crash faults. REIP handles Byzantine faults (malicious/erratic behavior). A spinning leader still sends heartbeats -- RAFT never catches it. REIP's trust model does.
 
 **Implementation:**
 ```python
@@ -87,9 +87,9 @@ Three-tier confidence-weighted suspicion:
 
 ```python
 # Weights by source reliability
-WEIGHT_PERSONAL = 1.0    # Cells I visited — ground truth
-WEIGHT_TOF = 1.0         # Obstacles in sensor range — I see it
-WEIGHT_PEER = 0.3        # Peer-reported — might be stale
+WEIGHT_PERSONAL = 1.0    # Cells I visited -- ground truth
+WEIGHT_TOF = 1.0         # Obstacles in sensor range -- I see it
+WEIGHT_PEER = 0.3        # Peer-reported -- might be stale
 
 # Thresholds
 SUSPICION_THRESHOLD = 1.5
@@ -135,7 +135,7 @@ def assess_leader_command(self, target_cell):
 ## IMPLEMENTATION ORDER
 
 ### Phase 1: Hardware Foundation
-- [ ] Clone SD card → clanker2, clanker3
+- [ ] Clone SD card -> clanker2, clanker3
 - [ ] Flash Picos
 - [ ] Mount overhead camera
 - [ ] Test ArUco position server
@@ -184,8 +184,8 @@ def assess_leader_command(self, target_cell):
 The poster tells ONE story:
 
 1. **Problem:** Coordination beats autonomy, but coordination has a single point of failure.
-2. **Solution:** REIP — trust-based governance that catches bad leaders before damage accumulates.
+2. **Solution:** REIP -- trust-based governance that catches bad leaders before damage accumulates.
 3. **Evidence:** REIP beats RAFT (the industry standard) under adversarial faults.
-4. **Visual:** Vectors diverge → trust decays → impeachment → recovery → vectors align.
+4. **Visual:** Vectors diverge -> trust decays -> impeachment -> recovery -> vectors align.
 
 That's it. Everything else is detail.

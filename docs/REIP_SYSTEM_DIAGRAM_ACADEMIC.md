@@ -5,9 +5,9 @@
 ```mermaid
 flowchart TD
     subgraph Input["INPUT DATA"]
-        A[Position Server<br/>UDP 5100<br/>x, y, θ updates]
+        A[Position Server<br/>UDP 5100<br/>x, y, theta updates]
         B[Peer Broadcasts<br/>UDP 5200<br/>State messages]
-        C[ToF Sensors<br/>5× VL53L0X<br/>Distance readings]
+        C[ToF Sensors<br/>5* VL53L0X<br/>Distance readings]
         D[Fault Injector<br/>UDP 5300<br/>Fault modes]
     end
 
@@ -111,7 +111,7 @@ graph TB
     subgraph Phase2["Phase 2: Causality-Aware Verification"]
         G[Causality Check<br/>assignment_time - grace_period<br/>Prevents false positives]
         H[Tier 1 Check<br/>cell in my_visited?<br/>visited_time < cutoff?]
-        I[Tier 2 Check<br/>dist ≤ 200mm AND<br/>cell in tof_obstacles?]
+        I[Tier 2 Check<br/>dist <= 200mm AND<br/>cell in tof_obstacles?]
         J[Tier 3 Check<br/>cell in known_visited?<br/>known_time < cutoff?]
         
         C --> G
@@ -125,7 +125,7 @@ graph TB
         K[MPC Direction Check<br/>_compute_mpc_direction_error]
         L[Find Unexplored Cells<br/>Frontiers]
         M[Compute Alignment<br/>cmd_dir vs. frontier_dir<br/>Best match]
-        N[Severity Classification<br/>Severe: >135°<br/>Moderate: 90-135°]
+        N[Severity Classification<br/>Severe: >135deg<br/>Moderate: 90-135deg]
         
         A --> K
         K --> L
@@ -135,7 +135,7 @@ graph TB
 
     subgraph Phase4["Phase 4: Suspicion Accumulation"]
         O[Suspicion Update<br/>suspicion += weight<br/>OR<br/>suspicion -= recovery_rate]
-        P[Threshold Check<br/>suspicion ≥ 1.5?]
+        P[Threshold Check<br/>suspicion >= 1.5?]
         Q[Trust Decay<br/>trust -= 0.2<br/>suspicion -= 1.5 carry-over]
         R[Detection Metrics<br/>first_bad_command_time<br/>first_decay_time<br/>bad_commands_received]
         
@@ -173,13 +173,13 @@ graph TB
         S1[Coverage Maps<br/>my_visited: Dict[cell, time]<br/>known_visited: Set[cell]<br/>known_visited_time: Dict]
         S2[Trust State<br/>trust_in_leader: float [0,1]<br/>suspicion_of_leader: float<br/>bad_commands_received: int]
         S3[Leadership State<br/>current_leader: Optional[int]<br/>my_vote: Optional[int]<br/>leader_failures: Dict[int, int]]
-        S4[Peer State<br/>peers: Dict[int, PeerInfo]<br/>x, y, θ, trust, vote]
+        S4[Peer State<br/>peers: Dict[int, PeerInfo]<br/>x, y, theta, trust, vote]
         S5[Sensor State<br/>tof: Dict[str, int]<br/>tof_obstacles: Set[cell]]
         S6[Assignment State<br/>leader_assigned_target: Tuple<br/>my_assigned_target: Tuple<br/>assignment_rx_mono: float]
     end
 
     subgraph Functions["Core Functions"]
-        F1[receive_position<br/>Updates: S1, x, y, θ]
+        F1[receive_position<br/>Updates: S1, x, y, theta]
         F2[receive_peer_states<br/>Updates: S1, S4, S6]
         F3[update_tof_obstacles<br/>Updates: S5]
         F4[assess_leader_command<br/>Reads: S1, S5, S6<br/>Updates: S2]
@@ -236,10 +236,10 @@ INPUT DATA
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │   Position   │  │    Peer      │  │     ToF      │  │    Fault     │
 │    Server    │  │  Broadcasts  │  │   Sensors    │  │   Injector   │
-│  UDP 5100    │  │  UDP 5200    │  │   5× VL53L0X │  │  UDP 5300    │
+│  UDP 5100    │  │  UDP 5200    │  │   5* VL53L0X │  │  UDP 5300    │
 └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
        │                 │                 │                 │
-       ▼                 ▼                 ▼                 ▼
+                                                          
 
 COVERAGE MERGING
 ┌──────────────────────────────────────────────────────────────────┐
@@ -249,7 +249,7 @@ COVERAGE MERGING
 └──────────────────────────────────────────────────────────────────┘
        │                 │                 │
        └─────────────────┼─────────────────┘
-                         ▼
+                         
 
 TRUST ASSESSMENT (assess_leader_command)
 ┌──────────────────────────────────────────────────────────────────┐
@@ -262,17 +262,17 @@ TRUST ASSESSMENT (assess_leader_command)
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘          │
 │         │                 │                 │                   │
 │         └─────────────────┼─────────────────┘                   │
-│                           ▼                                     │
+│                                                                │
 │  MPC Direction Check:                                            │
 │  • Command vs. nearest frontier                                  │
-│  • Angular alignment (>135° severe, 90-135° moderate)         │
+│  • Angular alignment (>135deg severe, 90-135deg moderate)         │
 │                                                                  │
 │  Output: suspicion_of_leader += weight                          │
 │          OR suspicion_of_leader -= recovery_rate                │
-│          IF suspicion ≥ 1.5: trust -= 0.2                        │
+│          IF suspicion >= 1.5: trust -= 0.2                        │
 └──────────────────────────────────────────────────────────────────┘
                          │
-                         ▼
+                         
 
 LEADERSHIP MANAGEMENT
 ┌──────────────────────────────────────────────────────────────────┐
@@ -283,7 +283,7 @@ LEADERSHIP MANAGEMENT
 │                             │  • Elect winner                   │
 └──────────────────────────────────────────────────────────────────┘
                          │
-                         ▼
+                         
 
 TASK ASSIGNMENT (Leader Only)
 ┌──────────────────────────────────────────────────────────────────┐
@@ -292,7 +292,7 @@ TASK ASSIGNMENT (Leader Only)
 │  • Exclude walls       │  • Distance sorting  │  • Passage yield  │
 └──────────────────────────────────────────────────────────────────┘
                          │
-                         ▼
+                         
 
 NAVIGATION & CONTROL
 ┌──────────────────────────────────────────────────────────────────┐
@@ -302,13 +302,13 @@ NAVIGATION & CONTROL
 │                      │                   │  • Stuck detection    │
 └──────────────────────────────────────────────────────────────────┘
                          │
-                         ▼
+                         
 
 OUTPUTS
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │    Motor     │  │    State     │  │   Logging    │
 │  Commands    │  │  Broadcast   │  │   JSON File  │
-│  UART→Pico  │  │  UDP 5200    │  │              │
+│  UART->Pico  │  │  UDP 5200    │  │              │
 └──────────────┘  └──────────────┘  └──────────────┘
 ```
 

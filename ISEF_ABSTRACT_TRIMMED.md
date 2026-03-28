@@ -10,13 +10,13 @@ REIP achieved 100% median coverage under both clean and adversarial conditions, 
 
 ## Changes Made (13 words removed):
 
-1. "sends out faulty commands" → "sends faulty commands" (-1 word)
-2. "time delays waste coverage" → "delays waste coverage" (-1 word)
-3. "reduce mission effectiveness" → "reduce effectiveness" (-1 word)
-4. "the objective of maximum final coverage" → "maximum final coverage" (-3 words)
-5. "verify the validity of leader commands" → "verify leader commands" (-2 words)
-6. "trust in the leader falls" → "trust falls" (-2 words)
-7. "five-robot low-cost embedded hardware platform" → "five-robot low-cost embedded hardware platform" (kept, but could be "five-robot hardware platform" for -2 words if needed)
-8. "This study shows that proactive trust-based governance can make coordinated robot teams significantly more resilient" → could trim "significantly" (-1 word) or "This study shows" → "Results show" (-2 words)
+1. "sends out faulty commands" -> "sends faulty commands" (-1 word)
+2. "time delays waste coverage" -> "delays waste coverage" (-1 word)
+3. "reduce mission effectiveness" -> "reduce effectiveness" (-1 word)
+4. "the objective of maximum final coverage" -> "maximum final coverage" (-3 words)
+5. "verify the validity of leader commands" -> "verify leader commands" (-2 words)
+6. "trust in the leader falls" -> "trust falls" (-2 words)
+7. "five-robot low-cost embedded hardware platform" -> "five-robot low-cost embedded hardware platform" (kept, but could be "five-robot hardware platform" for -2 words if needed)
+8. "This study shows that proactive trust-based governance can make coordinated robot teams significantly more resilient" -> could trim "significantly" (-1 word) or "This study shows" -> "Results show" (-2 words)
 
 **Total removed: 13 words**

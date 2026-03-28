@@ -2,7 +2,7 @@
 
 1. Assemble five differential-drive mobile robots, each including: Raspberry Pi Zero 2W for onboard computation and wireless communication, Raspberry Pi Pico H for motor control via UART, five VL53L0X time-of-flight sensors for obstacle detection (connected via I2C multiplexer), two N20 geared DC motors with encoders (1:100 gear ratio), 2S 1000 mAh LiPo battery power system, and 3D-printed PLA chassis (under 300g per robot).
 
-2. Program each robot with ArUco identification tags (IDs 1-5, 4×4 library, 50mm) for visual tracking, configure WiFi peer-to-peer communication, and name robots clanker1-5. The system operates autonomously without centralized control during trials.
+2. Program each robot with ArUco identification tags (IDs 1-5, 4*4 library, 50mm) for visual tracking, configure WiFi peer-to-peer communication, and name robots clanker1-5. The system operates autonomously without centralized control during trials.
 
 3. Develop all distributed software used by the robots, including: robot localization input processing, coverage tracking and map merging, peer-state broadcasting and reception, leader election mechanisms, leader-follower coordination protocols, trust evaluation algorithms, and fault-response behaviors.
 
@@ -10,7 +10,7 @@
 
 5. Implement baseline comparison systems from distributed coordination literature (Raft consensus protocol) that respond to unresponsive leaders but do not proactively evaluate whether an active leader is sending harmful or low-quality commands.
 
-6. Construct an indoor experimental arena (2000 × 1500 mm) using 38 mm EPS foamboard to represent a constrained search-and-rescue-style environment. The arena includes: boundary walls covered with masking tape to reduce ToF sensor reflections, a central divider (1000 mm from left edge, 1300 mm tall) creating a two-room layout, and four ArUco corner markers (IDs 40-43, 80mm) for camera-based localization.
+6. Construct an indoor experimental arena (2000 * 1500 mm) using 38 mm EPS foamboard to represent a constrained search-and-rescue-style environment. The arena includes: boundary walls covered with masking tape to reduce ToF sensor reflections, a central divider (1000 mm from left edge, 1300 mm tall) creating a two-room layout, and four ArUco corner markers (IDs 40-43, 80mm) for camera-based localization.
 
 7. Set up overhead imaging using a Logitech C922 webcam positioned approximately 2040 mm above the arena center. Configure an OpenCV-based script running on a laptop to perform real-time homography transformation, per-robot pose tracking, and live visualization overlay. The script broadcasts each robot's position via UDP to that robot only (no cross-robot position sharing).
 

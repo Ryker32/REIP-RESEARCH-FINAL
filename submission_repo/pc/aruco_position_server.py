@@ -27,7 +27,7 @@ from hardware_fidelity import DEFAULT_ARENA, DEFAULT_ARUCO, hardware_overlay_hea
 
 # ============== Configuration ==============
 CAMERA_ID = 0
-CAMERA_WIDTH = 1280   # 720p — faster ArUco detection, higher FPS for position updates
+CAMERA_WIDTH = 1280   # 720p -- faster ArUco detection, higher FPS for position updates
 CAMERA_HEIGHT = 720
 
 # ArUco
@@ -115,8 +115,8 @@ class PositionServer:
         # Calibration - two modes:
         # 1. Homography from 4 corner markers (preferred, auto-detects each frame)
         # 2. Simple linear scaling (fallback)
-        self.homography = None      # 3x3 pixel→arena transform
-        self.inv_homography = None  # 3x3 arena→pixel (for overlay drawing)
+        self.homography = None      # 3x3 pixel->arena transform
+        self.inv_homography = None  # 3x3 arena->pixel (for overlay drawing)
         self.use_homography = True  # Try to use corner markers
         self._corner_history = deque(maxlen=DEFAULT_ARUCO.stable_corner_frames)
         self._homography_locked = False
@@ -127,7 +127,7 @@ class PositionServer:
         self.origin_x = 0
         self.origin_y = actual_h
         
-        # Network — bind to WiFi interface so broadcasts reach robots
+        # Network -- bind to WiFi interface so broadcasts reach robots
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         bind_ip = self._detect_wifi_ip()
@@ -302,11 +302,11 @@ class PositionServer:
             self.state_log_file.close()
             self.state_log_file = None
         self.recording = False
-        print(f"[REC] Stopped — saved to {self.trial_dir}")
+        print(f"[REC] Stopped -- saved to {self.trial_dir}")
 
-    # Two height corrections — homography maps the wall-top plane (152mm).
-    # 1. Arena contour: wall-top → floor (0mm), scale outward ~7.5%
-    # 2. Robot positions: wall-top → robot tag height (80mm), scale outward ~3.5%
+    # Two height corrections -- homography maps the wall-top plane (152mm).
+    # 1. Arena contour: wall-top -> floor (0mm), scale outward ~7.5%
+    # 2. Robot positions: wall-top -> robot tag height (80mm), scale outward ~3.5%
     CAM_H = DEFAULT_ARUCO.cam_h_mm
     CORNER_H = DEFAULT_ARUCO.corner_h_mm
     ROBOT_TAG_H = DEFAULT_ARUCO.robot_tag_h_mm
@@ -389,7 +389,7 @@ class PositionServer:
 
         stable_src_pts = np.median(np.stack(self._corner_history, axis=0), axis=0).astype(np.float32)
 
-        # Compute homography (pixel→arena) and its inverse (arena→pixel)
+        # Compute homography (pixel->arena) and its inverse (arena->pixel)
         H, _ = cv2.findHomography(stable_src_pts, dst_pts)
         if H is None:
             print("[WARN] findHomography returned None, keeping previous homography")
@@ -576,7 +576,7 @@ class PositionServer:
         if self.inv_homography is None:
             return
 
-        WALL_MARGIN = 0    # no software padding — ToF handles avoidance
+        WALL_MARGIN = 0    # no software padding -- ToF handles avoidance
         DIVIDER_MARGIN = DEFAULT_ARENA.divider_margin_mm
         CELL_SIZE = DEFAULT_ARENA.cell_size_mm
         INTERIOR_WALL_X_LEFT = DEFAULT_ARENA.interior_wall_x_left_mm
@@ -613,7 +613,7 @@ class PositionServer:
         for i in range(4):
             cv2.line(overlay, mpts[i], mpts[(i + 1) % 4], (0, 200, 255), 1)
 
-        # Interior wall margins (yellow — uses DIVIDER_MARGIN from each face)
+        # Interior wall margins (yellow -- uses DIVIDER_MARGIN from each face)
         cv2.line(overlay,
                  self.arena_to_pixel(INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN, 0),
                  self.arena_to_pixel(INTERIOR_WALL_X_LEFT - DIVIDER_MARGIN, INTERIOR_WALL_Y_END),
@@ -653,11 +653,11 @@ class PositionServer:
 
             # --- Ring color: green=healthy, yellow=suspicious, red=distrusting ---
             if trust is not None and trust < 0.5:
-                ring_color = (0, 0, 255)       # red — lost trust
+                ring_color = (0, 0, 255)       # red -- lost trust
             elif suspicion and suspicion > 0.4:
-                ring_color = (0, 180, 255)     # orange — suspicious
+                ring_color = (0, 180, 255)     # orange -- suspicious
             else:
-                ring_color = (0, 255, 0)       # green — normal
+                ring_color = (0, 255, 0)       # green -- normal
 
             ring_thick = 3 if is_leader else 2
             cv2.circle(frame, (px, py), 22, ring_color, ring_thick)
@@ -704,7 +704,7 @@ class PositionServer:
                     dot = max(-1.0, min(1.0, dot))
                     angle_diff = math.degrees(math.acos(dot))
                     if angle_diff > 30:
-                        # Significant divergence — show red (commanded) vs green (predicted)
+                        # Significant divergence -- show red (commanded) vs green (predicted)
                         cpx, cpy = self.arena_to_pixel(cmd_tgt[0], cmd_tgt[1])
                         ddx, ddy = cpx - px, cpy - py
                         cd = math.sqrt(ddx * ddx + ddy * ddy)
@@ -864,7 +864,7 @@ class PositionServer:
                 print(f"Exploration overlay: {'ON' if self.show_exploration else 'OFF'}")
             elif key == ord('n'):
                 self._visited_cells.clear()
-                print("Coverage reset — new trial")
+                print("Coverage reset -- new trial")
 
             elapsed = time.time() - start
             if elapsed < interval:

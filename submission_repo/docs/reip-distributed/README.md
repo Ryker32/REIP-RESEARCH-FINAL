@@ -9,7 +9,7 @@ True distributed multi-agent coordination with REIP (Resilient Election & Impeac
         │   Overhead Camera    │
         └──────────┬───────────┘
                    │ USB
-                   ▼
+                   
         ┌──────────────────────┐
         │         PC           │
         │  aruco_position_     │
@@ -20,22 +20,22 @@ True distributed multi-agent coordination with REIP (Resilient Election & Impeac
         │  - Sends each robot  │           │      visualizer.py      │
         │    ONLY its own      │           │   (monitoring only)     │
         │    position          │           └─────────────────────────┘
-        └──────────┬───────────┘                       ▲
+        └──────────┬───────────┘                       
                    │                                   │
-          UDP 5003 │ (position: x,y,θ)                 │ UDP 5004
+          UDP 5003 │ (position: x,y,theta)                 │ UDP 5004
                    │                                   │ (peer broadcasts)
      ┌─────────────┼─────────────┬─────────────┐      │
-     ▼             ▼             ▼             ▼      │
+                                                  │
 ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐   │
 │ Robot 1 │  │ Robot 2 │  │ Robot 3 │  │ Robot 4 │   │
 │         │  │         │  │         │  │         │   │
 │reip_node│  │reip_node│  │reip_node│  │reip_node│   │
 │  .py    │  │  .py    │  │  .py    │  │  .py    │   │
-│         │◄─┼────────►│◄─┼────────►│◄─┼────────►│───┘
+│         │─┼────────│─┼────────│─┼────────│───┘
 │  REIP   │  │  REIP   │  │  REIP   │  │  REIP   │
 │ (local) │  │ (local) │  │ (local) │  │ (local) │
 └─────────┘  └─────────┘  └─────────┘  └─────────┘
-                   ◄───── UDP 5004 ─────►
+                   ───── UDP 5004 ─────
                     (peer-to-peer state)
 ```
 
@@ -116,9 +116,9 @@ python3 fault_inject.py
 
 | Port | Direction | Purpose |
 |------|-----------|---------|
-| 5003 | PC → Robot | Position updates (each robot gets only its own) |
+| 5003 | PC -> Robot | Position updates (each robot gets only its own) |
 | 5004 | Robot ↔ Robot | Peer state broadcasts (position, trust, vote, coverage) |
-| 5005 | PC → Robot | Fault injection (testing only) |
+| 5005 | PC -> Robot | Fault injection (testing only) |
 
 ## What Each Robot Broadcasts (UDP 5004)
 
@@ -165,9 +165,9 @@ Every 100ms:
 
 | Fault | Behavior | What REIP Should Do |
 |-------|----------|---------------------|
-| `spin` | Spin in circles | Detect rotation without translation → trust decays |
-| `stop` | Freeze in place | Detect no movement → trust decays |
-| `erratic` | Random movements | Detect inconsistent behavior → trust decays |
+| `spin` | Spin in circles | Detect rotation without translation -> trust decays |
+| `stop` | Freeze in place | Detect no movement -> trust decays |
+| `erratic` | Random movements | Detect inconsistent behavior -> trust decays |
 
 ## Expected Results
 
@@ -175,7 +175,7 @@ When fault injected:
 1. **0-2s**: Faulty robot starts misbehaving
 2. **2-5s**: Peers detect anomaly, trust decays
 3. **5-10s**: Trust falls below threshold
-4. **10-15s**: If faulty robot was leader → impeachment votes → new election
+4. **10-15s**: If faulty robot was leader -> impeachment votes -> new election
 5. **15-20s**: Swarm continues with new leader, excludes faulty robot
 
 ## Log Analysis

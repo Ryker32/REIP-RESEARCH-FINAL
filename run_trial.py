@@ -89,7 +89,7 @@ TRIALS_PER_CONDITION = 3
 
 
 # ==================== SSH helpers ====================
-# Per-operation SSH timeout — 2s was too aggressive for Pi Zero 2W under load
+# Per-operation SSH timeout -- 2s was too aggressive for Pi Zero 2W under load
 SSH_TIMEOUT = 8
 
 
@@ -419,7 +419,7 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
     kill_all(robot_ids)
     clear_robot_logs(robot_ids)
 
-    # Phase 1: Deploy and launch — returns only robots confirmed running
+    # Phase 1: Deploy and launch -- returns only robots confirmed running
     active_robots = deploy_and_launch(controller, robot_ids)
 
     if len(active_robots) < len(robot_ids):
@@ -437,7 +437,7 @@ def run_single_trial(controller, fault_type, trial_num, output_dir, robot_ids=No
         time.sleep(0.1)
 
     # Give robots time to get localized and elect a leader, then send start signal.
-    # (Startup: kill+clear ~2–4s, deploy Phase1 up to ~10s, Phase2+verify ~2–3s, then this delay.)
+    # (Startup: kill+clear ~2--4s, deploy Phase1 up to ~10s, Phase2+verify ~2--3s, then this delay.)
     delay = start_delay if start_delay is not None else START_DELAY_SEC
     print(f"\n[WAIT] Giving robots {delay}s for localization + leader election...")
     time.sleep(delay)

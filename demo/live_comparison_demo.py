@@ -2,14 +2,11 @@
 """
 Live side-by-side REIP vs Raft comparison demo.
 
-Imports VisualSimulation from test/visual_sim.py -- the SAME code that
-runs the regular sim -- and creates two embedded instances on separate
-UDP port ranges (one for REIP nodes, one for Raft nodes).
-
-Each panel is a real VisualSimulation running real robot node
-subprocesses.  All physics, coverage tracking, trust computation, and
-frontier assignment come from the actual reip_node.py / raft_node.py
-code, NOT re-implemented here.
+Uses ExperimentRunner from isef_experiments.py DIRECTLY -- the exact same
+physics, impairment model, message scheduling, peer relay, contact
+resolution, sensor simulation, and coverage tracking that produced every
+result in the paper.  This script adds ONLY a Pygame rendering layer on
+top.  Zero reimplementation.
 
 Usage: python demo/live_comparison_demo.py [num_robots] [layout]
 
@@ -18,14 +15,16 @@ Controls:
   SHIFT+F     Inject freeze_leader on current leader (both sides)
   C           Clear all faults on both sides
   SPACE       Pause / resume simulation
-  UP / DOWN   Speed up / slow down
   R           Reset (kill processes, respawn, start fresh)
   Q / ESC     Quit
 """
 
 import sys
 import os
+import math
 import time
+import json
+import socket
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -37,77 +36,171 @@ except ImportError:
     print("pygame not installed. Install with: pip install pygame-ce")
     sys.exit(1)
 
-# Import the real simulation class -- all physics, networking, coverage,
-# drawing, A* pathfinding, stuck detection etc. live here.
-from test.visual_sim import (
-    VisualSimulation,
-    ARENA_LAYOUTS, SIM_RATE,
-    WINDOW_WIDTH as VS_W,
-    WINDOW_HEIGHT as VS_H,
+# Import the REAL experiment runner -- all physics, networking, coverage,
+# impairment, contact resolution, divider queue, message scheduling etc.
+from test.isef_experiments import (
+    ExperimentRunner,
+    ARENA_LAYOUTS,
+    ARENA_WIDTH, ARENA_HEIGHT,
+    CELL_SIZE,
+    NUM_ROBOTS,
+    REIP_SCRIPT,
+    RAFT_SCRIPT,
+    START_PRESETS,
 )
+from hardware_fidelity import DEFAULT_ARENA
 
-# ====================== Hardware-captured starting positions ======================
-# All robots in Room A (left of divider), from 2026-03-08 hardware trial
-HARDWARE_STARTS = {
-    1: (185.9, 382.1, 0.188),
-    2: (792.9, 709.2, 2.255),
-    3: (318.8, 147.4, 0.736),
-    4: (768.7, 219.2, 1.577),
-    5: (182.4, 709.9, 0.410),
-}
-
-# ====================== Demo window constants ======================
+# ====================== Constants ======================
 HEADER_H = 48
 PLOT_H = 140
 GAP = 10
 MARGIN = 10
-NUM_ROBOTS = 5
-SPEED_MULTIPLIER = 1.5   # mild 1.5x -- safe for robot control loop, gives ~90s equivalent in 60s
+SIM_RATE = 20  # Match isef_experiments tick rate
+SPEED_MULTIPLIER = 5.0  # 5x -- ExperimentRunner sub-steps handle this safely
 REIP_COLOR = (0, 52, 204)
 RAFT_COLOR = (227, 30, 52)
 
+# Drawing colors (matching visual_sim OG style)
+COLOR_UNKNOWN = (158, 195, 230)
+COLOR_EXPLORED = (255, 255, 255)
+COLOR_WALL = (50, 50, 55)
+COLOR_GRID_LINE = (200, 208, 216)
+COLOR_FRONTIER = (255, 230, 80)
+AGENT_COLORS = [
+    (31, 119, 180), (255, 127, 14), (44, 160, 44),
+    (214, 39, 40), (148, 103, 189), (140, 86, 75),
+    (227, 119, 194), (127, 127, 127),
+]
+COLOR_LEADER_GOLD = (255, 215, 0)
 
-# ====================== Per-panel HUD overlay ======================
-_hud_fonts = {}  # Cached fonts (created once after pygame.init)
+
+# ====================== Panel drawing ======================
+def draw_panel(surface, runner, wall_segs, fonts, is_reip, label, color,
+               fault_active_rids):
+    """Render one ExperimentRunner's state onto a Pygame surface."""
+    w, h = surface.get_size()
+    surface.fill(COLOR_UNKNOWN)
+
+    # Grid dimensions
+    cols = ARENA_WIDTH // CELL_SIZE
+    rows = ARENA_HEIGHT // CELL_SIZE
+    # Scale: fit arena into surface
+    scale_x = w / ARENA_WIDTH
+    scale_y = h / ARENA_HEIGHT
+    scale = min(scale_x, scale_y)
+    off_x = (w - ARENA_WIDTH * scale) / 2
+    off_y = (h - ARENA_HEIGHT * scale) / 2
+
+    # Draw explored cells
+    for (cx, cy) in runner.visited_cells:
+        rx = off_x + cx * CELL_SIZE * scale
+        ry = off_y + cy * CELL_SIZE * scale
+        cw = CELL_SIZE * scale
+        ch = CELL_SIZE * scale
+        pygame.draw.rect(surface, COLOR_EXPLORED,
+                         (int(rx), int(ry), int(cw) + 1, int(ch) + 1))
+
+    # Grid lines
+    for col in range(cols + 1):
+        x = int(off_x + col * CELL_SIZE * scale)
+        pygame.draw.line(surface, COLOR_GRID_LINE,
+                         (x, int(off_y)), (x, int(off_y + rows * CELL_SIZE * scale)), 1)
+    for row in range(rows + 1):
+        y = int(off_y + row * CELL_SIZE * scale)
+        pygame.draw.line(surface, COLOR_GRID_LINE,
+                         (int(off_x), y), (int(off_x + cols * CELL_SIZE * scale), y), 1)
+
+    # Walls (filled rectangle for divider)
+    for seg in wall_segs:
+        x1, y1, x2, y2 = seg
+        sx1 = int(off_x + x1 * scale)
+        sy1 = int(off_y + y1 * scale)
+        sx2 = int(off_x + x2 * scale)
+        sy2 = int(off_y + y2 * scale)
+        pygame.draw.line(surface, COLOR_WALL, (sx1, sy1), (sx2, sy2), 3)
+
+    # Fill between the two divider faces (if multiroom)
+    if len(wall_segs) >= 2:
+        x_left = wall_segs[0][0]
+        x_right = wall_segs[1][0]
+        y_top = wall_segs[0][1]
+        y_bot = wall_segs[0][3]
+        rx = int(off_x + x_left * scale)
+        ry = int(off_y + y_top * scale)
+        rw = int((x_right - x_left) * scale)
+        rh = int((y_bot - y_top) * scale)
+        if rw > 0 and rh > 0:
+            pygame.draw.rect(surface, COLOR_WALL, (rx, ry, rw, rh))
+
+    # Robots
+    for rid in range(1, NUM_ROBOTS + 1):
+        if runner.sim_mode == "hardware_clone" and rid in runner.robot_plants:
+            plant = runner.robot_plants[rid]
+            rx, ry, rtheta = plant.x, plant.y, plant.theta
+        elif rid in runner.sim_positions:
+            rx, ry, rtheta = runner.sim_positions[rid]
+        else:
+            continue
+
+        sx = int(off_x + rx * scale)
+        sy = int(off_y + ry * scale)
+        rc = AGENT_COLORS[(rid - 1) % len(AGENT_COLORS)]
+        robot_r = max(6, int(77 * scale))  # Body radius ~77mm
+
+        # Check if leader
+        st = runner.last_states_by_robot.get(rid, {})
+        is_leader = (st.get('state') == 'leader')
+
+        # Gold ring for leader
+        if is_leader:
+            pygame.draw.circle(surface, COLOR_LEADER_GOLD, (sx, sy), robot_r + 3, 3)
+
+        # Robot body
+        pygame.draw.circle(surface, rc, (sx, sy), robot_r)
+
+        # Heading line
+        hx = sx + int(robot_r * 1.3 * math.cos(rtheta))
+        hy = sy + int(robot_r * 1.3 * math.sin(rtheta))
+        pygame.draw.line(surface, (255, 255, 255), (sx, sy), (hx, hy), 2)
+
+        # ID label
+        id_surf = fonts['tiny'].render(str(rid), True, (255, 255, 255))
+        surface.blit(id_surf, (sx - id_surf.get_width() // 2,
+                                sy - id_surf.get_height() // 2))
+
+        # Fault badge
+        if rid in fault_active_rids:
+            badge = fonts['tiny'].render("BAD", True, (255, 60, 60))
+            surface.blit(badge, (sx - badge.get_width() // 2, sy - robot_r - 14))
 
 
-def _get_hud_fonts():
-    """Lazy-init fonts for the HUD (called after pygame.init)."""
-    if not _hud_fonts:
-        _hud_fonts['tag'] = pygame.font.SysFont('consolas', 18, bold=True)
-        _hud_fonts['cov'] = pygame.font.SysFont('consolas', 14, bold=True)
-    return _hud_fonts
+def draw_hud(screen, x, y, w, h, runner, label, color, fonts, is_reip):
+    """Draw HUD overlay on top of a panel."""
+    total_cells = DEFAULT_ARENA.explorable_cell_count()
+    cov_pct = len(runner.visited_cells) / total_cells * 100 if total_cells else 0
 
-
-def _draw_panel_hud(screen, x, y, w, h, panel, label, color, fonts, is_reip):
-    """Draw a clean info overlay on top of a panel."""
-    hf = _get_hud_fonts()
-    total_cells = (2000 // 125) * (1500 // 125)
-    cov_pct = len(panel.visited_cells) / total_cells * 100 if total_cells else 0
-
-    # ---- Panel label badge (top center) ----
-    tag_surf = hf['tag'].render(label, True, (255, 255, 255))
+    # Panel label badge
+    tag_surf = fonts['tag'].render(label, True, (255, 255, 255))
     tw, th = tag_surf.get_size()
     badge_x = x + w // 2 - tw // 2 - 10
     badge_y = y + 4
-    badge_rect = pygame.Rect(badge_x, badge_y, tw + 20, th + 6)
-    badge_bg = pygame.Surface((badge_rect.w, badge_rect.h), pygame.SRCALPHA)
+    badge_bg = pygame.Surface((tw + 20, th + 6), pygame.SRCALPHA)
     badge_bg.fill((*color, 210))
-    screen.blit(badge_bg, badge_rect.topleft)
+    screen.blit(badge_bg, (badge_x, badge_y))
     screen.blit(tag_surf, (badge_x + 10, badge_y + 3))
 
-    # ---- Coverage % (top-left) ----
-    cov_surf = hf['cov'].render(f"{cov_pct:.0f}%", True, (255, 255, 255))
+    # Coverage % (top-left)
+    cov_surf = fonts['cov'].render(f"{cov_pct:.0f}%", True, (255, 255, 255))
     cov_bg = pygame.Surface((cov_surf.get_width() + 10, cov_surf.get_height() + 4),
                             pygame.SRCALPHA)
     cov_bg.fill((0, 0, 0, 150))
     screen.blit(cov_bg, (x + 6, y + 6))
     screen.blit(cov_surf, (x + 11, y + 8))
 
-    # ---- Leader + Elections (top-right) ----
-    leader = panel.current_leader_id or "?"
-    elec = panel.election_count
-    info_str = f"L={leader}  E={elec}"
+    # Leader + Elections (top-right)
+    leader = runner._get_current_leader()
+    elec_count = sum(1 for _ in runner.tracked_leaders.values())  # approximate
+    info_str = f"L={leader}"
     info_surf = fonts['small'].render(info_str, True, (255, 255, 255))
     info_bg = pygame.Surface((info_surf.get_width() + 10, info_surf.get_height() + 4),
                              pygame.SRCALPHA)
@@ -115,42 +208,40 @@ def _draw_panel_hud(screen, x, y, w, h, panel, label, color, fonts, is_reip):
     screen.blit(info_bg, (x + w - info_surf.get_width() - 16, y + 6))
     screen.blit(info_surf, (x + w - info_surf.get_width() - 11, y + 8))
 
-    # ---- Bottom bar: trust (REIP) or "No Trust Layer" (Raft) ----
+    # Bottom bar: trust (REIP) or "No Trust Layer" (Raft)
     bar_h = 22
     bar_bg = pygame.Surface((w, bar_h), pygame.SRCALPHA)
     bar_bg.fill((0, 0, 0, 140))
     screen.blit(bar_bg, (x, y + h - bar_h))
 
     if is_reip:
-        avg_trust = getattr(panel, '_avg_trust', 1.0)
-        if avg_trust > 0.6:
-            tc = (100, 220, 100)
-        elif avg_trust > 0.3:
-            tc = (255, 180, 50)
-        else:
-            tc = (255, 80, 80)
+        trusts = [st.get('trust_in_leader', 1.0)
+                  for st in runner.last_states_by_robot.values()
+                  if st.get('state') != 'leader']
+        avg_trust = sum(trusts) / len(trusts) if trusts else 1.0
+        tc = (100, 220, 100) if avg_trust > 0.6 else \
+             (255, 180, 50) if avg_trust > 0.3 else (255, 80, 80)
         trust_str = f"Avg Trust: {avg_trust:.2f}"
         trust_surf = fonts['small'].render(trust_str, True, tc)
         screen.blit(trust_surf, (x + 8, y + h - bar_h + 4))
 
-        sus_robots = [(rid, s.suspicion) for rid, s in panel.robot_states.items()
-                      if s.suspicion > 0.05]
+        sus_robots = [(rid, st.get('suspicion', 0.0))
+                      for rid, st in runner.last_states_by_robot.items()
+                      if st.get('suspicion', 0.0) > 0.05]
         if sus_robots:
             sus_parts = [f"R{rid}:{s:.1f}" for rid, s in sorted(sus_robots)]
             sus_str = "Sus: " + " ".join(sus_parts)
-            sus_color = (255, 120, 80) if any(s > 1.0 for _, s in sus_robots) \
-                else (255, 200, 100)
-            sus_surf = fonts['small'].render(sus_str, True, sus_color)
+            sus_surf = fonts['small'].render(sus_str, True, (255, 200, 100))
             screen.blit(sus_surf, (x + w // 2, y + h - bar_h + 4))
     else:
         raft_surf = fonts['small'].render("No Trust Layer", True, (180, 180, 190))
         screen.blit(raft_surf, (x + 8, y + h - bar_h + 4))
 
 
-# ====================== Coverage history plot ======================
-def _draw_coverage_plot(screen, rect, panels, labels, colors, elapsed, max_time,
-                        fonts, fault_times=(10, 30)):
-    """Draw a coverage-vs-time plot at the bottom of the window (dark theme)."""
+# ====================== Coverage plot ======================
+def draw_coverage_plot(screen, rect, runners, labels, colors, elapsed,
+                       max_time, fonts, cov_histories, fault_times):
+    """Coverage vs time plot (dark theme)."""
     bg = (40, 42, 50)
     pygame.draw.rect(screen, bg, rect, border_radius=6)
     pygame.draw.rect(screen, (70, 72, 80), rect, width=1, border_radius=6)
@@ -168,43 +259,41 @@ def _draw_coverage_plot(screen, rect, panels, labels, colors, elapsed, max_time,
     pygame.draw.line(screen, (100, 102, 110),
                      (inner.x, inner.y), (inner.x, inner.bottom), 1)
 
-    # Grid lines
+    # Grid
     for pct in (0, 25, 50, 75, 100):
-        y = inner.bottom - int((pct / 100.0) * inner.h)
-        pygame.draw.line(screen, (55, 57, 65),
-                         (inner.x, y), (inner.right, y), 1)
+        py = inner.bottom - int((pct / 100.0) * inner.h)
+        pygame.draw.line(screen, (55, 57, 65), (inner.x, py), (inner.right, py), 1)
         lbl = fonts['small'].render(f"{pct}%", True, (120, 120, 130))
-        screen.blit(lbl, (inner.x - lbl.get_width() - 4, y - 8))
+        screen.blit(lbl, (inner.x - lbl.get_width() - 4, py - 8))
 
-    # Fault markers (red dashed vertical lines)
+    # Fault markers
     for ft in fault_times:
         if ft <= elapsed:
             fx = inner.x + int((ft / max_time) * inner.w)
             for dy in range(inner.y, inner.bottom, 6):
                 pygame.draw.line(screen, (200, 60, 60),
                                  (fx, dy), (fx, min(dy + 3, inner.bottom)), 1)
-            fl = fonts['small'].render(f"F@{ft}s", True, (200, 80, 80))
+            fl = fonts['small'].render(f"F@{ft:.0f}s", True, (200, 80, 80))
             screen.blit(fl, (fx + 3, inner.y - 2))
 
     # Curves
-    for panel, color in zip(panels, colors):
-        hist = panel._cov_history
+    for hist, clr in zip(cov_histories, colors):
         if len(hist) < 2:
             continue
         pts = []
-        for idx, cov in enumerate(hist):
-            x = inner.x + int((idx / max(1, max_time * SIM_RATE)) * inner.w)
-            y = inner.bottom - int((min(100.0, cov) / 100.0) * inner.h)
-            pts.append((x, y))
+        for idx, (t, cov) in enumerate(hist):
+            px = inner.x + int((t / max_time) * inner.w)
+            py = inner.bottom - int((min(100.0, cov) / 100.0) * inner.h)
+            pts.append((px, py))
         if len(pts) >= 2:
-            pygame.draw.lines(screen, color, False, pts, 3)
+            pygame.draw.lines(screen, clr, False, pts, 3)
 
-    # Legend (top right of plot)
+    # Legend
     lx = rect.right - 240
     ly = rect.y + 8
-    for label, color in zip(labels, colors):
-        pygame.draw.line(screen, color, (lx, ly + 8), (lx + 20, ly + 8), 3)
-        lbl = fonts['small'].render(label, True, (190, 190, 200))
+    for lbl_text, clr in zip(labels, colors):
+        pygame.draw.line(screen, clr, (lx, ly + 8), (lx + 20, ly + 8), 3)
+        lbl = fonts['small'].render(lbl_text, True, (190, 190, 200))
         screen.blit(lbl, (lx + 26, ly))
         lx += 100
 
@@ -214,194 +303,198 @@ def _draw_coverage_plot(screen, rect, panels, labels, colors, elapsed, max_time,
     screen.blit(cs, (inner.x, rect.bottom - 18))
 
 
-# ====================== Overlay helpers ======================
-_overlay_font = None
-
-
-def _draw_overlay(screen, fonts, message, sub=""):
-    global _overlay_font
-    if _overlay_font is None:
-        _overlay_font = pygame.font.SysFont('consolas', 32, bold=True)
+# ====================== Overlay ======================
+def draw_overlay(screen, fonts, message, sub=""):
     w, h = screen.get_size()
     screen.fill((30, 32, 38))
-    surf = _overlay_font.render(message, True, (220, 220, 230))
+    big = fonts.get('big') or fonts['tag']
+    surf = big.render(message, True, (220, 220, 230))
     screen.blit(surf, (w // 2 - surf.get_width() // 2,
                         h // 2 - surf.get_height() // 2 - 16))
     if sub:
         ss = fonts['body'].render(sub, True, (140, 140, 150))
-        screen.blit(ss, (w // 2 - ss.get_width() // 2,
-                          h // 2 + 18))
+        screen.blit(ss, (w // 2 - ss.get_width() // 2, h // 2 + 18))
     pygame.display.flip()
 
 
-# ====================== Bootstrap with leader consensus ======================
-def _bootstrap_and_wait(panels, fonts, screen, timeout=6.0):
-    """Pump positions + relay + sensor feedback, then wait for leader consensus.
+# ====================== Bootstrap ======================
+def bootstrap_and_wait(runners, timeout=10.0):
+    """Mirror isef_experiments.py startup: pump positions + sensor data,
+    wait for leader consensus, then send start."""
+    for r in runners:
+        r._trial_start_wall_time = time.time()
+        r._next_position_publish = time.time()
 
-    Mirrors isef_experiments.py flow:
-      1. Send positions continuously so nodes get real poses before elections
-      2. Relay peer broadcasts so nodes can see each other
-      3. Wait until each panel reports a stable leader (majority agreement)
-      4. Send 'start' to unlock motor output
-
-    Without this, nodes self-elect at (0,0) and the leader may not be the one
-    we later fault-inject, making the demo meaningless.
-    """
-    deadline = time.time() + timeout
-
-    # Phase 1: pump positions for 3s before the nodes even try elections
+    # Phase 1: pump for 3s
     pump_until = time.time() + 3.0
     while time.time() < pump_until:
-        for p in panels:
-            p.send_positions()
-            p.send_sensor_feedback()
-            p.receive_states()
+        for r in runners:
+            r.receive_motor_intents()
+            r.receive_states()
+            r._flush_scheduled_messages()
+            r.send_sensor_feedback()
+            r._emit_position_packets()
+            r._flush_scheduled_messages()
         time.sleep(0.05)
 
-    # Phase 2: keep pumping and check for leader consensus
-    leaders_ok = [False] * len(panels)
+    # Phase 2: wait for leader consensus
+    deadline = time.time() + timeout - 3.0
+    leaders_ok = [False] * len(runners)
     while time.time() < deadline and not all(leaders_ok):
-        for i, p in enumerate(panels):
-            p.send_positions()
-            p.send_sensor_feedback()
-            p.receive_states()
-            if p.current_leader_id is not None:
-                leaders_ok[i] = True
+        for i, r in enumerate(runners):
+            r.receive_motor_intents()
+            states = r.receive_states()
+            r._flush_scheduled_messages()
+            r.send_sensor_feedback()
+            r._emit_position_packets()
+            r._flush_scheduled_messages()
+            if not leaders_ok[i]:
+                from collections import Counter
+                reports = [st.get('leader_id') for st in
+                           (list(states.values()) or list(r.last_states_by_robot.values()))
+                           if st.get('leader_id') is not None]
+                if reports:
+                    counts = Counter(reports)
+                    lid, cnt = counts.most_common(1)[0]
+                    if lid is not None and cnt >= max(1, NUM_ROBOTS // 2 + 1):
+                        leaders_ok[i] = True
+                        print(f"  [{'REIP' if i == 0 else 'RAFT'}] Leader consensus: Robot {lid}")
         time.sleep(0.05)
 
-    for i, p in enumerate(panels):
-        lbl = "REIP" if i == 0 else "RAFT"
-        lid = p.current_leader_id
-        if lid:
-            print(f"  [{lbl}] Leader consensus: Robot {lid}")
-        else:
+    for i, ok in enumerate(leaders_ok):
+        if not ok:
+            lbl = "REIP" if i == 0 else "RAFT"
             print(f"  [{lbl}] WARNING: no leader consensus before start")
 
-    # Phase 3: send 'start' to unlock motor output
-    for p in panels:
-        p.send_start()
-    time.sleep(0.1)
-    # Double-send for reliability (matches isef_experiments)
-    for p in panels:
-        p.send_start()
+    # Phase 3: send start
+    for r in runners:
+        r._send_bootstrap_packets()
+    time.sleep(0.2)
+    for r in runners:
+        r._send_bootstrap_packets()
+
+
+# ====================== Create / reset runner ======================
+def create_runner(port_offset, script, layout="multiroom"):
+    """Create an ExperimentRunner wired up for the demo."""
+    r = ExperimentRunner(
+        output_dir=os.path.join(PROJECT_ROOT, "demo_logs"),
+        port_offset=port_offset,
+        sim_mode="hardware_clone",
+        impairment_preset="hardware_clone_clean",
+    )
+    r.set_layout(layout)
+    return r
+
+
+def start_runner(runner, script, label):
+    """Start robot processes on a runner."""
+    fixed = START_PRESETS.get("hardware_clone_20260308")
+    print(f"  Starting {label} nodes (port_offset={runner.port_offset})...")
+    runner.start_robots(
+        script=script,
+        extra_args=[],
+        seed=42,
+        experiment_name=f"demo_{label.lower()}",
+        fixed_positions=fixed,
+    )
 
 
 # ====================== Main ======================
 def main():
-    num_robots = int(sys.argv[1]) if len(sys.argv) > 1 else NUM_ROBOTS
+    num_robots_arg = int(sys.argv[1]) if len(sys.argv) > 1 else NUM_ROBOTS
     layout = sys.argv[2] if len(sys.argv) > 2 else "multiroom"
 
     if layout not in ARENA_LAYOUTS:
-        print(f"Unknown layout '{layout}'. "
-              f"Available: {', '.join(ARENA_LAYOUTS.keys())}")
+        print(f"Unknown layout '{layout}'. Available: {', '.join(ARENA_LAYOUTS.keys())}")
         sys.exit(1)
 
-    # Use real hardware starts for multiroom
-    if layout == "multiroom" and num_robots <= len(HARDWARE_STARTS):
-        starts = {i: HARDWARE_STARTS[i] for i in range(1, num_robots + 1)}
-    else:
-        starts = None  # Let VisualSimulation use its defaults
-
     print("REIP vs Raft - Live Comparison Demo")
-    print(f"  Robots: {num_robots}  Layout: {layout}")
-    print(f"  Faults: t=8s bad_leader on leader (single fault)")
-    print("=" * 55)
+    print(f"  Robots: {num_robots_arg}  Layout: {layout}")
+    print(f"  Uses ExperimentRunner directly (identical physics to paper)")
+    print(f"  Speed: {SPEED_MULTIPLIER}x  Faults: t=10s R1 + t=30s leader (paper schedule)")
+    last_cov_print = 0
+    print("=" * 60)
 
-    # Init pygame BEFORE creating VisualSimulation instances (fonts need it)
+    # ---- Pygame init ----
     pygame.init()
 
-    # ---- Create two real VisualSimulation instances ----
-    # REIP on default ports (port_base=0)
-    # Raft on offset ports (port_base=2000)
-    reip_sim = VisualSimulation(
-        num_robots, layout,
-        port_base=0,
-        robot_script=os.path.join("robot", "reip_node.py"),
-        start_positions=starts,
-        embedded=True,
-    )
-    raft_sim = VisualSimulation(
-        num_robots, layout,
-        port_base=2000,
-        robot_script=os.path.join("robot", "baselines", "raft_node.py"),
-        start_positions=starts,
-        embedded=True,
-    )
-    panels = [reip_sim, raft_sim]
-    labels = ["REIP", "RAFT"]
-    colors = [REIP_COLOR, RAFT_COLOR]
-
-    # Speed up playback so judges don't wait 2 minutes
-    for p in panels:
-        p.speed_multiplier = SPEED_MULTIPLIER
-
-    # Coverage history (separate from VisualSimulation's internal state)
-    for p in panels:
-        p._cov_history = []
-
-    # ---- Pygame window (auto-fit to screen) ----
-    # Detect screen resolution so it fits on small laptops (e.g. 14" OmniBook)
+    # Auto-fit window to screen
     disp_info = pygame.display.Info()
-    screen_w = disp_info.current_w
-    screen_h = disp_info.current_h
-    # Leave room for taskbar / title bar
+    screen_w, screen_h = disp_info.current_w, disp_info.current_h
     usable_w = int(screen_w * 0.95)
     usable_h = int(screen_h * 0.88)
 
-    # Each panel renders to VS_W x VS_H internally. Scale to fit side-by-side.
-    aspect = VS_W / VS_H
+    aspect = ARENA_WIDTH / ARENA_HEIGHT
     max_panel_w = (usable_w - 2 * MARGIN - GAP) // 2
     max_panel_h = usable_h - HEADER_H - MARGIN - PLOT_H - MARGIN
-    # Maintain aspect ratio -- constrained by width or height
     panel_h = min(max_panel_h, int(max_panel_w / aspect))
     panel_w = int(panel_h * aspect)
     total_w = 2 * panel_w + GAP + 2 * MARGIN
     total_h = HEADER_H + panel_h + MARGIN + PLOT_H + MARGIN
     print(f"  Window: {total_w}x{total_h}  (screen {screen_w}x{screen_h})")
+
     screen = pygame.display.set_mode((total_w, total_h))
     pygame.display.set_caption("REIP vs Raft - Live Comparison")
     clock = pygame.time.Clock()
 
     fonts = {
+        'big':   pygame.font.SysFont('consolas', 32, bold=True),
+        'tag':   pygame.font.SysFont('consolas', 18, bold=True),
+        'cov':   pygame.font.SysFont('consolas', 14, bold=True),
         'title': pygame.font.SysFont('consolas', 16, bold=True),
         'body':  pygame.font.SysFont('consolas', 14, bold=True),
         'small': pygame.font.SysFont('consolas', 12),
+        'tiny':  pygame.font.SysFont('consolas', 10, bold=True),
     }
 
-    # Panel blit positions
+    # Panel surfaces
+    reip_surface = pygame.Surface((panel_w, panel_h))
+    raft_surface = pygame.Surface((panel_w, panel_h))
+
     left_x = MARGIN
     right_x = MARGIN + panel_w + GAP
     panels_y = HEADER_H
     plot_rect = pygame.Rect(MARGIN, HEADER_H + panel_h + MARGIN,
                             total_w - 2 * MARGIN, PLOT_H)
 
-    # ---- Startup ----
-    screen.fill((235, 237, 240))
-    _draw_overlay(screen, fonts, "STARTING ROBOT NODES...",
-                  "Spawning REIP and Raft processes")
-    print("\n  Starting robot nodes...")
-    for p in panels:
-        p.start_robot_processes()
-    time.sleep(2.0)  # Let processes initialise (matches isef_experiments)
+    wall_segs = list(ARENA_LAYOUTS.get(layout, []))
 
-    # Bootstrap: pump positions + sensor data + relay, then wait for leader
-    # consensus before sending 'start'. This mirrors what isef_experiments.py
-    # does so that robots elect a leader at their real positions instead of
-    # self-electing at (0,0).
-    _draw_overlay(screen, fonts, "BOOTSTRAPPING...",
-                  "Waiting for leader consensus")
-    _bootstrap_and_wait(panels, fonts, screen, timeout=10.0)
+    # ---- Create runners ----
+    draw_overlay(screen, fonts, "CREATING RUNNERS...", "Setting up ExperimentRunner instances")
+    reip_runner = create_runner(port_offset=0, script=REIP_SCRIPT, layout=layout)
+    raft_runner = create_runner(port_offset=2000, script=RAFT_SCRIPT, layout=layout)
+    runners = [reip_runner, raft_runner]
+    runner_labels = ["REIP", "RAFT"]
+    runner_colors = [REIP_COLOR, RAFT_COLOR]
+    runner_scripts = [REIP_SCRIPT, RAFT_SCRIPT]
+    runner_surfaces = [reip_surface, raft_surface]
+    runner_x_positions = [left_x, right_x]
+
+    # ---- Start processes ----
+    draw_overlay(screen, fonts, "STARTING ROBOT NODES...", "Spawning REIP and Raft processes")
+    for r, script, label in zip(runners, runner_scripts, runner_labels):
+        start_runner(r, script, label)
+
+    # ---- Bootstrap ----
+    draw_overlay(screen, fonts, "BOOTSTRAPPING...", "Waiting for leader consensus")
+    bootstrap_and_wait(runners, timeout=10.0)
     print("  Ready!\n")
 
     # ---- State ----
-    sim_rate = SIM_RATE
     start_time = time.time()
     paused = False
     run_number = 1
-    max_time = 60
+    max_time = 40  # Enough to see full divergence after both faults
     fault_schedule = [
-        {"time": 8.0,  "target": "leader", "fired": False},
+        {"time": 10.0, "target": "leader", "fired": False},   # bad_leader on CURRENT leader at t=10
+        {"time": 30.0, "target": "leader", "fired": False},   # bad_leader on CURRENT leader at t=30
     ]
+    cov_histories = [[], []]  # [(elapsed, coverage%), ...]
+    fault_active_rids = [{}, {}]  # Which robots have active faults per runner
+
+    # Track leader changes for each runner
+    prev_leaders = [{}, {}]  # {rid: last_known_leader_id}
 
     try:
         running = True
@@ -421,34 +514,65 @@ def main():
                     elif event.key == pygame.K_f:
                         mods = pygame.key.get_mods()
                         ft = 'freeze_leader' if (mods & pygame.KMOD_SHIFT) else 'bad_leader'
-                        for p in panels:
-                            target = p.current_leader_id or 1
-                            p.inject_fault(target, ft)
+                        for i, r in enumerate(runners):
+                            target = r._get_current_leader()
+                            r.inject_fault(target, ft)
+                            r._flush_scheduled_messages()
+                            fault_active_rids[i][target] = True
+                            print(f"  [MANUAL] {ft} on [{runner_labels[i]}] R{target}")
                     elif event.key == pygame.K_c:
-                        for p in panels:
-                            p.clear_all_faults()
-                    elif event.key == pygame.K_UP:
-                        sim_rate = min(60, sim_rate + 5)
-                    elif event.key == pygame.K_DOWN:
-                        sim_rate = max(5, sim_rate - 5)
+                        for i, r in enumerate(runners):
+                            for rid in range(1, NUM_ROBOTS + 1):
+                                r.inject_fault(rid, 'clear')
+                            r._flush_scheduled_messages()
+                            fault_active_rids[i].clear()
+                            print(f"  [MANUAL] Clear all faults on [{runner_labels[i]}]")
 
             # ---- Reset ----
             if needs_reset:
                 run_number += 1
-                print(f"\n{'='*55}")
+                print(f"\n{'='*60}")
                 print(f"  RESET -- starting run #{run_number}")
-                print(f"{'='*55}")
-                _draw_overlay(screen, fonts, "RESETTING...",
-                              "Killing old processes and respawning")
-                for p in panels:
-                    p.reset(start_positions=starts)
-                    p._cov_history = []
-                time.sleep(2.0)  # Let processes init (matches startup)
-                _draw_overlay(screen, fonts, "BOOTSTRAPPING...",
-                              "Waiting for leader consensus")
-                _bootstrap_and_wait(panels, fonts, screen, timeout=10.0)
+                print(f"{'='*60}")
+                draw_overlay(screen, fonts, "RESETTING...",
+                             "Killing old processes and respawning")
+
+                # Stop old processes and close sockets
+                for r in runners:
+                    r.stop_robots()
+                time.sleep(1.0)
+
+                # Close old sockets
+                for r in runners:
+                    try:
+                        r.state_socket.close()
+                        r.motor_socket.close()
+                        r.pos_socket.close()
+                        r.sensor_socket.close()
+                        r.fault_socket.close()
+                    except Exception:
+                        pass
+
+                # Recreate runners fresh
+                reip_runner = create_runner(port_offset=0, script=REIP_SCRIPT, layout=layout)
+                raft_runner = create_runner(port_offset=2000, script=RAFT_SCRIPT, layout=layout)
+                runners = [reip_runner, raft_runner]
+
+                # Start new processes
+                draw_overlay(screen, fonts, "STARTING ROBOT NODES...",
+                             "Spawning fresh REIP and Raft processes")
+                for r, script, label in zip(runners, runner_scripts, runner_labels):
+                    start_runner(r, script, label)
+
+                draw_overlay(screen, fonts, "BOOTSTRAPPING...",
+                             "Waiting for leader consensus")
+                bootstrap_and_wait(runners, timeout=10.0)
+
                 start_time = time.time()
                 paused = False
+                cov_histories = [[], []]
+                fault_active_rids = [{}, {}]
+                prev_leaders = [{}, {}]
                 for fe in fault_schedule:
                     fe["fired"] = False
                 print("  Ready!\n")
@@ -456,28 +580,50 @@ def main():
 
             elapsed = time.time() - start_time
 
-            # ---- Auto fault schedule ----
+            # ---- Auto fault schedule (matches paper: t=10 on R1, t=30 on leader) ----
             for fe in fault_schedule:
                 if not fe["fired"] and elapsed >= fe["time"]:
                     fe["fired"] = True
-                    for p, lbl in zip(panels, labels):
-                        rid = p.current_leader_id or 1
-                        p.inject_fault(rid, 'bad_leader')
-                        print(f"  [AUTO] bad_leader on [{lbl}] R{rid} "
-                              f"(leader) at t={elapsed:.1f}s")
+                    for i, r in enumerate(runners):
+                        if fe["target"] == "robot1":
+                            rid = 1  # Fixed target: Robot 1
+                        else:
+                            rid = r._get_current_leader()  # Current leader
+                        r.inject_fault(rid, 'bad_leader')
+                        r._flush_scheduled_messages()
+                        fault_active_rids[i][rid] = True
+                        mode = "R1 (fixed)" if fe["target"] == "robot1" else f"R{rid} (leader)"
+                        print(f"  [AUTO] bad_leader on [{runner_labels[i]}] {mode} "
+                              f"at t={elapsed:.1f}s")
 
-            # ---- Simulation step ----
+            # ---- Simulation tick (EXACT same as isef_experiments) ----
             if not paused:
-                for p in panels:
-                    p.receive_motor_intents()
-                    p.update_sim_robots()
-                    p.send_positions()
-                    p.send_sensor_feedback()
-                    p.receive_states()
-                    # Record coverage for the bottom plot
-                    total = ((2000 // 125) * (1500 // 125))
-                    cov_pct = len(p.visited_cells) / total * 100 if total else 0
-                    p._cov_history.append(cov_pct)
+                now = time.time()
+                for i, r in enumerate(runners):
+                    dt = now - (r._last_tick_time if hasattr(r, '_last_tick_time') else now)
+                    dt = min(dt, 0.15)
+                    dt *= SPEED_MULTIPLIER
+                    r._last_tick_time = now
+
+                    r.receive_motor_intents()
+                    states = r.receive_states()
+                    r._flush_scheduled_messages()
+                    r.update_positions(states, dt)
+                    r.send_sensor_feedback()
+                    r._emit_position_packets()
+                    r._flush_scheduled_messages()
+
+                    # Track coverage
+                    cov = r.get_coverage()
+                    cov_histories[i].append((elapsed, cov))
+
+                    # Track leader changes for display
+                    for rid, st in states.items():
+                        reported_leader = st.get('leader_id')
+                        prev_leader = r.tracked_leaders.get(rid)
+                        if prev_leader is not None and reported_leader != prev_leader:
+                            pass  # Could count elections here
+                        r.tracked_leaders[rid] = reported_leader
 
             # ---- Draw ----
             screen.fill((30, 32, 38))
@@ -495,52 +641,56 @@ def main():
             st_surf = fonts['body'].render(info, True, (160, 160, 170))
             screen.blit(st_surf, (total_w - st_surf.get_width() - MARGIN, 30))
 
-            # Each VisualSimulation draws to its own surface
-            for p in panels:
-                p.draw()
+            # Draw each panel
+            for i, (r, surf, lbl, clr, px) in enumerate(zip(
+                    runners, runner_surfaces, runner_labels, runner_colors,
+                    runner_x_positions)):
+                draw_panel(surf, r, wall_segs, fonts,
+                           is_reip=(i == 0), label=lbl, color=clr,
+                           fault_active_rids=fault_active_rids[i])
+                screen.blit(surf, (px, panels_y))
 
-            # Scale and blit each panel
-            scaled_reip = pygame.transform.smoothscale(
-                reip_sim.screen, (panel_w, panel_h))
-            scaled_raft = pygame.transform.smoothscale(
-                raft_sim.screen, (panel_w, panel_h))
-            screen.blit(scaled_reip, (left_x, panels_y))
-            screen.blit(scaled_raft, (right_x, panels_y))
+                # Border
+                pygame.draw.rect(screen, clr,
+                                 (px - 2, panels_y - 2, panel_w + 4, panel_h + 4),
+                                 2, border_radius=3)
 
-            # Thin colored border around each panel
-            pygame.draw.rect(screen, REIP_COLOR,
-                             (left_x - 2, panels_y - 2, panel_w + 4, panel_h + 4), 2,
-                             border_radius=3)
-            pygame.draw.rect(screen, RAFT_COLOR,
-                             (right_x - 2, panels_y - 2, panel_w + 4, panel_h + 4), 2,
-                             border_radius=3)
-
-            # Clean per-panel HUD overlays
-            _draw_panel_hud(screen, left_x, panels_y, panel_w, panel_h,
-                            reip_sim, "REIP", REIP_COLOR, fonts, is_reip=True)
-            _draw_panel_hud(screen, right_x, panels_y, panel_w, panel_h,
-                            raft_sim, "RAFT", RAFT_COLOR, fonts, is_reip=False)
+                # HUD overlay
+                draw_hud(screen, px, panels_y, panel_w, panel_h,
+                         r, lbl, clr, fonts, is_reip=(i == 0))
 
             # Coverage plot
             ft = tuple(fe["time"] for fe in fault_schedule)
-            _draw_coverage_plot(screen, plot_rect, panels, labels, colors,
-                                elapsed, max_time, fonts, fault_times=ft)
+            draw_coverage_plot(screen, plot_rect, runners, runner_labels,
+                               runner_colors, elapsed, max_time, fonts,
+                               cov_histories, ft)
 
             # Restart hint
-            if elapsed > 50:
+            # Log coverage every 5s for debugging
+            if int(elapsed) % 5 == 0 and int(elapsed) != last_cov_print and int(elapsed) > 0:
+                last_cov_print = int(elapsed)
+                c0 = runners[0].get_coverage()
+                c1 = runners[1].get_coverage()
+                print(f"  t={elapsed:.0f}s  REIP={c0:.1f}%  RAFT={c1:.1f}%  gap={c0-c1:+.1f}%")
+
+            if elapsed > 30:
                 hint = fonts['body'].render(
                     "Press R to restart", True, (120, 120, 130))
                 screen.blit(hint, (total_w // 2 - hint.get_width() // 2,
                                     total_h - 20))
 
             pygame.display.flip()
-            clock.tick(sim_rate)
+            clock.tick(SIM_RATE)
 
     finally:
         print("\nStopping robot processes...")
-        for p in panels:
-            p.stop_robot_processes()
-            p.close_sockets()
+        for r in runners:
+            r.stop_robots()
+            try:
+                r.state_socket.close()
+                r.motor_socket.close()
+            except Exception:
+                pass
         pygame.quit()
         print("Done.")
 

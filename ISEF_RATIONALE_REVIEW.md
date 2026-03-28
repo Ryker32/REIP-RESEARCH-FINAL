@@ -1,6 +1,6 @@
 # ISEF Rationale Review
 
-## Overall Assessment: **Excellent** ✅
+## Overall Assessment: **Excellent** [x]
 
 Your rationale is well-structured, clear, and compelling. It effectively:
 - Establishes real-world relevance (avalanche search-and-rescue)
@@ -28,11 +28,11 @@ Your rationale is approximately 250 words, which is appropriate for ISEF (typica
 
 ## What's Great
 
-✅ **Strong opening** - Real-world problem with clear stakes (survival probability decreases with time)
-✅ **Good problem setup** - Multi-robot advantages → leader-follower benefits → vulnerability identified
-✅ **Clear research question** - "whether a low cost robot team is able to detect..."
-✅ **Solution description** - REIP explained clearly without excessive technical detail
-✅ **Future applications** - Nice connection to real-world deployment
+[x] **Strong opening** - Real-world problem with clear stakes (survival probability decreases with time)
+[x] **Good problem setup** - Multi-robot advantages -> leader-follower benefits -> vulnerability identified
+[x] **Clear research question** - "whether a low cost robot team is able to detect..."
+[x] **Solution description** - REIP explained clearly without excessive technical detail
+[x] **Future applications** - Nice connection to real-world deployment
 
 ## Final Version (with minor edits)
 
@@ -47,8 +47,8 @@ To address this problem, I developed the Resilient Election and Impeachment Poli
 ---
 
 **Changes made:**
-1. "compromising attack" → "compromise attack"
-2. "informatics structure" → "information structure"
+1. "compromising attack" -> "compromise attack"
+2. "informatics structure" -> "information structure"
 3. Added semicolon in Raft sentence for better flow
 
 **Word count:** ~250 words (perfect for ISEF)

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-✅ **Code is ready** - All recent bug fixes are in place:
+[x] **Code is ready** - All recent bug fixes are in place:
 - ToF sensor error handling (returns 9999)
 - UART error counting and warnings
 - Position timeout handling (2.0s threshold)
@@ -105,11 +105,11 @@ Every 2 seconds, you should see:
 ```
 
 **Key things to check:**
-- ✅ Position updates (x, y values changing)
-- ✅ Motors engaging (mot values non-zero after start)
-- ✅ Coverage increasing (cov percentage)
-- ✅ Target assigned (tgt not None)
-- ✅ No crashes or errors
+- [x] Position updates (x, y values changing)
+- [x] Motors engaging (mot values non-zero after start)
+- [x] Coverage increasing (cov percentage)
+- [x] Target assigned (tgt not None)
+- [x] No crashes or errors
 
 ## Troubleshooting
 

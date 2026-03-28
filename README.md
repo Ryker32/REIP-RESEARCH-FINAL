@@ -2,7 +2,7 @@
 
 A research project implementing and evaluating **REIP** (Trust-based Election/Impeachment Protocol) for resilient multi-agent exploration under adversarial conditions.
 
-## 🔬 Research Overview
+##  Research Overview
 
 This project compares REIP against traditional fixed-leader systems in multi-agent exploration scenarios with:
 - **Communication faults** (packet loss, corruption, limited range)
@@ -11,10 +11,10 @@ This project compares REIP against traditional fixed-leader systems in multi-age
 
 **Key Finding**: REIP demonstrates **8.1% better coverage** under extreme adversarial conditions (8% hallucination rate, 20% command loss).
 
-## 📁 Repository Structure
+##  Repository Structure
 
 ```
-├── docs/                          # 📚 Research Documentation
+├── docs/                          #  Research Documentation
 │   ├── BENCHMARK_SUMMARY.md       # Statistical analysis results
 │   ├── IMPLEMENTATION_COMPLETE.md # Complete feature list
 │   ├── CITATIONS.md               # Academic references
@@ -24,32 +24,32 @@ This project compares REIP against traditional fixed-leader systems in multi-age
 │   ├── T1000_BENCHMARK.md         # Large-scale experiments
 │   ├── DEBUGGING_ROOT_CAUSE.md    # Technical debugging notes
 │   └── references.bib             # Bibliography
-├── src/                           # 🔧 Core Implementation
+├── src/                           #  Core Implementation
 │   ├── main.py                    # Main simulation entry point
 │   ├── agents/                    # Agent implementations
 │   ├── policy/                    # REIP and baseline policies
 │   ├── comms/                     # Communication/fault models
 │   ├── env/                       # Grid environment
 │   └── utils/                     # Utility functions
-├── configs/                       # ⚙️ Experiment Configurations
+├── configs/                       #  Experiment Configurations
 │   ├── reip_*.yaml               # REIP system configs
 │   └── baseline_*.yaml           # Baseline system configs
-├── scripts/                       # 📊 Analysis Scripts
+├── scripts/                       #  Analysis Scripts
 │   ├── compare_reip_vs_baseline.py
 │   ├── collect_metrics.py
 │   └── plot_metrics.py
-├── results/                       # 📈 Experimental Results
+├── results/                       #  Experimental Results
 │   ├── benchmark_results_*.csv    # Raw benchmark data
 │   ├── optimal_benchmark_*.csv    # Optimized runs
 │   └── *.png                     # Visualization plots
-├── archive/                       # 📦 Legacy/Development Files
+├── archive/                       #  Legacy/Development Files
 │   ├── run_benchmark_*.py        # Old benchmark scripts
 │   └── validate_*.py             # Validation utilities
-├── runs/                         # 🏃 Simulation Output
-└── tools/                        # 🛠️ Development Tools
+├── runs/                         #  Simulation Output
+└── tools/                        #  Development Tools
 ```
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Running Core Simulations
 ```bash
@@ -74,17 +74,17 @@ python scripts/collect_metrics.py
 python scripts/plot_metrics.py
 ```
 
-## 📊 Key Results
+##  Key Results
 
 | Metric | Baseline | REIP | Improvement |
 |--------|----------|------|-------------|
-| **Coverage** | 17.9% ± 2.1% | **19.4% ± 3.3%** | **+8.1%** |
+| **Coverage** | 17.9% +/- 2.1% | **19.4% +/- 3.3%** | **+8.1%** |
 | **Success Rate** | 40% | **60%** | **+50%** |
-| **Elections** | 0 | 28.9 ± 0.7 | Adaptive |
+| **Elections** | 0 | 28.9 +/- 0.7 | Adaptive |
 
 *Under extreme adversarial conditions: 8% hallucination, 20% command loss*
 
-## 🔗 Academic Context
+##  Academic Context
 
 ### Core Technologies
 - **Trust-based Governance**: Dynamic leader election/impeachment
@@ -99,7 +99,7 @@ python scripts/plot_metrics.py
 - Amodei et al. (AI safety/hallucinations)
 - Simmons et al. (centralized coordination)
 
-## 📈 Research Impact
+##  Research Impact
 
 This work addresses critical challenges in:
 - **Autonomous vehicle coordination** under GPS jamming
@@ -107,14 +107,14 @@ This work addresses critical challenges in:
 - **Robot team resilience** against adversarial attacks
 - **Multi-agent AI safety** for real-world deployment
 
-## 🔬 Experimental Validation
+##  Experimental Validation
 
 - **Statistical rigor**: 10+ trials per configuration
 - **Realistic faults**: Based on empirical network studies
 - **Comparative methodology**: Direct baseline comparison
 - **Reproducible results**: Documented configurations and seeds
 
-## 🎯 Future Directions
+##  Future Directions
 
 See `docs/FUTURE_EXPERIMENTS.md` for detailed research roadmap including:
 - Heterogeneous agent capabilities
@@ -124,9 +124,9 @@ See `docs/FUTURE_EXPERIMENTS.md` for detailed research roadmap including:
 
 ---
 
-**Status**: Implementation Complete ✅ | Statistical Validation Complete ✅ | Ready for Publication 📄
+**Status**: Implementation Complete [x] | Statistical Validation Complete [x] | Ready for Publication 
  
-## 🧭 Initialization-with-Command and Spawn Configuration
+##  Initialization-with-Command and Spawn Configuration
 
 To prevent early stagnation when commands are lost, the REIP controller seeds every agent with an initial goal at t=0 and uses a persistent hold mechanism:
 
@@ -177,7 +177,7 @@ python tests\test_init_with_command.py
 
 See also docs/CONFIG_SPAWN_AND_COMMANDS.md for more examples.
 
-## 🧭 Connectivity-aware assignment and regional diversity
+##  Connectivity-aware assignment and regional diversity
 
 To maintain a relay backbone and reduce clustering, the frontier assignment can:
 
@@ -203,7 +203,7 @@ reip:
 
 Tip: Align `command_radius` with your communication radius for consistent behavior when using connectivity bonuses.
 
-## 🧲 Motion-level deconfliction knobs
+##  Motion-level deconfliction knobs
 
 The environment applies soft deconfliction to reduce criss-crossing and oscillations:
 
@@ -224,7 +224,7 @@ These are soft costs layered on top of A*'s move cost; they reduce path crossing
 
 ## How to cite
 
-If you use this repository in academic work, please cite it and the foundational methods. A `CITATION.cff` file is included for GitHub’s citation widget.
+If you use this repository in academic work, please cite it and the foundational methods. A `CITATION.cff` file is included for GitHub's citation widget.
 
 Example (APA):
 

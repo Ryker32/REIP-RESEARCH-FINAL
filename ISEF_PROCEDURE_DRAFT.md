@@ -10,11 +10,11 @@ I assembled five differential-drive robots, each consisting of:
 - 2S 1000 mAh LiPo battery
 - 3D-printed PLA chassis (under 300g per robot)
 
-Each robot is color-coded and carries an ArUco identification tag (IDs 1-5, 4×4 library, 50mm). Robots communicate via WiFi peer-to-peer and are named clanker1-5.
+Each robot is color-coded and carries an ArUco identification tag (IDs 1-5, 4*4 library, 50mm). Robots communicate via WiFi peer-to-peer and are named clanker1-5.
 
 ## Experimental Arena
 
-A 2000 × 1500 mm arena was constructed from 38 mm EPS foamboard, covered with masking tape to reduce ToF sensor reflections. A central divider (1000 mm from left edge, 1300 mm tall) creates a two-room layout. Four ArUco corner markers (IDs 40-43, 80mm) enable camera-based localization.
+A 2000 * 1500 mm arena was constructed from 38 mm EPS foamboard, covered with masking tape to reduce ToF sensor reflections. A central divider (1000 mm from left edge, 1300 mm tall) creates a two-room layout. Four ArUco corner markers (IDs 40-43, 80mm) enable camera-based localization.
 
 ## Data Collection
 

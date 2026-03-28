@@ -303,6 +303,7 @@ class VisualSimulation:
         # Per-robot velocity state for differential drive integration
         self._motor_vel: Dict[int, List[float]] = {}  # rid -> [left_mm_s, right_mm_s]
         self._last_tick_time = time.time()
+        self.speed_multiplier = 1.0  # Caller can set this to >1 for faster playback
 
         # Coverage tracking
         self.visited_cells: Set[tuple] = set()
@@ -776,6 +777,7 @@ class VisualSimulation:
         now = time.time()
         dt = now - self._last_tick_time
         dt = min(dt, 0.15)  # Cap to prevent huge jumps
+        dt *= self.speed_multiplier  # Allow caller to speed up playback
         self._last_tick_time = now
 
         # Simplified hardware_clone constants (from isef_experiments.py)

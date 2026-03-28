@@ -58,10 +58,11 @@ HARDWARE_STARTS = {
 
 # ====================== Demo window constants ======================
 HEADER_H = 48
-PLOT_H = 170
-GAP = 12
-MARGIN = 12
+PLOT_H = 140
+GAP = 10
+MARGIN = 10
 NUM_ROBOTS = 5
+SPEED_MULTIPLIER = 2.5   # 2.5x real-time so judges don't wait forever
 REIP_COLOR = (0, 52, 204)
 RAFT_COLOR = (227, 30, 52)
 
@@ -330,20 +331,33 @@ def main():
     labels = ["REIP", "RAFT"]
     colors = [REIP_COLOR, RAFT_COLOR]
 
+    # Speed up playback so judges don't wait 2 minutes
+    for p in panels:
+        p.speed_multiplier = SPEED_MULTIPLIER
+
     # Coverage history (separate from VisualSimulation's internal state)
     for p in panels:
         p._cov_history = []
 
-    # ---- Pygame window ----
-    # Each panel renders to VS_W x VS_H.  Scale to fit side-by-side.
-    panel_w = (1920 - 2 * MARGIN - GAP) // 2
-    panel_h_max = 750
-    # Maintain aspect ratio
+    # ---- Pygame window (auto-fit to screen) ----
+    # Detect screen resolution so it fits on small laptops (e.g. 14" OmniBook)
+    disp_info = pygame.display.Info()
+    screen_w = disp_info.current_w
+    screen_h = disp_info.current_h
+    # Leave room for taskbar / title bar
+    usable_w = int(screen_w * 0.95)
+    usable_h = int(screen_h * 0.88)
+
+    # Each panel renders to VS_W x VS_H internally. Scale to fit side-by-side.
     aspect = VS_W / VS_H
-    panel_h = min(panel_h_max, int(panel_w / aspect))
+    max_panel_w = (usable_w - 2 * MARGIN - GAP) // 2
+    max_panel_h = usable_h - HEADER_H - MARGIN - PLOT_H - MARGIN
+    # Maintain aspect ratio -- constrained by width or height
+    panel_h = min(max_panel_h, int(max_panel_w / aspect))
     panel_w = int(panel_h * aspect)
     total_w = 2 * panel_w + GAP + 2 * MARGIN
     total_h = HEADER_H + panel_h + MARGIN + PLOT_H + MARGIN
+    print(f"  Window: {total_w}x{total_h}  (screen {screen_w}x{screen_h})")
     screen = pygame.display.set_mode((total_w, total_h))
     pygame.display.set_caption("REIP vs Raft - Live Comparison")
     clock = pygame.time.Clock()
@@ -513,7 +527,7 @@ def main():
                                 elapsed, max_time, fonts)
 
             # Restart hint
-            if elapsed > 45:
+            if elapsed > 35:
                 hint = fonts['body'].render(
                     "Press R to restart", True, (120, 120, 130))
                 screen.blit(hint, (total_w // 2 - hint.get_width() // 2,
